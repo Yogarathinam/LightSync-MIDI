@@ -37,7 +37,8 @@ LightSync MIDI is a customizable MIDI light controller application for WS2812B L
    - Upload `LightSync_MIDI_ESP32.ino` to ESP32 using Arduino IDE.
 
 6. **Project Details:**
-   - Screenshot of the LightSync MIDI application. ![Application Screenshot](media/application.PNG): 
+   - Screenshot of the LightSync MIDI application.
+   - ![Application Screenshot](media/application.PNG): 
    - ![Color Selector Screenshot](media/colorselector.PNG): Color selector GUI screenshot.
    - ![Live Control Video Demo](media/livecontrolvideodemo.mp4): Video demo of live MIDI control.
    - ![Blue LED Glow Image](media/poweronblueledglow.jpg): Image of blue LED glow on startup.
