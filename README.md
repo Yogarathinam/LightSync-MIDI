@@ -38,13 +38,27 @@ LightSync MIDI is a customizable MIDI light controller application for WS2812B L
 
 6. **Project Details:**
    - Screenshot of the LightSync MIDI application.
-   - ![Application Screenshot](media/application.PNG): 
-   - ![Color Selector Screenshot](media/colorselector.PNG): Color selector GUI screenshot.
-   - ![Live Control Video Demo](media/livecontrolvideodemo.mp4): Video demo of live MIDI control.
-   - ![Blue LED Glow Image](media/poweronblueledglow.jpg): Image of blue LED glow on startup.
-   - ![Keyboard Mapping Image](media/rightmappingkeyboardimage.jpg): Image of correct LED mapping for keyboard.
-   - ![Music Demo Video](media/samplevideoplayingmusicdemo.mp4): Video demo of MIDI keyboard playing music.
-   - ![Wrong Mapping Image](media/wrongmappingkeyboardimage.jpg): Image of incorrect LED mapping for keyboard.
+   - ![Application Screenshot](media/application.PNG):
+   - 
+   -  Color selector GUI screenshot:
+   - ![Color Selector Screenshot](media/colorselector.PNG):
+  
+   - Video demo of MIDI keyboard playing music:
+   - ![Music Demo Video](media/samplevideoplayingmusicdemo.mp4):
+   - 
+   - Video demo of live MIDI control:
+   - ![Live Control Video Demo](media/livecontrolvideodemo.mp4):
+   - 
+   - Image of blue LED glow on startup:
+   - ![Blue LED Glow Image](media/poweronblueledglow.jpg):
+   - 
+   -  Image of correct LED mapping for keyboard:
+   - ![Keyboard Mapping Image](media/rightmappingkeyboardimage.jpg):
+   
+   -  Image of incorrect LED mapping for keyboard:
+   - ![Wrong Mapping Image](media/wrongmappingkeyboardimage.jpg):
+  
+   - 
 
 7. **Contributing:**
    - Fork the repository and create a pull request for new features or bug fixes.
