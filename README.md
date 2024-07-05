@@ -13,8 +13,8 @@ LightSync MIDI is a customizable MIDI light controller application for WS2812B L
 ## Setup and Usage
 
 1. **Hardware Requirements:**
-   - WS2812B LED strip (144 LEDs/m recommended)
-   - ESP32 microcontroller
+   - WS2812B LED strip (144 LEDs/m recommended) OR Any other Compatible ARGB LED Strip for Fastled library.
+   - ESP32/Arduino Microcontrollers 
    - MIDI keyboard
 
 2. **Software Requirements:**
@@ -22,18 +22,22 @@ LightSync MIDI is a customizable MIDI light controller application for WS2812B L
    - Arduino IDE for ESP32 firmware
 
 3. **Wiring:**
-   - Refer to ![Wiring Diagram](media/esp32wiringdiagram.jpg) for wiring diagram.
-
+   - Refer to the below image for wiring diagram
+   - For ESP32 Data Pin is PIN13
+   - For Arduino Data Pin is PIN6
+   -  ![Wiring Diagram](media/esp32wiringdiagram.jpg)
+  
+     
 4. **Installation:**
    - Clone the repository.
-   - Install necessary Python dependencies (`pip install -r requirements.txt`).
+   - Watch Tutorial on Installation and Setup.
 
 5. **Running the Application:**
    - Run `LightSync-MIDI.py` for the Python GUI.
    - Upload `LightSync_MIDI_ESP32.ino` to ESP32 using Arduino IDE.
 
-6. **Media Files:**
-   - ![Application Screenshot](media/application.PNG): Screenshot of the LightSync MIDI application.
+6. **Project Details:**
+   - Screenshot of the LightSync MIDI application. ![Application Screenshot](media/application.PNG): 
    - ![Color Selector Screenshot](media/colorselector.PNG): Color selector GUI screenshot.
    - ![Live Control Video Demo](media/livecontrolvideodemo.mp4): Video demo of live MIDI control.
    - ![Blue LED Glow Image](media/poweronblueledglow.jpg): Image of blue LED glow on startup.
