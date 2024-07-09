@@ -44,7 +44,7 @@ LightSync MIDI is a customizable MIDI light controller application for WS2812B L
    - ![Color Selector Screenshot](media/colorselector.PNG):
   
    - Video demo of MIDI keyboard playing music:
-   - ![Music Demo Video](https://drive.google.com/file/d/1_V3cptpd3Wpp9s43U3nNAnm5pTAUmZtn/view?usp=drive_link):
+   - [Music Demo Video](https://drive.google.com/file/d/1_V3cptpd3Wpp9s43U3nNAnm5pTAUmZtn/view?usp=drive_link):
    - 
    - Video demo of live MIDI control:
    - ![Live Control Video Demo](media/livecontrolvideodemo.mp4):
