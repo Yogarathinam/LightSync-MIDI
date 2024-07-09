@@ -47,7 +47,7 @@ LightSync MIDI is a customizable MIDI light controller application for WS2812B L
    - [Music Demo Video](https://drive.google.com/file/d/1_V3cptpd3Wpp9s43U3nNAnm5pTAUmZtn/view?usp=drive_link):
    - 
    - Video demo of live MIDI control:
-   - ![Live Control Video Demo](media/livecontrolvideodemo.mp4):
+   - [Live Control Video Demo]([media/livecontrolvideodemo.mp4](https://drive.google.com/file/d/15NqTEcp7ht09yN46TLPa2harzB-JZiVa/view?usp=sharing)):
    - 
    - Image of blue LED glow on startup:
    - ![Blue LED Glow Image](media/poweronblueledglow.jpg):
