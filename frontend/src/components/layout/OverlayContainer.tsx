@@ -38,22 +38,25 @@ export const OverlayContainer: React.FC = () => {
     if (activeOverlay) {
       setRenderedOverlay(activeOverlay);
       setIsClosing(false);
-    } else if (renderedOverlay && !isClosing) {
+    } else if (renderedOverlay) {
       setIsClosing(true);
-      const timer = setTimeout(() => {
+      const timer = window.setTimeout(() => {
         setRenderedOverlay(null);
         setIsClosing(false);
-      }, 140);
-      return () => clearTimeout(timer);
+        // Ensure keyboard focus returns to window
+        if (document.activeElement instanceof HTMLElement) {
+          document.activeElement.blur();
+        }
+        window.focus();
+      }, 150);
+      return () => window.clearTimeout(timer);
     }
-  }, [activeOverlay, renderedOverlay, isClosing]);
+  }, [activeOverlay, renderedOverlay]);
 
-  // Request close with smooth exit animation
+  // Request close
   const handleRequestClose = useCallback(() => {
-    if (isClosing) return;
-    setIsClosing(true);
     closeOverlay();
-  }, [isClosing, closeOverlay]);
+  }, [closeOverlay]);
 
   // Close on Escape key
   useEffect(() => {

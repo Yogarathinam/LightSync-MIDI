@@ -43,8 +43,56 @@ interface FlowTrail {
   secondaryColor: { r: number; g: number; b: number };
 }
 
+interface RunwayParticle {
+  active: boolean;
+  type: 'spark' | 'burst';
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  size: number;
+  color: { r: number; g: number; b: number };
+  life: number;
+  maxLife: number;
+}
+
+interface ShockwaveRipple {
+  active: boolean;
+  x: number;
+  y: number;
+  radius: number;
+  maxRadius: number;
+  speed: number;
+  life: number;
+  color: { r: number; g: number; b: number };
+}
+
+interface LensFlare {
+  active: boolean;
+  x: number;
+  y: number;
+  width: number;
+  life: number;
+  color: { r: number; g: number; b: number };
+}
+
+interface AmbientParticle {
+  x: number;
+  y: number;
+  size: number;
+  speedY: number;
+  driftPhase: number;
+  driftSpeed: number;
+  alpha: number;
+  color: { r: number; g: number; b: number };
+}
+
 const MAX_PARTICLES = 64;
 const MAX_FALLING_NOTES = 128;
+const MAX_RUNWAY_PARTICLES = 128;
+const MAX_RIPPLES = 16;
+const MAX_LENS_FLARES = 6;
+const AMBIENT_PARTICLES_COUNT = 36;
 
 const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 const SOLFEGE = ["Do", "Di", "Re", "Ri", "Mi", "Fa", "Fi", "Sol", "Si", "La", "Li", "Ti"];
@@ -167,6 +215,59 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
   // Moving perspective grid offset
   const bgScrollOffsetRef = useRef<number>(0);
 
+  // 2D Runway Visual Effects Pools
+  const runwayParticlesRef = useRef<RunwayParticle[]>(
+    Array.from({ length: MAX_RUNWAY_PARTICLES }, () => ({
+      active: false,
+      type: 'spark',
+      x: 0,
+      y: 0,
+      vx: 0,
+      vy: 0,
+      size: 2,
+      color: { r: 99, g: 102, b: 241 },
+      life: 0,
+      maxLife: 1
+    }))
+  );
+
+  const shockwaveRipplesRef = useRef<ShockwaveRipple[]>(
+    Array.from({ length: MAX_RIPPLES }, () => ({
+      active: false,
+      x: 0,
+      y: 0,
+      radius: 0,
+      maxRadius: 60,
+      speed: 120,
+      life: 0,
+      color: { r: 99, g: 102, b: 241 }
+    }))
+  );
+
+  const lensFlaresRef = useRef<LensFlare[]>(
+    Array.from({ length: MAX_LENS_FLARES }, () => ({
+      active: false,
+      x: 0,
+      y: 0,
+      width: 0,
+      life: 0,
+      color: { r: 255, g: 255, b: 255 }
+    }))
+  );
+
+  const ambientParticlesRef = useRef<AmbientParticle[]>(
+    Array.from({ length: AMBIENT_PARTICLES_COUNT }, () => ({
+      x: Math.random(),
+      y: Math.random(),
+      size: 1.0 + Math.random() * 2.2,
+      speedY: 0.12 + Math.random() * 0.3,
+      driftPhase: Math.random() * Math.PI * 2,
+      driftSpeed: 0.4 + Math.random() * 1.2,
+      alpha: 0.15 + Math.random() * 0.45,
+      color: Math.random() > 0.5 ? { r: 165, g: 180, b: 252 } : { r: 192, g: 132, b: 252 }
+    }))
+  );
+
   // Pointer drag interaction
   const isPointerDownRef = useRef(false);
   const activePointerKeyRef = useRef<number | null>(null);
@@ -237,6 +338,58 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
         break;
     }
   }, [effectConfig, ledCount]);
+
+  // Helper to spawn 2D sparks and bursts at note impact / press
+  const spawnRunwayBursts = useCallback((x: number, y: number, color: { r: number; g: number; b: number }, count = 12, isBurst = false) => {
+    const pool = runwayParticlesRef.current;
+    let spawned = 0;
+    for (let i = 0; i < pool.length && spawned < count; i++) {
+      const p = pool[i];
+      if (!p.active) {
+        p.active = true;
+        p.type = isBurst ? (Math.random() < 0.4 ? 'burst' : 'spark') : 'spark';
+        p.x = x + (Math.random() - 0.5) * 8;
+        p.y = y + (Math.random() - 0.5) * 4;
+        const angle = -Math.PI / 2 + (Math.random() - 0.5) * (isBurst ? Math.PI * 1.2 : Math.PI * 0.7);
+        const speed = isBurst ? (80 + Math.random() * 160) : (50 + Math.random() * 120);
+        p.vx = Math.cos(angle) * speed;
+        p.vy = Math.sin(angle) * speed;
+        p.size = isBurst ? (2.0 + Math.random() * 2.5) : (1.2 + Math.random() * 2.0);
+        p.color = color;
+        p.life = 1.0;
+        p.maxLife = 0.4 + Math.random() * 0.4;
+        spawned++;
+      }
+    }
+  }, []);
+
+  // Helper to spawn a shockwave ripple at key press location
+  const spawnShockwaveRipple = useCallback((x: number, y: number, color: { r: number; g: number; b: number }, maxRadius = 70) => {
+    const pool = shockwaveRipplesRef.current;
+    const r = pool.find(item => !item.active);
+    if (!r) return;
+    r.active = true;
+    r.x = x;
+    r.y = y;
+    r.radius = 2;
+    r.maxRadius = maxRadius;
+    r.speed = 140;
+    r.life = 1.0;
+    r.color = color;
+  }, []);
+
+  // Helper to spawn an anamorphic lens flare on chords or intense notes
+  const spawnLensFlare = useCallback((x: number, y: number, color: { r: number; g: number; b: number }, width = 340) => {
+    const pool = lensFlaresRef.current;
+    const f = pool.find(item => !item.active);
+    if (!f) return;
+    f.active = true;
+    f.x = x;
+    f.y = y;
+    f.width = width;
+    f.life = 1.0;
+    f.color = color;
+  }, []);
 
   // Keyboard layout metadata
   const keys = useMemo(() => {
@@ -317,7 +470,7 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
   const onFpsUpdateRef = useRef(onFpsUpdate);
   onFpsUpdateRef.current = onFpsUpdate;
 
-  // Listen for newly pressed keys to trigger LED strip effects
+  // Listen for newly pressed keys to trigger LED strip effects & 2D Runway VFX
   const prevPitchesRef = useRef<Set<number>>(new Set());
   useEffect(() => {
     const currentPitches = new Set(activeNotes.keys());
@@ -327,6 +480,7 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
       if (!prevPitches.has(pitch)) {
         const noteData = activeNotes.get(pitch);
         const centerLed = noteData ? noteData.centerLed : 72;
+        const velocity = noteData ? noteData.velocity : 100;
         const cols = getNoteColors(pitch, effectConfig, flowKeyConfig);
 
         // Spawn LED strip burst
@@ -339,10 +493,28 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
         } else {
           spawnParticle(effectConfig.effect, centerLed, cols.primary);
         }
+
+        // Spawn 2D Runway VFX (sparks, note bursts, ripples, lens flares)
+        if (canvasRef.current) {
+          const canvas = canvasRef.current;
+          const curH = keyboardHeightRef.current;
+          const keyAreaHeight = Math.max(100, Math.min(curH, Math.floor(canvas.height * 0.52)));
+          const keyAreaTop = canvas.height - keyAreaHeight - 1;
+          const ledBarTop = keyAreaTop - 25;
+          const geom = getKeyGeometry(pitch, canvas.width, keyAreaTop, keyAreaHeight);
+          if (geom) {
+            const keyCenterX = geom.x + geom.width / 2;
+            spawnRunwayBursts(keyCenterX, ledBarTop, cols.primary, 14, velocity > 85);
+            spawnShockwaveRipple(keyCenterX, ledBarTop, cols.primary, geom.width * 2.8 + 45);
+            if (velocity >= 90 || currentPitches.size >= 3) {
+              spawnLensFlare(keyCenterX, ledBarTop, cols.primary, Math.max(280, canvas.width * 0.45));
+            }
+          }
+        }
       }
     }
     prevPitchesRef.current = currentPitches;
-  }, [activeNotes, effectConfig, flowKeyConfig, spawnParticle]);
+  }, [activeNotes, effectConfig, flowKeyConfig, spawnParticle, getKeyGeometry, spawnRunwayBursts, spawnShockwaveRipple, spawnLensFlare]);
 
   // Main Rock-Solid 60/120 FPS Render Loop (Zero teardown on keypress or resize)
   useEffect(() => {
@@ -428,7 +600,39 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
       ctx.fillStyle = isDark ? '#050608' : '#0f172a';
       ctx.fillRect(0, 0, width, height);
 
-      // B. Key Region Zebra Columns (Tinting for black vs white keys)
+      // B. Volumetric Atmospheric Haze & Reactive Musical Atmosphere
+      const reactiveEnergy = Math.min(1.0, curActiveNotes.size * 0.22);
+      const beatPulse = Math.pow(Math.sin((now * 0.002) * Math.PI), 6);
+      const totalPulse = Math.max(beatPulse * 0.35, reactiveEnergy);
+
+      const hazeGrad = ctx.createLinearGradient(0, ledBarTop, 0, waterfallTop);
+      const hazeAlpha = (isDark ? 0.12 : 0.06) + totalPulse * 0.14;
+      hazeGrad.addColorStop(0, `rgba(99, 102, 241, ${hazeAlpha})`);
+      hazeGrad.addColorStop(0.5, `rgba(168, 85, 247, ${hazeAlpha * 0.45})`);
+      hazeGrad.addColorStop(1, 'transparent');
+      ctx.fillStyle = hazeGrad;
+      ctx.fillRect(16, waterfallTop, width - 32, waterfallHeight);
+
+      // C. Particle Field: Ambient Stardust Floating through Background Runway
+      const ambParts = ambientParticlesRef.current;
+      for (let i = 0; i < ambParts.length; i++) {
+        const ap = ambParts[i];
+        ap.driftPhase += dt * ap.driftSpeed;
+        ap.y -= ap.speedY * dt * 0.06;
+        if (ap.y < 0) ap.y += 1.0;
+
+        const apx = 16 + ap.x * (width - 32) + Math.sin(ap.driftPhase) * 6;
+        const apy = waterfallTop + ap.y * waterfallHeight;
+        const twinkle = 0.5 + 0.5 * Math.sin(ap.driftPhase * 2.5);
+        const curAlpha = ap.alpha * twinkle * (isDark ? 0.55 : 0.35);
+
+        ctx.fillStyle = `rgba(${ap.color.r}, ${ap.color.g}, ${ap.color.b}, ${curAlpha})`;
+        ctx.beginPath();
+        ctx.arc(apx, apy, ap.size, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // D. Key Region Zebra Columns (Tinting for black vs white keys & reactive pitch columns)
       if (curBg.showKeyRegions) {
         curKeys.forEach((key) => {
           const geom = getKeyGeometry(key.midi, width, keyAreaTop, keyAreaHeight);
@@ -438,15 +642,22 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
             // Darker obsidian column for black keys giving visual depth
             ctx.fillStyle = isDark ? 'rgba(0, 0, 0, 0.55)' : 'rgba(15, 23, 42, 0.7)';
             ctx.fillRect(geom.x, waterfallTop, geom.width, waterfallHeight);
-          } else if (curActiveNotes.has(key.midi)) {
-            // Subtle active lane illumination
-            ctx.fillStyle = isDark ? 'rgba(99, 102, 241, 0.08)' : 'rgba(99, 102, 241, 0.15)';
+          }
+
+          if (curActiveNotes.has(key.midi)) {
+            // Reactive Background: active pitch column glowing upward
+            const cols = getNoteColors(key.midi, curEff, curFlow);
+            const beamGrad = ctx.createLinearGradient(0, ledBarTop, 0, waterfallTop);
+            beamGrad.addColorStop(0, `rgba(${cols.primary.r}, ${cols.primary.g}, ${cols.primary.b}, 0.22)`);
+            beamGrad.addColorStop(0.6, `rgba(${cols.primary.r}, ${cols.primary.g}, ${cols.primary.b}, 0.07)`);
+            beamGrad.addColorStop(1, 'transparent');
+            ctx.fillStyle = beamGrad;
             ctx.fillRect(geom.x, waterfallTop, geom.width, waterfallHeight);
           }
         });
       }
 
-      // C. Vertical Pitch Lanes matching piano keys
+      // E. Vertical Pitch Lanes matching piano keys
       if (curBg.showVerticalPitchLanes) {
         ctx.lineWidth = 1;
         curKeys.forEach((key) => {
@@ -462,29 +673,32 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
         });
       }
 
-      // D. Horizontal Time & Measure Divisions (Moving AWAY from the keyboard towards the horizon)
+      // F. Horizontal Time & Measure Divisions (Moving UPWARDS away from the keyboard smoothly)
       if (curBg.showHorizontalBeatLines) {
         const beatSpacing = 44;
         // Continuous upward travel distance: increases over time (moves away from keyboard)
         const scrollDistance = curBg.scrollGrid ? (now * 0.001 * 50 * curFlow.flowSpeed) : 0;
-        const phase = scrollDistance % beatSpacing;
 
         ctx.save();
         ctx.beginPath();
         ctx.rect(16, waterfallTop, width - 32, waterfallHeight);
         ctx.clip(); // Keep grid strictly contained inside the runway
 
-        // Step upwards from ledBarTop towards waterfallTop:
-        for (let y = ledBarTop + beatSpacing - phase; y >= waterfallTop - beatSpacing; y -= beatSpacing) {
-          const indexFromBottom = Math.round((ledBarTop - y) / beatSpacing);
-          const isMeasureBar = (indexFromBottom + Math.floor(scrollDistance / beatSpacing)) % 4 === 0;
+        const kMin = Math.floor((scrollDistance - waterfallHeight - beatSpacing) / beatSpacing) - 1;
+        const kMax = Math.ceil((scrollDistance + beatSpacing) / beatSpacing) + 1;
+
+        for (let k = kMin; k <= kMax; k++) {
+          const y = ledBarTop - (scrollDistance - k * beatSpacing);
+          if (y < waterfallTop - 2 || y > ledBarTop + 2) continue;
+
+          const isMeasureBar = ((k % 4 + 4) % 4 === 0);
 
           ctx.beginPath();
           ctx.moveTo(16, y);
           ctx.lineTo(width - 16, y);
 
           if (isMeasureBar) {
-            ctx.strokeStyle = isDark ? 'rgba(148, 163, 184, 0.22)' : 'rgba(100, 116, 139, 0.35)';
+            ctx.strokeStyle = isDark ? 'rgba(148, 163, 184, 0.25)' : 'rgba(100, 116, 139, 0.38)';
             ctx.lineWidth = 1.5;
             ctx.stroke();
           } else if (curBg.showSubtleGrid) {
@@ -496,16 +710,18 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
         ctx.restore();
       }
 
-      // E. Stronger Markings around Important Divisions (Octave Boundaries & C-Markers)
+      // G. Stronger Markings around Important Divisions (Octave Boundaries & C-Markers)
       if (curBg.showOctaveDividers) {
         curKeys.forEach((key) => {
           if (key.midi % 12 === 0) { // Every C note (C1, C2, C3, C4, C5, C6...)
             const geom = getKeyGeometry(key.midi, width, keyAreaTop, keyAreaHeight);
             if (!geom) return;
 
-            // Prominent octave divider
-            ctx.strokeStyle = isDark ? 'rgba(99, 102, 241, 0.6)' : 'rgba(129, 140, 248, 0.7)';
-            ctx.lineWidth = 2;
+            const isOctaveActive = Array.from(curActiveNotes.keys()).some(p => Math.floor(p / 12) === Math.floor(key.midi / 12));
+            ctx.strokeStyle = isOctaveActive 
+              ? (isDark ? 'rgba(129, 140, 248, 0.9)' : 'rgba(99, 102, 241, 0.95)')
+              : (isDark ? 'rgba(99, 102, 241, 0.6)' : 'rgba(129, 140, 248, 0.7)');
+            ctx.lineWidth = isOctaveActive ? 2.5 : 2;
             ctx.beginPath();
             ctx.moveTo(geom.x, waterfallTop);
             ctx.lineTo(geom.x, ledBarTop);
@@ -528,9 +744,15 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
         });
       }
 
-      // F. Runway Top Glow Header
+      // H. Beat Pulse Lateral Border & Horizon Glow
+      if (totalPulse > 0.02) {
+        ctx.strokeStyle = `rgba(99, 102, 241, ${0.08 + totalPulse * 0.22})`;
+        ctx.lineWidth = 1 + totalPulse * 1.5;
+        ctx.strokeRect(16, waterfallTop, width - 32, waterfallHeight);
+      }
+
       const headerGrad = ctx.createLinearGradient(0, waterfallTop, 0, waterfallTop + 35);
-      headerGrad.addColorStop(0, isDark ? 'rgba(99, 102, 241, 0.15)' : 'rgba(99, 102, 241, 0.08)');
+      headerGrad.addColorStop(0, isDark ? 'rgba(99, 102, 241, 0.18)' : 'rgba(99, 102, 241, 0.1)');
       headerGrad.addColorStop(1, 'transparent');
       ctx.fillStyle = headerGrad;
       ctx.fillRect(16, waterfallTop, width - 32, 35);
@@ -573,7 +795,7 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
           const bar = bars[i];
           bar.y += bar.speed * dt;
 
-          // Impact at LED strip line
+          // Impact at LED strip line: trigger note and explosive burst effects
           if (!bar.triggered && (bar.y + bar.length) >= ledBarTop) {
             bar.triggered = true;
             triggerNoteOn(bar.pitch, 100);
@@ -582,6 +804,12 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
             const centerLed = Math.floor((keyIdx / (keyboardSize - 1)) * 143);
             for (let s = 0; s < 4; s++) {
               spawnParticle('spark', centerLed, bar.color);
+            }
+            const keyCenterX = bar.x + bar.width / 2;
+            spawnRunwayBursts(keyCenterX, ledBarTop, bar.color, 12, true);
+            spawnShockwaveRipple(keyCenterX, ledBarTop, bar.color, bar.width * 2.5 + 40);
+            if (Math.random() < 0.3) {
+              spawnLensFlare(keyCenterX, ledBarTop, bar.color, 260);
             }
           }
 
@@ -679,6 +907,10 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
             const keyIdx = Math.max(0, Math.min(keyboardSize - 1, t.pitch - startMidi));
             const centerLed = Math.floor((keyIdx / (keyboardSize - 1)) * 143);
             spawnParticle('spark', centerLed, t.color);
+            const geom = getKeyGeometry(t.pitch, width, keyAreaTop, keyAreaHeight);
+            if (geom) {
+              spawnRunwayBursts(geom.x + geom.width / 2, ledBarTop, t.color, 2, false);
+            }
           }
         } else {
           // Released: tail lifts off ledBarTop and floats upward
@@ -708,7 +940,7 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
           const col = t.color;
           const sec = t.secondaryColor;
 
-          // Optical Bloom Aura
+          // Optical Bloom / Glow Aura
           if (curFlow.bloomGlow && curFlow.glowIntensity > 0) {
             const glowAlpha = (curFlow.glowIntensity / 100) * 0.7;
             ctx.shadowColor = `rgba(${col.r}, ${col.g}, ${col.b}, ${glowAlpha})`;
@@ -745,6 +977,20 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
           ctx.lineWidth = 1.2;
           ctx.stroke();
 
+          // Note ribbon transverse ridges: glowing horizontal micro-bars across ribbon
+          if (barHeight > 18) {
+            const ridgeSpacing = 20;
+            const startRidge = Math.ceil(barTop / ridgeSpacing) * ridgeSpacing;
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.22)';
+            ctx.lineWidth = 1.2;
+            ctx.beginPath();
+            for (let ry = startRidge; ry < barBottom - 4; ry += ridgeSpacing) {
+              ctx.moveTo(trailX + 3, ry);
+              ctx.lineTo(trailX + trailWidth - 3, ry);
+            }
+            ctx.stroke();
+          }
+
           // Acrylic glass reflection highlight
           const glassGrad = ctx.createLinearGradient(trailX, 0, trailX + trailWidth, 0);
           glassGrad.addColorStop(0, 'rgba(255, 255, 255, 0.45)');
@@ -759,15 +1005,150 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
           if (t.endTime === null && tailY >= ledBarTop - 2) {
             ctx.fillStyle = '#ffffff';
             ctx.shadowColor = `rgb(${col.r}, ${col.g}, ${col.b})`;
-            ctx.shadowBlur = 10;
+            ctx.shadowBlur = 12;
             ctx.fillRect(trailX - 1, ledBarTop - 2, trailWidth + 2, 3);
             ctx.shadowBlur = 0;
+          }
+
+          // Afterglow / persistence trail: fading phosphor wake left behind moving note
+          if (t.endTime !== null && barBottom < ledBarTop) {
+            const wakeDist = Math.min(45, ledBarTop - barBottom);
+            const wakeGrad = ctx.createLinearGradient(0, barBottom, 0, barBottom + wakeDist);
+            wakeGrad.addColorStop(0, `rgba(${col.r}, ${col.g}, ${col.b}, 0.28)`);
+            wakeGrad.addColorStop(1, 'transparent');
+            ctx.fillStyle = wakeGrad;
+            ctx.fillRect(trailX + 1, barBottom, trailWidth - 2, wakeDist);
           }
         }
       }
 
       // ==========================================
-      // 4. LED BUFFER DECAY & AURA
+      // 4. SHOCKWAVE RIPPLES (CIRCULAR SHOCKWAVES)
+      // ==========================================
+      const ripples = shockwaveRipplesRef.current;
+      for (let i = 0; i < ripples.length; i++) {
+        const r = ripples[i];
+        if (!r.active) continue;
+
+        r.radius += r.speed * dt;
+        r.life = Math.max(0, 1.0 - (r.radius / r.maxRadius));
+
+        if (r.radius >= r.maxRadius || r.life <= 0) {
+          r.active = false;
+          continue;
+        }
+
+        ctx.save();
+        ctx.beginPath();
+        // Elliptical perspective ripple
+        ctx.ellipse(r.x, r.y, r.radius, r.radius * 0.38, 0, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(${r.color.r}, ${r.color.g}, ${r.color.b}, ${r.life * 0.65})`;
+        ctx.lineWidth = Math.max(1, 2.5 * r.life);
+        ctx.shadowColor = `rgb(${r.color.r}, ${r.color.g}, ${r.color.b})`;
+        ctx.shadowBlur = 8 * r.life;
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // ==========================================
+      // 5. RUNWAY VFX PARTICLES (SPARKS & IMPACT BURSTS)
+      // ==========================================
+      const runwayParts = runwayParticlesRef.current;
+      for (let i = 0; i < runwayParts.length; i++) {
+        const p = runwayParts[i];
+        if (!p.active) continue;
+
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        p.vy += 85 * dt; // gentle gravity
+        p.life -= dt / p.maxLife;
+
+        if (p.life <= 0 || p.y < waterfallTop || p.y > height) {
+          p.active = false;
+          continue;
+        }
+
+        const alpha = Math.max(0, Math.min(1, p.life));
+        ctx.save();
+        if (p.type === 'spark') {
+          // Electrical spark: luminous fast-moving streak aligned with velocity
+          const vLen = Math.hypot(p.vx, p.vy) || 1;
+          const streakLen = Math.min(10, vLen * 0.05);
+          const tailX = p.x - (p.vx / vLen) * streakLen;
+          const tailY = p.y - (p.vy / vLen) * streakLen;
+
+          ctx.beginPath();
+          ctx.moveTo(tailX, tailY);
+          ctx.lineTo(p.x, p.y);
+          ctx.strokeStyle = `rgba(${p.color.r}, ${p.color.g}, ${p.color.b}, ${alpha})`;
+          ctx.lineWidth = p.size;
+          ctx.stroke();
+
+          // Spark core
+          ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.size * 0.6, 0, Math.PI * 2);
+          ctx.fill();
+        } else {
+          // Impact burst particle: glowing circular starburst
+          ctx.shadowColor = `rgb(${p.color.r}, ${p.color.g}, ${p.color.b})`;
+          ctx.shadowBlur = 6;
+          ctx.fillStyle = `rgba(${p.color.r}, ${p.color.g}, ${p.color.b}, ${alpha})`;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.fillStyle = `rgba(255, 255, 255, ${alpha * 0.9})`;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.size * 0.45, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
+      }
+
+      // ==========================================
+      // 6. ANAMORPHIC LENS FLARES
+      // ==========================================
+      const flares = lensFlaresRef.current;
+      for (let i = 0; i < flares.length; i++) {
+        const f = flares[i];
+        if (!f.active) continue;
+
+        f.life -= dt * 2.5;
+        if (f.life <= 0) {
+          f.active = false;
+          continue;
+        }
+
+        const alpha = Math.max(0, Math.min(1, f.life));
+        ctx.save();
+
+        // Horizontal laser streak
+        const flareGrad = ctx.createLinearGradient(f.x - f.width / 2, 0, f.x + f.width / 2, 0);
+        flareGrad.addColorStop(0, 'transparent');
+        flareGrad.addColorStop(0.35, `rgba(${f.color.r}, ${f.color.g}, ${f.color.b}, ${alpha * 0.4})`);
+        flareGrad.addColorStop(0.5, `rgba(255, 255, 255, ${alpha * 0.95})`);
+        flareGrad.addColorStop(0.65, `rgba(${f.color.r}, ${f.color.g}, ${f.color.b}, ${alpha * 0.4})`);
+        flareGrad.addColorStop(1, 'transparent');
+
+        ctx.fillStyle = flareGrad;
+        ctx.fillRect(f.x - f.width / 2, f.y - 1.5, f.width, 3);
+
+        // Core bright radial orb
+        const orbGrad = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, 16);
+        orbGrad.addColorStop(0, `rgba(255, 255, 255, ${alpha})`);
+        orbGrad.addColorStop(0.3, `rgba(${f.color.r}, ${f.color.g}, ${f.color.b}, ${alpha * 0.7})`);
+        orbGrad.addColorStop(1, 'transparent');
+        ctx.fillStyle = orbGrad;
+        ctx.beginPath();
+        ctx.arc(f.x, f.y, 16, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
+      }
+
+      // ==========================================
+      // 7. LED BUFFER DECAY & AURA
       // ==========================================
       const decay = curEff.decay;
       const leds = ledsRef.current;
@@ -783,7 +1164,7 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
         addSpreadLuminance(noteData.centerLed, curEff.spread * 1.2, cols.primary, 1.0);
       });
 
-      // Update active particles
+      // Update active LED particles
       const particles = particlesRef.current;
       for (let i = 0; i < particles.length; i++) {
         const p = particles[i];
@@ -843,7 +1224,7 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
       }
 
       // ==========================================
-      // 5. DRAW WS2812B LED STRIP MOUNT
+      // 8. DRAW WS2812B LED STRIP MOUNT
       // ==========================================
       ctx.fillStyle = isDark ? '#09090b' : '#f1f5f9';
       ctx.fillRect(8, ledBarTop, width - 16, ledBarHeight);
@@ -879,7 +1260,7 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
       }
 
       // ==========================================
-      // 6. DRAW PIANO KEYS (Anchored directly at bottom)
+      // 9. DRAW PIANO KEYS (KEY PRESS GLOW & RADIANCE)
       // ==========================================
       const whiteKeys = curKeys.filter(k => !k.isBlack);
       const whiteKeyWidth = (width - 32) / whiteKeys.length;
@@ -893,22 +1274,43 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
 
         if (isPressed) {
           const cols = getNoteColors(key.midi, curEff, curFlow);
-          ctx.fillStyle = `rgb(${cols.primary.r}, ${cols.primary.g}, ${cols.primary.b})`;
+          // Key Press Glow: radiant gradient from top contact to bottom
+          const keyGrad = ctx.createLinearGradient(0, keyAreaTop, 0, keyAreaTop + keyAreaHeight);
+          keyGrad.addColorStop(0, '#ffffff'); // intense contact highlight
+          keyGrad.addColorStop(0.12, `rgba(${cols.primary.r}, ${cols.primary.g}, ${cols.primary.b}, 0.95)`);
+          keyGrad.addColorStop(0.85, `rgba(${cols.primary.r}, ${cols.primary.g}, ${cols.primary.b}, 0.82)`);
+          keyGrad.addColorStop(1, `rgba(${cols.secondary.r}, ${cols.secondary.g}, ${cols.secondary.b}, 0.95)`);
+          ctx.fillStyle = keyGrad;
+
+          // Key bloom aura
+          ctx.shadowColor = `rgba(${cols.primary.r}, ${cols.primary.g}, ${cols.primary.b}, 0.6)`;
+          ctx.shadowBlur = 12;
         } else if (isExpected) {
           ctx.fillStyle = '#10b981';
+          ctx.shadowBlur = 0;
         } else {
           ctx.fillStyle = isDark ? '#18181b' : '#ffffff';
+          ctx.shadowBlur = 0;
         }
 
         ctx.fillRect(keyX + 1, keyAreaTop, whiteKeyWidth - 2, keyAreaHeight);
+        ctx.shadowBlur = 0;
+
         ctx.strokeStyle = isDark ? '#27272a' : '#cbd5e1';
         ctx.lineWidth = 1;
         ctx.strokeRect(keyX + 1, keyAreaTop, whiteKeyWidth - 2, keyAreaHeight);
 
-        // Pressed bottom accent line
+        // Pressed bottom accent line & inner light reflection
         if (isPressed) {
           ctx.fillStyle = '#ffffff';
           ctx.fillRect(keyX + 2, keyAreaTop + keyAreaHeight - 6, whiteKeyWidth - 4, 4);
+
+          const highlightGrad = ctx.createLinearGradient(keyX + 1, 0, keyX + whiteKeyWidth - 1, 0);
+          highlightGrad.addColorStop(0, 'rgba(255, 255, 255, 0.4)');
+          highlightGrad.addColorStop(0.4, 'rgba(255, 255, 255, 0.05)');
+          highlightGrad.addColorStop(1, 'rgba(0, 0, 0, 0.2)');
+          ctx.fillStyle = highlightGrad;
+          ctx.fillRect(keyX + 1, keyAreaTop, whiteKeyWidth - 2, keyAreaHeight - 6);
         }
 
         // Key Labels
@@ -927,7 +1329,7 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
         }
       });
 
-      // B. Black Keys (Overlaid on top)
+      // B. Black Keys (Overlaid on top with radiant glow)
       curKeys.forEach((key) => {
         if (!key.isBlack) return;
 
@@ -939,16 +1341,26 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
 
         if (isPressed) {
           const cols = getNoteColors(key.midi, curEff, curFlow);
-          ctx.fillStyle = `rgb(${cols.primary.r}, ${cols.primary.g}, ${cols.primary.b})`;
+          const bGrad = ctx.createLinearGradient(0, keyAreaTop, 0, keyAreaTop + blackKeyHeight);
+          bGrad.addColorStop(0, '#ffffff');
+          bGrad.addColorStop(0.18, `rgb(${cols.primary.r}, ${cols.primary.g}, ${cols.primary.b})`);
+          bGrad.addColorStop(1, `rgb(${Math.round(cols.secondary.r * 0.7)}, ${Math.round(cols.secondary.g * 0.7)}, ${Math.round(cols.secondary.b * 0.7)})`);
+          ctx.fillStyle = bGrad;
+          ctx.shadowColor = `rgba(${cols.primary.r}, ${cols.primary.g}, ${cols.primary.b}, 0.75)`;
+          ctx.shadowBlur = 14;
         } else if (isExpected) {
           ctx.fillStyle = '#059669';
+          ctx.shadowBlur = 0;
         } else {
           ctx.fillStyle = isDark ? '#000000' : '#0f172a';
+          ctx.shadowBlur = 0;
         }
 
         ctx.fillRect(keyX, keyAreaTop, blackKeyWidth, blackKeyHeight);
-        ctx.strokeStyle = isDark ? '#3f3f46' : '#475569';
-        ctx.lineWidth = 1;
+        ctx.shadowBlur = 0;
+
+        ctx.strokeStyle = isPressed ? '#ffffff' : (isDark ? '#3f3f46' : '#475569');
+        ctx.lineWidth = isPressed ? 1.5 : 1;
         ctx.strokeRect(keyX, keyAreaTop, blackKeyWidth, blackKeyHeight);
 
         // Black key accent top
