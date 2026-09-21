@@ -127,18 +127,22 @@ export const AppHeader: React.FC<{
         {/* Right Universal Actions Bar */}
         <div className="flex items-center gap-2 shrink-0 select-none">
           
-          {/* Live Chord Badge */}
-          {currentChord && (
-            <div className="hidden 2xl:flex items-center gap-1 px-2.5 py-1 rounded-xl bg-indigo-50 dark:bg-zinc-900 border border-indigo-200 dark:border-zinc-800 text-xs text-indigo-700 dark:text-indigo-300 font-bold font-mono animate-pulse">
-              <span>{currentChord.chord}</span>
-            </div>
-          )}
+          {/* Live Chord Badge (Fixed width to prevent horizontal layout shift) */}
+          <div className="hidden xl:flex items-center justify-center w-24 h-8 px-2.5 rounded-xl bg-slate-100 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-xs font-mono select-none">
+            {currentChord ? (
+              <span className="font-bold text-indigo-600 dark:text-indigo-400 truncate">
+                {currentChord.chord}
+              </span>
+            ) : (
+              <span className="text-slate-400 dark:text-zinc-600">--</span>
+            )}
+          </div>
 
-          {/* Active Note Key Count */}
-          <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-xs text-slate-600 dark:text-zinc-300">
-            <span className={`w-2 h-2 rounded-full transition-colors ${activeNotes.size > 0 ? 'bg-indigo-500 animate-ping' : 'bg-slate-400 dark:bg-zinc-600'}`} />
-            <span className="font-mono text-[11px]">
-              {activeNotes.size > 0 ? `${activeNotes.size} Keys` : 'Idle'}
+          {/* Active Note Key Count (Fixed width w-20 with tabular-nums so Idle vs Keys never shifts) */}
+          <div className="hidden lg:flex items-center justify-center gap-1.5 w-20 h-8 px-2 rounded-xl bg-slate-100 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-xs text-slate-600 dark:text-zinc-300 select-none">
+            <span className={`w-2 h-2 rounded-full shrink-0 transition-colors ${activeNotes.size > 0 ? 'bg-indigo-500 animate-ping' : 'bg-slate-400 dark:bg-zinc-600'}`} />
+            <span className="font-mono text-[11px] tabular-nums text-center whitespace-nowrap">
+              {activeNotes.size > 0 ? `${activeNotes.size} ${activeNotes.size === 1 ? 'Key' : 'Keys'}` : 'Idle'}
             </span>
           </div>
 

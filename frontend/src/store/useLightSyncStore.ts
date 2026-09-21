@@ -35,6 +35,7 @@ interface LightSyncState {
 
   // Keyboard & Visualizer Settings
   keyboardSize: 25 | 49 | 61 | 88;
+  keyboardHeight: number;
   octaveShift: number;
   transpose: number;
   keyLabels: 'notes' | 'solfege' | 'qwerty' | 'none';
@@ -43,6 +44,7 @@ interface LightSyncState {
   flowSpeed: number;
   isAutoDemo: boolean;
   setKeyboardSize: (size: 25 | 49 | 61 | 88) => void;
+  setKeyboardHeight: (height: number) => void;
   setOctaveShift: (shift: number) => void;
   incrementOctave: () => void;
   decrementOctave: () => void;
@@ -215,6 +217,7 @@ export const useLightSyncStore = create<LightSyncState>((set, get) => ({
 
   // Keyboard Viewport
   keyboardSize: 61,
+  keyboardHeight: 220,
   octaveShift: 0,
   transpose: 0,
   keyLabels: 'notes',
@@ -223,6 +226,7 @@ export const useLightSyncStore = create<LightSyncState>((set, get) => ({
   flowSpeed: 1.2,
   isAutoDemo: false,
   setKeyboardSize: (size) => set({ keyboardSize: size }),
+  setKeyboardHeight: (height) => set({ keyboardHeight: Math.max(130, Math.min(420, height)) }),
   setOctaveShift: (shift) => set({ octaveShift: Math.max(-4, Math.min(4, shift)) }),
   incrementOctave: () => set((state) => ({ octaveShift: Math.max(-4, Math.min(4, state.octaveShift + 1)) })),
   decrementOctave: () => set((state) => ({ octaveShift: Math.max(-4, Math.min(4, state.octaveShift - 1)) })),

@@ -92,6 +92,8 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
 
   const {
     keyboardSize,
+    keyboardHeight,
+    setKeyboardHeight,
     octaveShift,
     transpose,
     keyLabels,
@@ -107,6 +109,10 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
     activeOverlay,
     closeOverlay
   } = useLightSyncStore();
+
+  const isResizingRef = useRef(false);
+  const startYRef = useRef(0);
+  const startHeightRef = useRef(220);
 
   const ledCount = 144;
   const baseStartMidi = keyboardSize === 25 ? 48 : keyboardSize === 49 ? 36 : keyboardSize === 61 ? 36 : 21;
@@ -373,8 +379,8 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
       const height = canvas.height;
       const isDark = theme === 'dark';
 
-      // Dimensions: Extended tall keyboard anchored directly at bottom
-      const keyAreaHeight = Math.max(190, Math.min(Math.floor(height * 0.36), 250));
+      // Dimensions: Dynamic resizable tall keyboard anchored directly at bottom
+      const keyAreaHeight = Math.max(130, Math.min(keyboardHeight, height - 120));
       const keyAreaTop = height - keyAreaHeight - 1;
       const ledBarHeight = 24;
       const ledBarTop = keyAreaTop - ledBarHeight - 1;
@@ -740,6 +746,7 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
     triggerNoteOff,
     spawnParticle,
     getKeyGeometry,
+    keyboardHeight,
     onFpsUpdate
   ]);
 
@@ -755,7 +762,7 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
     const x = (clientX - rect.left) * scaleX;
     const y = (clientY - rect.top) * scaleY;
 
-    const keyAreaHeight = Math.max(190, Math.min(Math.floor(canvas.height * 0.36), 250));
+    const keyAreaHeight = Math.max(130, Math.min(keyboardHeight, canvas.height - 120));
     const keyAreaTop = canvas.height - keyAreaHeight - 1;
 
     // Only keys area triggers notes
@@ -852,6 +859,32 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
     return () => window.removeEventListener('resize', resize);
   }, []);
 
+  // Resize keyboard drag handlers
+  const handleResizeStart = (e: React.PointerEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    isResizingRef.current = true;
+    startYRef.current = e.clientY;
+    startHeightRef.current = keyboardHeight;
+  };
+
+  const handleResizeMove = (e: React.PointerEvent) => {
+    if (!isResizingRef.current) return;
+    const deltaY = startYRef.current - e.clientY;
+    const newHeight = Math.max(130, Math.min(420, startHeightRef.current + deltaY));
+    setKeyboardHeight(newHeight);
+  };
+
+  const handleResizeEnd = (e: React.PointerEvent) => {
+    if (isResizingRef.current) {
+      isResizingRef.current = false;
+      try {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      } catch (_) {}
+    }
+  };
+
   return (
     <div className="relative w-full flex-1 flex flex-col bg-slate-900 dark:bg-black rounded-2xl border border-slate-700/50 dark:border-zinc-800 p-1.5 overflow-hidden shadow-xl transition-colors min-h-0">
       {/* Visualizer Top Info Bar */}
@@ -861,6 +894,26 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
           WATERFALL FLOW KEYS RUNWAY
         </span>
         <span>WS2812B STRIP (144 LEDS) • {keyboardSize} KEYS (MIDI {startMidi} - {startMidi + keyboardSize - 1}) • QWERTY [A-K]</span>
+      </div>
+
+      {/* Interactive Resizable Divider to expand/shrink piano keyboard */}
+      <div
+        onPointerDown={handleResizeStart}
+        onPointerMove={handleResizeMove}
+        onPointerUp={handleResizeEnd}
+        onPointerCancel={handleResizeEnd}
+        style={{ bottom: `${Math.max(130, Math.min(keyboardHeight, 420)) + 24}px` }}
+        className="absolute left-0 right-0 h-6 z-20 cursor-row-resize flex items-center justify-center group select-none -mb-3 touch-none"
+        title="Drag up or down to resize keyboard height"
+      >
+        <div className="flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-slate-800/90 dark:bg-zinc-800/90 border border-slate-600/70 dark:border-zinc-700/70 group-hover:border-indigo-500 group-hover:bg-indigo-600/40 transition-all shadow-md">
+          <div className="w-1 h-1 rounded-full bg-slate-400 group-hover:bg-indigo-400 transition-colors" />
+          <div className="w-8 h-1 rounded-full bg-slate-400/80 group-hover:bg-indigo-400 transition-colors" />
+          <div className="w-1 h-1 rounded-full bg-slate-400 group-hover:bg-indigo-400 transition-colors" />
+          <span className="text-[9px] font-mono text-slate-300 dark:text-zinc-400 group-hover:text-white hidden group-hover:inline ml-1 font-bold">
+            {Math.round(keyboardHeight)}px
+          </span>
+        </div>
       </div>
 
       <canvas
