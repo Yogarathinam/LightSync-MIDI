@@ -43,11 +43,23 @@
 
 ## Key Features
 
-- 🎹 **Play Studio**: Polyphonic keyboard, real-time chord detection (Triads, 7ths, Diminished, Suspended, Inversions), interactive metronome (Tap Tempo, BPM slider, visual beats, audio click), and sustain pedal (Spacebar).
-- 🔊 **Sound Engine**: 4 selectable Web Audio instruments (*Concert Grand Piano*, *Vintage Rhodes*, *Analog Synth*, *Marimba Pluck*) with natural ADSR release curves.
+- 🎹 **Bottom Piano Keyboard & Waterfall Flow Runway**:
+  - Full interactive piano keyboard anchored at the very bottom of the screen with responsive polyphonic touch/mouse dragging and QWERTY [A-K] input.
+  - **WS2812B 144-LED Strip Mount** positioned directly above the piano keys with silicone optical diffuser simulation.
+  - **Waterfall Flow Keys (Falling Bars)**: Vertical note bars cascading downwards from the top towards the keys and LED strip with impact sparks and contact ripples.
+  - **Rising Freestyle Beams**: Manual key strikes shoot radiant fountain beams upward into the waterfall lanes.
+- 🎴 **Floating Card Overlay System with Autohide**:
+  - All studio modes (*Play*, *Effect Studio*, *Learn*, *Practice*, *Analyze*, *AI Coach*, *Hardware*, and *Settings*) open as elevated Material card overlays with gesture-like drag-handle pills.
+  - **Autohide on Click Anywhere**: Clicking anywhere outside the card (e.g. directly onto the visualizer canvas or piano keys) automatically hides the overlay so you can play without interruption.
+- ⚙️ **Studio Preferences & Settings Modal**:
+  - Auto Demo music stream controller (with cascading chord arpeggiations and LED patterns).
+  - Waterfall flow descent speed (0.5x to 3.0x), WS2812B diffuser blur toggle, keyboard range (25k, 49k, 61k, 88k), key overlay labels (Notes, Solfège, QWERTY), and factory reset.
+- 🌗 **Full-Application Light & Pure-Black Dark Theme**:
+  - One-click toggle switching the entire application between **True OLED Black** (`#000000`) and **Clean Daylight** (`#f8fafc`).
+- 🔊 **Web Audio Synthesizer**: 4 polyphonic instruments (*Concert Grand Piano*, *Vintage Rhodes*, *Analog Synth*, *Marimba Pluck*) with natural ADSR release curves.
 - 🌈 **Effect Studio (9 Algorithms)**:
   - `Bounce`, `Ripple`, `Pulse`, `Hold Aura`, `Cyber Glitch`, `Spark Burst`, `Sprinkle`, `Neon Rain`, `Harmonic Wave`.
-  - Dynamic sliders: Speed, Decay, Spread Width, Brightness, Rainbow dynamic mode, and Color pickers.
+  - Real-time sliders: Speed, Decay, Spread Width, Brightness, Rainbow dynamic mode, and Color pickers.
   - Live protocol generator (CLI Text & JSON format) with one-click **"Apply to M5Stack Strip"**.
 - 🎓 **Learn Mode**: Guided interactive curriculum (*Ode to Joy*, *Für Elise*, *C Major Scale*) with *Wait-For-Key* and *In-Time Flow* modes, step progress, real-time hit rating badges (Perfect, Great, Early, Late, Miss), and confetti celebrations.
 - ⚡ **Practice Mode**: Sub-tempo scaling (50% to 130%), hand isolation (Both Hands, Right Hand only, Left Hand only), and A-B looper.
@@ -56,7 +68,6 @@
   - **AI Coach**: Detailed diagnostic critique analyzing user timing variance and suggesting tailored practice drills.
   - **Visual Copilot**: Text prompt bar (*"Warm fireplace with gentle sparks"*) that translates natural language into structured LED parameters.
 - 📟 **Hardware Device Monitor**: COM port scanner, roundtrip ping latency tester, live simulated M5Stack 320x240 LCD display with clickable hardware buttons A, B, C, and live serial logs.
-- 🌗 **Dual Theme (`ThemeContext`)**: One-click switch between **Pure OLED Black** (`#000000`) and **Crisp Studio Daylight** (`#ffffff`).
 
 ---
 

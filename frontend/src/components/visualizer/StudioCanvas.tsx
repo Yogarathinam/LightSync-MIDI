@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState, useCallback } from 'react';
+import React, { useRef, useEffect, useCallback } from 'react';
 import { useLightSyncStore } from '../../store/useLightSyncStore';
 import { useTheme } from '../../context/ThemeContext';
 import { EffectType } from '../../types';
@@ -18,7 +18,34 @@ interface Particle {
   phase: number;
 }
 
+interface WaterfallNote {
+  id: number;
+  pitch: number;
+  x: number;
+  width: number;
+  y: number;
+  length: number;
+  speed: number;
+  color: { r: number; g: number; b: number };
+  triggered: boolean;
+  active: boolean;
+}
+
+interface RisingBeam {
+  id: number;
+  pitch: number;
+  x: number;
+  width: number;
+  y: number;
+  height: number;
+  alpha: number;
+  color: { r: number; g: number; b: number };
+}
+
 const MAX_PARTICLES = 64;
+const MAX_FALLING_NOTES = 128;
+const MAX_RISING_BEAMS = 32;
+
 const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 const SOLFEGE = ["Do", "Di", "Re", "Ri", "Mi", "Fa", "Fi", "Sol", "Si", "La", "Li", "Ti"];
 
@@ -68,17 +95,21 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
     keyLabels,
     diffuseBlur,
     fallingNotes,
+    flowSpeed,
+    isAutoDemo,
     effectConfig,
     activeNotes,
     triggerNoteOn,
     triggerNoteOff,
-    expectedPitch
+    expectedPitch,
+    activeOverlay,
+    closeOverlay
   } = useLightSyncStore();
 
   const ledCount = 144;
   const startMidi = keyboardSize === 25 ? 48 : keyboardSize === 49 ? 36 : keyboardSize === 61 ? 36 : 21;
 
-  // Particle pool
+  // Particle pool for LED strip and impact sparks
   const particlesRef = useRef<Particle[]>(
     Array.from({ length: MAX_PARTICLES }, () => ({
       active: false,
@@ -101,10 +132,19 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
     Array.from({ length: ledCount }, () => ({ r: 0, g: 0, b: 0 }))
   );
 
-  // Drag interaction state
+  // Falling waterfall bars pool
+  const fallingBarsRef = useRef<WaterfallNote[]>([]);
+  // Rising freestyle beams pool
+  const risingBeamsRef = useRef<RisingBeam[]>([]);
+
+  // Pointer drag interaction
   const isPointerDownRef = useRef(false);
   const activePointerKeyRef = useRef<number | null>(null);
   const prevActivePitchesRef = useRef<Set<number>>(new Set());
+
+  // Demo step timer
+  const demoTimerRef = useRef<number>(0);
+  const demoStepRef = useRef<number>(0);
 
   // Helper to allocate a particle
   const spawnParticle = useCallback((type: EffectType, centerLed: number, color: { r: number; g: number; b: number }) => {
@@ -158,7 +198,7 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
       case 'rain':
         p.pos = centerLed;
         p.vel = (Math.random() > 0.5 ? 1 : -1) * effectConfig.speed * 1.8;
-        p.spread = effectConfig.spread * 3.0; // tail length
+        p.spread = effectConfig.spread * 3.0;
         break;
       case 'wave':
         p.pos = centerLed;
@@ -168,39 +208,6 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
         break;
     }
   }, [effectConfig, ledCount]);
-
-  // Listen for new notes pressed to spawn effect particles
-  useEffect(() => {
-    const currentPitches = new Set(activeNotes.keys());
-    const prevPitches = prevActivePitchesRef.current;
-
-    for (const pitch of currentPitches) {
-      if (!prevPitches.has(pitch)) {
-        // Note ON occurred!
-        const noteData = activeNotes.get(pitch);
-        const centerLed = noteData ? noteData.centerLed : 72;
-
-        let col = hexToRgb(effectConfig.primaryColor);
-        if (effectConfig.rainbow) {
-          const hue = (pitch % 12) / 12;
-          col = hslToRgb(hue, 1.0, 0.5);
-        }
-
-        // Spawn burst based on current effect
-        if (effectConfig.effect === 'spark') {
-          for (let i = 0; i < 6; i++) spawnParticle('spark', centerLed, col);
-        } else if (effectConfig.effect === 'glitch') {
-          for (let i = 0; i < 5; i++) spawnParticle('glitch', centerLed, col);
-        } else if (effectConfig.effect === 'sprinkle') {
-          for (let i = 0; i < 8; i++) spawnParticle('sprinkle', centerLed, col);
-        } else {
-          spawnParticle(effectConfig.effect, centerLed, col);
-        }
-      }
-    }
-
-    prevActivePitchesRef.current = currentPitches;
-  }, [activeNotes, effectConfig, spawnParticle]);
 
   // Keyboard layout metadata
   const keys = React.useMemo(() => {
@@ -228,6 +235,86 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
     return keyList;
   }, [keyboardSize, startMidi]);
 
+  // Calculate key geometry helper
+  const getKeyGeometry = useCallback((midi: number, width: number, keyAreaTop: number, keyAreaHeight: number) => {
+    const keyObj = keys.find(k => k.midi === midi);
+    if (!keyObj) return null;
+
+    const whiteKeys = keys.filter(k => !k.isBlack);
+    const whiteKeyWidth = (width - 32) / whiteKeys.length;
+
+    if (!keyObj.isBlack) {
+      const x = 16 + keyObj.whiteIndex * whiteKeyWidth;
+      return {
+        x,
+        width: whiteKeyWidth,
+        isBlack: false
+      };
+    } else {
+      const prevWhiteIdx = keys.slice(0, keyObj.index).filter(k => !k.isBlack).length - 1;
+      const x = 16 + (prevWhiteIdx + 0.65) * whiteKeyWidth;
+      const blackKeyWidth = whiteKeyWidth * 0.65;
+      return {
+        x,
+        width: blackKeyWidth,
+        isBlack: true
+      };
+    }
+  }, [keys]);
+
+  // Listen for key presses to spawn effects and rising fountain beams
+  useEffect(() => {
+    const currentPitches = new Set(activeNotes.keys());
+    const prevPitches = prevActivePitchesRef.current;
+    const canvas = canvasRef.current;
+
+    for (const pitch of currentPitches) {
+      if (!prevPitches.has(pitch)) {
+        const noteData = activeNotes.get(pitch);
+        const centerLed = noteData ? noteData.centerLed : 72;
+
+        let col = hexToRgb(effectConfig.primaryColor);
+        if (effectConfig.rainbow) {
+          const hue = (pitch % 12) / 12;
+          col = hslToRgb(hue, 1.0, 0.5);
+        }
+
+        // Spawn LED strip burst
+        if (effectConfig.effect === 'spark') {
+          for (let i = 0; i < 6; i++) spawnParticle('spark', centerLed, col);
+        } else if (effectConfig.effect === 'glitch') {
+          for (let i = 0; i < 5; i++) spawnParticle('glitch', centerLed, col);
+        } else if (effectConfig.effect === 'sprinkle') {
+          for (let i = 0; i < 8; i++) spawnParticle('sprinkle', centerLed, col);
+        } else {
+          spawnParticle(effectConfig.effect, centerLed, col);
+        }
+
+        // Spawn rising fountain beam into the waterfall lane if not in auto-demo
+        if (!isAutoDemo && canvas) {
+          const geom = getKeyGeometry(pitch, canvas.width, 0, 0);
+          if (geom) {
+            risingBeamsRef.current.push({
+              id: Date.now() + Math.random(),
+              pitch,
+              x: geom.x + 2,
+              width: geom.width - 4,
+              y: canvas.height - 150,
+              height: 40,
+              alpha: 0.9,
+              color: col
+            });
+            if (risingBeamsRef.current.length > MAX_RISING_BEAMS) {
+              risingBeamsRef.current.shift();
+            }
+          }
+        }
+      }
+    }
+
+    prevActivePitchesRef.current = currentPitches;
+  }, [activeNotes, effectConfig, spawnParticle, isAutoDemo, getKeyGeometry]);
+
   // Main 60 FPS Render Loop
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -239,6 +326,18 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
     let lastTime = performance.now();
     let frameCounter = 0;
     let fpsTimer = performance.now();
+
+    // Auto demo melody chords
+    const demoChords = [
+      [60, 64, 67],      // C Maj
+      [65, 69, 72],      // F Maj
+      [67, 71, 74],      // G Maj
+      [69, 72, 76],      // A min
+      [65, 69, 72],      // F Maj
+      [60, 64, 67, 72],  // C Maj spread
+      [62, 65, 69],      // D min
+      [67, 71, 76]       // G7 high
+    ];
 
     const addSpreadLuminance = (centerPos: number, spread: number, color: { r: number; g: number; b: number }, factor: number) => {
       const brt = (effectConfig.brightness / 255) * factor;
@@ -260,7 +359,6 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
       const dt = Math.min((now - lastTime) / 1000, 0.05);
       lastTime = now;
 
-      // FPS tracking
       frameCounter++;
       if (now - fpsTimer >= 1000) {
         if (onFpsUpdate) onFpsUpdate(frameCounter);
@@ -270,9 +368,160 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
 
       const width = canvas.width;
       const height = canvas.height;
+      const isDark = theme === 'dark';
+
+      // Dimensions: Keyboard at very bottom, LED strip right above keys
+      const keyAreaHeight = 125;
+      const keyAreaTop = height - keyAreaHeight - 4;
+      const ledBarHeight = 24;
+      const ledBarTop = keyAreaTop - ledBarHeight - 6;
+      const waterfallTop = 8;
+      const waterfallHeight = ledBarTop - waterfallTop;
+
       ctx.clearRect(0, 0, width, height);
 
-      // 1. Decay LED Buffer
+      // 1. Draw Waterfall Runway Background
+      ctx.fillStyle = isDark ? '#000000' : '#f8fafc';
+      ctx.fillRect(0, 0, width, height);
+
+      // Subtle Vertical Key Lane Separators in Waterfall Runway
+      const whiteKeys = keys.filter(k => !k.isBlack);
+      const whiteKeyWidth = (width - 32) / whiteKeys.length;
+
+      ctx.lineWidth = 1;
+      for (let i = 0; i <= whiteKeys.length; i++) {
+        const laneX = 16 + i * whiteKeyWidth;
+        ctx.strokeStyle = isDark ? 'rgba(39, 39, 42, 0.4)' : 'rgba(226, 232, 240, 0.8)';
+        ctx.beginPath();
+        ctx.moveTo(laneX, waterfallTop);
+        ctx.lineTo(laneX, ledBarTop);
+        ctx.stroke();
+      }
+
+      // Waterfall Lane Guide Glow Header
+      const headerGrad = ctx.createLinearGradient(0, waterfallTop, 0, waterfallTop + 40);
+      headerGrad.addColorStop(0, isDark ? 'rgba(99, 102, 241, 0.12)' : 'rgba(99, 102, 241, 0.06)');
+      headerGrad.addColorStop(1, 'transparent');
+      ctx.fillStyle = headerGrad;
+      ctx.fillRect(16, waterfallTop, width - 32, 40);
+
+      // 2. Auto Demo Spawner
+      if (isAutoDemo) {
+        demoTimerRef.current += dt;
+        if (demoTimerRef.current > 0.35 / flowSpeed) {
+          demoTimerRef.current = 0;
+          const chord = demoChords[demoStepRef.current % demoChords.length];
+          demoStepRef.current++;
+
+          chord.forEach((pitch) => {
+            const geom = getKeyGeometry(pitch, width, keyAreaTop, keyAreaHeight);
+            if (geom) {
+              let col = hexToRgb(effectConfig.primaryColor);
+              if (effectConfig.rainbow) {
+                col = hslToRgb((pitch % 12) / 12, 1.0, 0.5);
+              }
+
+              fallingBarsRef.current.push({
+                id: Math.random(),
+                pitch,
+                x: geom.x + 2,
+                width: geom.width - 4,
+                y: waterfallTop,
+                length: Math.max(30, 60 * flowSpeed),
+                speed: 180 * flowSpeed,
+                color: col,
+                triggered: false,
+                active: true
+              });
+            }
+          });
+        }
+      }
+
+      // 3. Update & Draw Waterfall Falling Note Bars
+      if (fallingNotes) {
+        const bars = fallingBarsRef.current;
+        for (let i = bars.length - 1; i >= 0; i--) {
+          const bar = bars[i];
+          bar.y += bar.speed * dt;
+
+          // Check if bar has reached LED strip impact line
+          if (!bar.triggered && (bar.y + bar.length) >= ledBarTop) {
+            bar.triggered = true;
+            triggerNoteOn(bar.pitch, 100);
+
+            // Impact Sparkles
+            const keyIdx = Math.max(0, Math.min(keyboardSize - 1, bar.pitch - startMidi));
+            const centerLed = Math.floor((keyIdx / (keyboardSize - 1)) * 143);
+            for (let s = 0; s < 4; s++) {
+              spawnParticle('spark', centerLed, bar.color);
+            }
+          }
+
+          // Check if tail passed bottom of key area
+          if (bar.y >= ledBarTop) {
+            if (bar.triggered && bar.active) {
+              triggerNoteOff(bar.pitch);
+              bar.active = false;
+            }
+          }
+
+          // Remove completed bar
+          if (bar.y > height) {
+            bars.splice(i, 1);
+            continue;
+          }
+
+          // Render Falling Bar
+          const barGrad = ctx.createLinearGradient(0, bar.y, 0, bar.y + bar.length);
+          barGrad.addColorStop(0, `rgba(${bar.color.r}, ${bar.color.g}, ${bar.color.b}, 0.35)`);
+          barGrad.addColorStop(0.8, `rgba(${bar.color.r}, ${bar.color.g}, ${bar.color.b}, 0.95)`);
+          barGrad.addColorStop(1, '#ffffff');
+
+          ctx.fillStyle = barGrad;
+          ctx.beginPath();
+          ctx.roundRect(bar.x, bar.y, bar.width, bar.length, [6, 6, 4, 4]);
+          ctx.fill();
+
+          // Bar Outline
+          ctx.strokeStyle = `rgba(${bar.color.r}, ${bar.color.g}, ${bar.color.b}, 0.8)`;
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+
+          // Impact Glow when hitting LED strip
+          if (bar.y + bar.length >= ledBarTop && bar.y < ledBarTop + 10) {
+            ctx.fillStyle = '#ffffff';
+            ctx.shadowColor = `rgb(${bar.color.r}, ${bar.color.g}, ${bar.color.b})`;
+            ctx.shadowBlur = 15;
+            ctx.fillRect(bar.x - 2, ledBarTop - 2, bar.width + 4, 4);
+            ctx.shadowBlur = 0;
+          }
+        }
+      }
+
+      // 4. Update & Draw Rising Freestyle Beams (when user presses keys manually)
+      const risingBeams = risingBeamsRef.current;
+      for (let i = risingBeams.length - 1; i >= 0; i--) {
+        const beam = risingBeams[i];
+        beam.y -= 260 * dt;
+        beam.alpha -= 1.1 * dt;
+
+        if (beam.alpha <= 0 || beam.y < waterfallTop) {
+          risingBeams.splice(i, 1);
+          continue;
+        }
+
+        const beamGrad = ctx.createLinearGradient(0, beam.y + beam.height, 0, beam.y);
+        beamGrad.addColorStop(0, `rgba(${beam.color.r}, ${beam.color.g}, ${beam.color.b}, ${beam.alpha * 0.8})`);
+        beamGrad.addColorStop(1, `rgba(${beam.color.r}, ${beam.color.g}, ${beam.color.b}, 0)`);
+
+        ctx.fillStyle = beamGrad;
+        ctx.beginPath();
+        ctx.roundRect(beam.x, beam.y, beam.width, beam.height, 4);
+        ctx.fill();
+      }
+
+      // 5. Decay LED Buffer
       const decay = effectConfig.decay;
       const leds = ledsRef.current;
       for (let i = 0; i < ledCount; i++) {
@@ -281,7 +530,7 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
         leds[i].b *= decay;
       }
 
-      // 2. Sustain aura on held keys
+      // 6. Sustain aura on held keys
       activeNotes.forEach((noteData) => {
         let col = hexToRgb(effectConfig.primaryColor);
         if (effectConfig.rainbow) {
@@ -295,133 +544,86 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
         }
       });
 
-      // 3. Update Particles
+      // 7. Update Particles
       const particles = particlesRef.current;
       for (let i = 0; i < particles.length; i++) {
         const p = particles[i];
         if (!p.active) continue;
 
-        switch (p.type) {
-          case 'bounce':
-            p.pos += p.vel;
-            if (p.pos <= 0 || p.pos >= ledCount - 1) {
-              p.vel *= -0.85;
-              p.pos = Math.max(0, Math.min(ledCount - 1, p.pos));
-            }
-            p.life *= (effectConfig.decay + 0.01);
-            addSpreadLuminance(p.pos, p.spread, p.color, p.life);
-            break;
-
-          case 'ripple':
-            p.radius += p.speed * 0.8;
-            p.life -= (1 - effectConfig.decay) * 0.35;
-            for (let idx = 0; idx < ledCount; idx++) {
-              const dist = Math.abs(idx - p.pos);
-              const distFromRing = Math.abs(dist - p.radius);
-              if (distFromRing < p.thickness) {
-                const ringIntensity = Math.cos((distFromRing / p.thickness) * (Math.PI / 2)) * p.life;
-                if (ringIntensity > 0) addSpreadLuminance(idx, 0.8, p.color, ringIntensity);
-              }
-            }
-            if (p.pos - p.radius < 0 && p.pos + p.radius >= ledCount) p.life = 0;
-            break;
-
-          case 'pulse':
-            p.radius += p.speed * 0.5;
-            p.phase += p.speed * 0.15;
-            p.life -= (1 - effectConfig.decay) * 0.25;
-            const pulseBreath = (Math.sin(p.phase * Math.PI * 2) * 0.5 + 0.5) * p.life;
-            for (let idx = 0; idx < ledCount; idx++) {
-              const dist = Math.abs(idx - p.pos);
-              if (dist <= p.radius) {
-                const innerIntensity = (1 - (dist / p.radius)) * pulseBreath;
-                addSpreadLuminance(idx, p.spread, p.color, innerIntensity);
-              }
-            }
-            if (p.radius >= p.maxRadius) p.life = 0;
-            break;
-
-          case 'hold_beam':
-            p.life -= 0.05;
-            addSpreadLuminance(p.pos, p.spread, p.color, p.life * 1.5);
-            break;
-
-          case 'glitch':
-            p.life -= 0.04;
-            if (Math.random() > 0.3) {
-              addSpreadLuminance(p.pos, 0.6, p.color, p.life);
-            }
-            break;
-
-          case 'spark':
-            p.pos += p.vel;
-            p.life -= 0.03 * (2.0 - effectConfig.decay);
-            addSpreadLuminance(p.pos, p.spread, p.color, Math.max(0, p.life));
-            break;
-
-          case 'sprinkle':
-            p.life -= 0.03;
-            const sparkleIntensity = Math.sin(p.life * Math.PI) * Math.random();
-            addSpreadLuminance(p.pos, 0.8, p.color, Math.max(0, sparkleIntensity));
-            break;
-
-          case 'rain':
-            p.pos += p.vel;
-            p.life -= 0.02 * (2.0 - effectConfig.decay);
-            const dir = p.vel >= 0 ? 1 : -1;
-            for (let t = 0; t < p.spread; t++) {
-              const tailPos = p.pos - (dir * t);
-              if (tailPos >= 0 && tailPos < ledCount) {
-                const tailFactor = (1 - t / p.spread) * p.life;
-                addSpreadLuminance(tailPos, 0.8, p.color, tailFactor);
-              }
-            }
-            if (p.pos < 0 || p.pos >= ledCount) p.life = 0;
-            break;
-
-          case 'wave':
-            p.phase += p.speed;
-            p.life -= 0.015;
-            for (let idx = 0; idx < ledCount; idx++) {
-              const dist = Math.abs(idx - p.pos);
-              if (dist <= p.spread * 2) {
-                const waveVal = Math.sin(dist * 0.5 - p.phase) * 0.5 + 0.5;
-                addSpreadLuminance(idx, 1.0, p.color, waveVal * p.life);
-              }
-            }
-            break;
+        p.life -= dt * (1.2 / Math.max(0.1, p.speed));
+        if (p.life <= 0) {
+          p.active = false;
+          continue;
         }
 
-        if (p.life <= 0.02) p.active = false;
+        switch (p.type) {
+          case 'bounce':
+            p.pos += p.vel * dt * 45;
+            if (p.pos <= 0 || p.pos >= ledCount - 1) {
+              p.vel *= -1;
+              p.pos = Math.max(0, Math.min(ledCount - 1, p.pos));
+            }
+            addSpreadLuminance(p.pos, p.spread, p.color, p.life);
+            break;
+          case 'ripple':
+            p.radius += dt * 38 * p.speed;
+            if (p.pos - p.radius >= 0) addSpreadLuminance(p.pos - p.radius, p.thickness, p.color, p.life * 0.9);
+            if (p.pos + p.radius < ledCount) addSpreadLuminance(p.pos + p.radius, p.thickness, p.color, p.life * 0.9);
+            break;
+          case 'pulse':
+            p.phase += dt * 5 * p.speed;
+            p.radius = Math.sin(p.phase) * p.maxRadius;
+            addSpreadLuminance(p.pos, Math.max(1, Math.abs(p.radius)), p.color, p.life);
+            break;
+          case 'hold_beam':
+            addSpreadLuminance(p.pos, p.spread, p.color, p.life);
+            break;
+          case 'glitch':
+            if (Math.random() > 0.4) {
+              const jitterPos = Math.max(0, Math.min(ledCount - 1, p.pos + (Math.random() - 0.5) * 6));
+              addSpreadLuminance(jitterPos, 1.5, p.color, p.life * 1.3);
+            }
+            break;
+          case 'spark':
+            p.pos += p.vel * dt * 50;
+            if (p.pos >= 0 && p.pos < ledCount) addSpreadLuminance(p.pos, 1.2, p.color, p.life * 1.5);
+            break;
+          case 'sprinkle':
+            if (Math.random() > 0.5) addSpreadLuminance(p.pos, 1.8, p.color, p.life);
+            break;
+          case 'rain':
+            p.pos += p.vel * dt * 40;
+            if (p.pos >= 0 && p.pos < ledCount) addSpreadLuminance(p.pos, p.spread, p.color, p.life);
+            break;
+          case 'wave':
+            p.phase += dt * 8;
+            const wavePos = p.pos + Math.sin(p.phase) * (p.spread * 3);
+            if (wavePos >= 0 && wavePos < ledCount) addSpreadLuminance(wavePos, 2.5, p.color, p.life);
+            break;
+        }
       }
 
-      // 4. Draw WS2812B Strip Channel (Top Bar)
-      const isDark = theme === 'dark';
-      const ledBarHeight = 32;
-      const keyAreaTop = ledBarHeight + 16;
-      const keyAreaHeight = height - keyAreaTop - 8;
-
-      // Strip Track
+      // 8. Draw WS2812B LED Strip Mount (Directly above piano keys)
       ctx.fillStyle = isDark ? '#09090b' : '#f1f5f9';
-      ctx.fillRect(8, 6, width - 16, ledBarHeight);
+      ctx.fillRect(8, ledBarTop, width - 16, ledBarHeight);
       ctx.strokeStyle = isDark ? '#27272a' : '#cbd5e1';
       ctx.lineWidth = 1;
-      ctx.strokeRect(8, 6, width - 16, ledBarHeight);
+      ctx.strokeRect(8, ledBarTop, width - 16, ledBarHeight);
 
       const ledSpacing = (width - 32) / ledCount;
 
       for (let i = 0; i < ledCount; i++) {
         const ledX = 16 + i * ledSpacing + ledSpacing / 2;
-        const ledY = 6 + ledBarHeight / 2;
+        const ledY = ledBarTop + ledBarHeight / 2;
         const col = leds[i];
 
         // LED dot core
         ctx.beginPath();
-        ctx.arc(ledX, ledY, Math.min(ledSpacing * 0.4, 3.5), 0, Math.PI * 2);
+        ctx.arc(ledX, ledY, Math.min(ledSpacing * 0.4, 3.2), 0, Math.PI * 2);
         ctx.fillStyle = `rgb(${Math.round(col.r)}, ${Math.round(col.g)}, ${Math.round(col.b)})`;
         ctx.fill();
 
-        // Silicone diffuser glow
+        // Silicone optical diffuser blur
         if (diffuseBlur && (col.r > 8 || col.g > 8 || col.b > 8)) {
           const glowGrad = ctx.createRadialGradient(ledX, ledY, 0, ledX, ledY, ledSpacing * 2.8);
           glowGrad.addColorStop(0, `rgba(${Math.round(col.r)}, ${Math.round(col.g)}, ${Math.round(col.b)}, 0.85)`);
@@ -435,11 +637,8 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
         }
       }
 
-      // 5. Draw Piano Keys
-      const whiteKeys = keys.filter(k => !k.isBlack);
-      const whiteKeyWidth = (width - 32) / whiteKeys.length;
-
-      // Draw White Keys First
+      // 9. Draw Piano Keys (Anchored at the very bottom)
+      // A. White Keys
       whiteKeys.forEach((key, wIdx) => {
         const keyX = 16 + wIdx * whiteKeyWidth;
         const isPressed = activeNotes.has(key.midi);
@@ -448,7 +647,7 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
         if (isPressed) {
           ctx.fillStyle = isDark ? '#6366f1' : '#4f46e5';
         } else if (isExpected) {
-          ctx.fillStyle = '#10b981'; // Green prompt for learn
+          ctx.fillStyle = '#10b981';
         } else {
           ctx.fillStyle = isDark ? '#18181b' : '#ffffff';
         }
@@ -462,7 +661,7 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
         ctx.fillStyle = isPressed ? (isDark ? '#4338ca' : '#3730a3') : (isDark ? '#27272a' : '#e2e8f0');
         ctx.fillRect(keyX + 1, keyAreaTop + keyAreaHeight - 8, whiteKeyWidth - 2, 8);
 
-        // Labels
+        // Key Labels
         if (keyLabels !== 'none') {
           let labelText = '';
           if (keyLabels === 'notes') labelText = key.name;
@@ -478,7 +677,7 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
         }
       });
 
-      // Draw Black Keys Second
+      // B. Black Keys (Overlapping top)
       keys.forEach((key) => {
         if (!key.isBlack) return;
 
@@ -526,11 +725,18 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
     keyLabels,
     diffuseBlur,
     fallingNotes,
+    flowSpeed,
+    isAutoDemo,
     effectConfig,
     activeNotes,
     expectedPitch,
     keys,
     ledCount,
+    startMidi,
+    triggerNoteOn,
+    triggerNoteOff,
+    spawnParticle,
+    getKeyGeometry,
     onFpsUpdate
   ]);
 
@@ -540,18 +746,21 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
     if (!canvas) return null;
 
     const rect = canvas.getBoundingClientRect();
-    const x = clientX - rect.left;
-    const y = clientY - rect.top;
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
 
-    const ledBarHeight = 32;
-    const keyAreaTop = ledBarHeight + 16;
+    const x = (clientX - rect.left) * scaleX;
+    const y = (clientY - rect.top) * scaleY;
+
+    const keyAreaHeight = 125;
+    const keyAreaTop = canvas.height - keyAreaHeight - 4;
+
+    // Only keys area triggers notes
     if (y < keyAreaTop) return null;
 
-    const width = canvas.width;
-    const height = canvas.height;
     const whiteKeys = keys.filter(k => !k.isBlack);
-    const whiteKeyWidth = (width - 32) / whiteKeys.length;
-    const blackKeyHeight = (height - keyAreaTop - 8) * 0.62;
+    const whiteKeyWidth = (canvas.width - 32) / whiteKeys.length;
+    const blackKeyHeight = keyAreaHeight * 0.62;
 
     // Check black keys first
     if (y < keyAreaTop + blackKeyHeight) {
@@ -576,8 +785,13 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
     return null;
   }, [keys]);
 
-  // Pointer Handlers with Drag Capture
+  // Pointer Handlers with Drag Capture & Overlay Autohide
   const handlePointerDown = (e: React.PointerEvent) => {
+    // Autohide card overlay on canvas click
+    if (activeOverlay !== null) {
+      closeOverlay();
+    }
+
     const canvas = canvasRef.current;
     if (!canvas) return;
     canvas.setPointerCapture(e.pointerId);
@@ -615,7 +829,7 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
     }
   };
 
-  // Resize canvas to container
+  // Resize canvas to parent container
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -624,7 +838,8 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
       const parent = canvas.parentElement;
       if (parent) {
         canvas.width = parent.clientWidth;
-        canvas.height = window.innerWidth < 640 ? 260 : 310;
+        // Immersive waterfall canvas height
+        canvas.height = Math.max(480, Math.min(window.innerHeight - 200, 640));
       }
     };
 
@@ -634,10 +849,14 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
   }, []);
 
   return (
-    <div className="relative w-full bg-white dark:bg-black rounded-2xl border border-slate-200 dark:border-zinc-800 p-2 overflow-hidden shadow-sm transition-colors">
-      <div className="w-full flex justify-between items-center px-2 py-1 text-[11px] text-slate-400 dark:text-zinc-500 font-mono">
-        <span>WS2812B STRIP MOUNT (144 LEDS)</span>
-        <span>{keyboardSize} KEYS (MIDI {startMidi} - {startMidi + keyboardSize - 1})</span>
+    <div className="relative w-full bg-white dark:bg-black rounded-3xl border border-slate-200 dark:border-zinc-800 p-2 overflow-hidden shadow-md transition-colors">
+      {/* Visualizer Top Info Bar */}
+      <div className="w-full flex justify-between items-center px-3 py-1.5 text-[11px] text-slate-400 dark:text-zinc-500 font-mono">
+        <span className="flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+          WATERFALL FLOW KEYS RUNWAY
+        </span>
+        <span>WS2812B STRIP MOUNT (144 LEDS) • {keyboardSize} KEYS (MIDI {startMidi} - {startMidi + keyboardSize - 1})</span>
       </div>
 
       <canvas
@@ -646,12 +865,13 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
-        className="w-full h-[260px] sm:h-[310px] cursor-pointer rounded-xl touch-none"
+        className="w-full h-[480px] sm:h-[540px] cursor-pointer rounded-2xl touch-none"
       />
 
-      <div className="mt-1 flex items-center justify-between text-[11px] text-slate-400 dark:text-zinc-500 px-2 font-mono">
-        <span>Touch or click keys, or press QWERTY [A-K] / Space for sustain</span>
-        <span>Polyphonic 60 FPS Engine</span>
+      {/* Visualizer Bottom Info */}
+      <div className="mt-1 flex items-center justify-between text-[11px] text-slate-400 dark:text-zinc-500 px-3 py-1 font-mono">
+        <span>Play keys via MIDI, touch/mouse, or QWERTY [A-K] • Space = Sustain</span>
+        <span>Pure Black OLED 60 FPS Engine</span>
       </div>
     </div>
   );

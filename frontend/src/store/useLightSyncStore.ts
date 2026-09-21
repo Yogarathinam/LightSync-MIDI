@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { 
   StudioTab, 
+  OverlayModalType,
   InstrumentType, 
   EffectType, 
   EffectConfig, 
@@ -15,9 +16,12 @@ import {
 import { synthEngine } from '../audio/synthEngine';
 
 interface LightSyncState {
-  // Navigation
+  // Navigation & Overlay Modal
   activeTab: StudioTab;
   setActiveTab: (tab: StudioTab) => void;
+  activeOverlay: OverlayModalType;
+  setActiveOverlay: (overlay: OverlayModalType) => void;
+  closeOverlay: () => void;
 
   // Active Key States & Chord
   activeNotes: Map<number, ActiveNoteState>;
@@ -32,11 +36,16 @@ interface LightSyncState {
   keyLabels: 'notes' | 'solfege' | 'qwerty' | 'none';
   diffuseBlur: boolean;
   fallingNotes: boolean;
+  flowSpeed: number;
+  isAutoDemo: boolean;
   setKeyboardSize: (size: 25 | 49 | 61 | 88) => void;
   setOctaveShift: (shift: number) => void;
   setKeyLabels: (labels: 'notes' | 'solfege' | 'qwerty' | 'none') => void;
   setDiffuseBlur: (enabled: boolean) => void;
   setFallingNotes: (enabled: boolean) => void;
+  setFlowSpeed: (speed: number) => void;
+  setIsAutoDemo: (active: boolean) => void;
+  toggleAutoDemo: () => void;
 
   // Audio Synth Controls
   volume: number;
@@ -96,9 +105,12 @@ interface LightSyncState {
 }
 
 export const useLightSyncStore = create<LightSyncState>((set, get) => ({
-  // Navigation
+  // Navigation & Overlay
   activeTab: 'play',
-  setActiveTab: (tab) => set({ activeTab: tab }),
+  setActiveTab: (tab) => set({ activeTab: tab, activeOverlay: tab }),
+  activeOverlay: null,
+  setActiveOverlay: (overlay) => set({ activeOverlay: overlay }),
+  closeOverlay: () => set({ activeOverlay: null }),
 
   // Notes & Chord
   activeNotes: new Map(),
@@ -161,11 +173,16 @@ export const useLightSyncStore = create<LightSyncState>((set, get) => ({
   keyLabels: 'notes',
   diffuseBlur: true,
   fallingNotes: true,
+  flowSpeed: 1.2,
+  isAutoDemo: false,
   setKeyboardSize: (size) => set({ keyboardSize: size }),
   setOctaveShift: (shift) => set({ octaveShift: shift }),
   setKeyLabels: (labels) => set({ keyLabels: labels }),
   setDiffuseBlur: (enabled) => set({ diffuseBlur: enabled }),
   setFallingNotes: (enabled) => set({ fallingNotes: enabled }),
+  setFlowSpeed: (speed) => set({ flowSpeed: Math.max(0.2, Math.min(3.0, speed)) }),
+  setIsAutoDemo: (active) => set({ isAutoDemo: active }),
+  toggleAutoDemo: () => set((state) => ({ isAutoDemo: !state.isAutoDemo })),
 
   // Audio Controls
   volume: 0.7,

@@ -2,6 +2,8 @@ export type ThemeMode = 'light' | 'dark';
 
 export type StudioTab = 'play' | 'effects' | 'learn' | 'practice' | 'analyze' | 'aicoach' | 'device';
 
+export type OverlayModalType = StudioTab | 'settings' | null;
+
 export type InstrumentType = 'acoustic_grand' | 'electric_rhodes' | 'warm_synth' | 'marimba';
 
 export type EffectType = 
