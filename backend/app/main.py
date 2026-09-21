@@ -5,7 +5,7 @@ from typing import List, Dict, Any
 from contextlib import asynccontextmanager
 
 from pathlib import Path
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -13,7 +13,14 @@ from pydantic import BaseModel
 from app.core.config import settings
 from app.core.event_bus import event_bus
 from app.music.midi_engine import midi_engine
-from app.music.song_catalog import SONG_CATALOG
+from app.music.song_catalog import (
+    SONG_CATALOG, 
+    get_all_songs, 
+    get_midi_folder_path, 
+    save_uploaded_midi, 
+    delete_midi_file, 
+    rescan_midi_folder
+)
 from app.music.chord_detector import ChordDetector
 from app.device.serial_manager import serial_manager
 from app.analytics.db import init_db, get_recent_sessions, get_all_presets, save_preset
@@ -125,7 +132,41 @@ def connect_device(data: ConnectDeviceModel):
 
 @app.get("/api/songs")
 def get_songs():
-    return {"songs": SONG_CATALOG}
+    return {
+        "songs": get_all_songs(),
+        "midi_folder": str(get_midi_folder_path())
+    }
+
+@app.post("/api/songs/upload")
+async def upload_midi_file(file: UploadFile = File(...)):
+    if not file.filename or not file.filename.lower().endswith(('.mid', '.midi')):
+        raise HTTPException(status_code=400, detail="Only .mid and .midi files are supported.")
+    
+    try:
+        content = await file.read()
+        song = save_uploaded_midi(file.filename, content)
+        if not song:
+            raise HTTPException(status_code=422, detail="Failed to parse MIDI file.")
+        return {"status": "success", "song": song}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error saving uploaded MIDI: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/songs/rescan")
+def rescan_songs():
+    refreshed_songs = rescan_midi_folder()
+    return {
+        "status": "success",
+        "songs": refreshed_songs,
+        "midi_folder": str(get_midi_folder_path())
+    }
+
+@app.delete("/api/songs/{song_id}")
+def delete_song(song_id: str):
+    success = delete_midi_file(song_id)
+    return {"status": "success" if success else "not_found", "deleted": success}
 
 @app.get("/api/presets")
 def get_presets():

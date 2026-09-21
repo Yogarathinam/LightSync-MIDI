@@ -103,6 +103,8 @@ export interface SongItem {
   time_signature: string;
   key: string;
   notes: SongNote[];
+  source?: 'curated' | 'local_midi' | 'imported';
+  filename?: string;
 }
 
 export interface NoteAttempt {

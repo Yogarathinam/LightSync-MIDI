@@ -299,6 +299,12 @@ interface LightSyncState {
   sessionHistory: SessionResult[];
   setSessionHistory: (history: SessionResult[]) => void;
   addSessionResult: (res: SessionResult) => void;
+  midiFolderPath: string | null;
+  isScanningMidi: boolean;
+  fetchSongs: () => Promise<void>;
+  rescanMidiFolder: () => Promise<void>;
+  uploadMidiFile: (file: File) => Promise<SongItem | null>;
+  deleteMidiSong: (songId: string) => Promise<boolean>;
 
   // AI Coach Feedback
   aiCoachFeedback: AICoachFeedback | null;
@@ -636,6 +642,82 @@ export const useLightSyncStore = create<LightSyncState>((set, get) => ({
   sessionHistory: [],
   setSessionHistory: (history) => set({ sessionHistory: history }),
   addSessionResult: (res) => set((state) => ({ sessionHistory: [res, ...state.sessionHistory] })),
+
+  midiFolderPath: null,
+  isScanningMidi: false,
+  fetchSongs: async () => {
+    try {
+      const res = await fetch('http://localhost:8000/api/songs');
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.songs && Array.isArray(data.songs)) {
+        set({ 
+          songsList: data.songs,
+          midiFolderPath: data.midi_folder || null
+        });
+      }
+    } catch (e) {
+      console.warn('Could not fetch songs from backend:', e);
+    }
+  },
+  rescanMidiFolder: async () => {
+    set({ isScanningMidi: true });
+    try {
+      const res = await fetch('http://localhost:8000/api/songs/rescan', { method: 'POST' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.songs) {
+          set({ 
+            songsList: data.songs,
+            midiFolderPath: data.midi_folder || null
+          });
+          get().addConsoleLog(`Rescanned MIDI folder: ${data.songs.length} songs loaded.`);
+        }
+      }
+    } catch (e) {
+      console.error('Failed to rescan MIDI folder:', e);
+      get().addConsoleLog('Failed to rescan MIDI folder (backend offline).');
+    } finally {
+      set({ isScanningMidi: false });
+    }
+  },
+  uploadMidiFile: async (file: File) => {
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch('http://localhost:8000/api/songs/upload', {
+        method: 'POST',
+        body: formData
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.song) {
+          const song = data.song as SongItem;
+          get().addSong(song);
+          get().addConsoleLog(`Imported MIDI: "${song.title}" (${song.notes.length} notes)`);
+          return song;
+        }
+      }
+    } catch (e) {
+      console.warn('Backend upload failed, falling back to client-side parsing:', e);
+    }
+    return null;
+  },
+  deleteMidiSong: async (songId: string) => {
+    try {
+      await fetch(`http://localhost:8000/api/songs/${encodeURIComponent(songId)}`, {
+        method: 'DELETE'
+      });
+    } catch (e) {
+      console.warn('Failed to delete on backend:', e);
+    }
+    set((state) => ({
+      songsList: state.songsList.filter((s) => s.id !== songId),
+      currentSong: state.currentSong?.id === songId ? state.songsList[0] || null : state.currentSong
+    }));
+    get().addConsoleLog(`Removed song: ${songId}`);
+    return true;
+  },
 
   // AI Coach Feedback
   aiCoachFeedback: null,
