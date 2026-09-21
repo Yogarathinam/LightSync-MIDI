@@ -1,0 +1,1400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LightSync Effect Studio - LED Visualizer</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Google Font: Inter -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap">
+  
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            brand: {
+              50: '#f0f6ff',
+              500: '#3b82f6',
+              600: '#2563eb',
+              900: '#0f172a',
+            },
+            cyber: {
+              dark: '#0a0d14',
+              panel: '#121824',
+              border: '#1e293b',
+              accent: '#00f0ff',
+              pink: '#ff007f'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  
+  <style>
+    body {
+      background-color: #080b11;
+      color: #e2e8f0;
+      user-select: none;
+    }
+    
+    /* Custom scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0d121d;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #1e293b;
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #334155;
+    }
+
+    .glow-cyan {
+      box-shadow: 0 0 20px rgba(0, 240, 255, 0.25);
+    }
+
+    .glow-pink {
+      box-shadow: 0 0 20px rgba(255, 0, 127, 0.25);
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col font-sans antialiased overflow-x-hidden">
+
+  <!-- Top Navigation Header -->
+  <header class="bg-cyber-panel border-b border-cyber-border px-4 py-3 flex items-center justify-between shadow-lg sticky top-0 z-50">
+    <div class="flex items-center space-x-3">
+      <div class="w-9 h-9 rounded-lg bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center text-white font-bold shadow-lg shadow-cyan-500/30">
+        <i class="fa-solid font-mono text-lg">LS</i>
+      </div>
+      <div>
+        <h1 class="text-lg font-bold tracking-wide text-white flex items-center gap-2">
+          LIGHTSYNC <span class="text-xs px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 font-mono">STUDIO v2.0</span>
+        </h1>
+        <p class="text-xs text-slate-400">WS2812B LED Array Visualizer for M5Stack / ESP32</p>
+      </div>
+    </div>
+
+    <!-- Quick Status & Global Settings -->
+    <div class="flex items-center space-x-4">
+      <!-- MIDI Connection Status -->
+      <div id="midiStatus" class="hidden sm:flex items-center gap-2 text-xs bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-lg text-slate-400">
+        <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse" id="midiDot"></span>
+        <span id="midiText">MIDI: Scanning...</span>
+      </div>
+
+      <!-- Audio Output Toggle -->
+      <button id="audioToggleBtn" onclick="toggleAudio()" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-medium text-slate-300 border border-slate-700 flex items-center gap-2 transition-all">
+        <i class="fa-solid fa-volume-high text-cyan-400" id="audioIcon"></i>
+        <span id="audioLabel">Sound On</span>
+      </button>
+
+      <!-- Connection Mock Button -->
+      <button onclick="toggleDeviceConnection()" id="connectDeviceBtn" class="px-3.5 py-1.5 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/30 text-xs font-medium border border-emerald-500/40 flex items-center gap-2 transition-all">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+        <span id="connectBtnText">M5Stack Connected</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Studio Workspace Grid -->
+  <main class="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 p-4 max-w-[1800px] w-full mx-auto">
+
+    <!-- Left Column: Primary Visualizer Viewport (8 Cols) -->
+    <section class="lg:col-span-8 flex flex-col gap-4">
+
+      <!-- LED & Piano Canvas Viewport Box -->
+      <div class="bg-cyber-panel border border-cyber-border rounded-xl p-4 flex flex-col gap-3 relative shadow-2xl overflow-hidden">
+        
+        <!-- Viewport Toolbar -->
+        <div class="flex flex-wrap items-center justify-between gap-2 bg-slate-900/80 p-2.5 rounded-lg border border-slate-800 text-xs">
+          <!-- Keyboard Size Selector -->
+          <div class="flex items-center gap-2">
+            <span class="text-slate-400 font-medium">Keyboard Layout:</span>
+            <div class="inline-flex rounded-md shadow-sm" role="group">
+              <button onclick="setKeyboardSize(61)" id="btn61Keys" class="px-3 py-1 rounded-l-lg bg-cyan-600 text-white font-semibold border border-cyan-500 transition-all">
+                61 Keys
+              </button>
+              <button onclick="setKeyboardSize(88)" id="btn88Keys" class="px-3 py-1 rounded-r-lg bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700 transition-all">
+                88 Keys
+              </button>
+            </div>
+          </div>
+
+          <!-- LED Density Selector -->
+          <div class="flex items-center gap-2">
+            <span class="text-slate-400 font-medium">LED Count:</span>
+            <select id="ledCountSelect" onchange="updateLedCount(this.value)" class="bg-slate-800 border border-slate-700 text-cyan-300 rounded-md px-2.5 py-1 focus:outline-none focus:border-cyan-500 font-mono">
+              <option value="144" selected>144 LEDs (Standard density)</option>
+              <option value="207">207 LEDs (Scaled 88k density)</option>
+              <option value="300">300 LEDs (High density)</option>
+              <option value="72">72 LEDs (Low density)</option>
+            </select>
+          </div>
+
+          <!-- Visual Filter Toggle (Diffuser Simulation) -->
+          <div class="flex items-center gap-3">
+            <label class="flex items-center cursor-pointer gap-2 select-none">
+              <input type="checkbox" id="diffuserBlurToggle" checked onchange="toggleDiffuser(this.checked)" class="sr-only peer">
+              <div class="w-8 h-4 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-cyan-500 relative"></div>
+              <span class="text-slate-300 font-medium">Silicone Diffuser Glow</span>
+            </label>
+
+            <!-- Auto Play Demo -->
+            <button onclick="toggleAutoDemo()" id="demoBtn" class="px-3 py-1 rounded-md bg-purple-600/20 text-purple-300 hover:bg-purple-600/30 border border-purple-500/40 flex items-center gap-1.5 transition-all">
+              <i class="fa-solid fa-play text-xs" id="demoIcon"></i>
+              <span id="demoText">Auto Demo</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Interactive Visualizer Canvas Area -->
+        <div class="relative w-full bg-slate-950 rounded-lg border border-slate-800 p-2 overflow-hidden flex flex-col items-center">
+          
+          <!-- Strip Header Metadata -->
+          <div class="w-full flex justify-between items-center px-2 py-1 text-[10px] text-slate-500 font-mono">
+            <span>WS2812B STRIP MOUNT (TOP OF KEYBOARD)</span>
+            <span id="ledDensityInfo">144 LEDs mapped across 61 keys (~2.36 LEDs/Key)</span>
+          </div>
+
+          <!-- Real-Time Rendering Canvas -->
+          <canvas id="studioCanvas" class="w-full h-[280px] sm:h-[340px] cursor-pointer rounded bg-slate-950 touch-none"></canvas>
+
+          <!-- Interaction Helper Overlay Text -->
+          <div class="absolute bottom-4 left-1/2 -translate-x-1/2 bg-slate-900/90 text-slate-400 border border-slate-800 px-3 py-1 rounded-full text-xs font-mono backdrop-blur-sm pointer-events-none flex items-center gap-2">
+            <i class="fa-solid fa-hand-pointer text-cyan-400 animate-bounce"></i>
+            <span>Click / Touch piano keys or press QWERTY [A-K] keys to trigger effects</span>
+          </div>
+        </div>
+
+        <!-- Key Press Visual Monitor Bar -->
+        <div class="flex items-center justify-between text-xs font-mono text-slate-400 bg-slate-900/60 px-3 py-2 rounded-lg border border-slate-800">
+          <div class="flex items-center gap-2">
+            <span>Active Trigger:</span>
+            <span id="activeNoteDisplay" class="text-cyan-400 font-bold bg-cyan-950/50 px-2 py-0.5 rounded border border-cyan-800/50">None</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span>Mapped LED Index:</span>
+            <span id="activeLedDisplay" class="text-emerald-400 font-bold bg-emerald-950/50 px-2 py-0.5 rounded border border-emerald-800/50">-</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span>FPS:</span>
+            <span id="fpsCounter" class="text-amber-400 font-bold">60</span>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Effects Selector & Real-Time Parameter Sliders -->
+      <div class="bg-cyber-panel border border-cyber-border rounded-xl p-4 flex flex-col gap-4 shadow-xl">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+          <h2 class="text-sm font-bold text-slate-200 tracking-wider flex items-center gap-2">
+            <i class="fa-solid fa-sliders text-cyan-400"></i>
+            EFFECT PARAMETERS & CONTROLS
+          </h2>
+          <span class="text-xs text-slate-400 font-mono">Target: WS2812B Engine</span>
+        </div>
+
+        <!-- Effect Mode Selector Grid -->
+        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2" id="effectButtonsContainer">
+          <!-- Populated dynamically via JS -->
+        </div>
+
+        <!-- Dynamic Parameter Controls Sliders -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 pt-2">
+          
+          <!-- Speed Control -->
+          <div class="bg-slate-900/80 p-3 rounded-lg border border-slate-800 flex flex-col gap-2">
+            <div class="flex justify-between items-center text-xs">
+              <label for="sliderSpeed" class="text-slate-300 font-medium flex items-center gap-1.5">
+                <i class="fa-solid fa-gauge-high text-cyan-400"></i> Speed
+              </label>
+              <span id="valSpeed" class="font-mono text-cyan-400 font-semibold">1.20</span>
+            </div>
+            <input type="range" id="sliderSpeed" min="0.1" max="5.0" step="0.05" value="1.2" oninput="updateParam('speed', this.value)" class="w-full accent-cyan-400 h-1.5 bg-slate-800 rounded-lg cursor-pointer">
+          </div>
+
+          <!-- Decay Control -->
+          <div class="bg-slate-900/80 p-3 rounded-lg border border-slate-800 flex flex-col gap-2">
+            <div class="flex justify-between items-center text-xs">
+              <label for="sliderDecay" class="text-slate-300 font-medium flex items-center gap-1.5">
+                <i class="fa-solid fa-fire-extinguisher text-amber-400"></i> Decay / Fade
+              </label>
+              <span id="valDecay" class="font-mono text-amber-400 font-semibold">0.85</span>
+            </div>
+            <input type="range" id="sliderDecay" min="0.5" max="0.99" step="0.01" value="0.85" oninput="updateParam('decay', this.value)" class="w-full accent-amber-400 h-1.5 bg-slate-800 rounded-lg cursor-pointer">
+          </div>
+
+          <!-- Spread Control -->
+          <div class="bg-slate-900/80 p-3 rounded-lg border border-slate-800 flex flex-col gap-2">
+            <div class="flex justify-between items-center text-xs">
+              <label for="sliderSpread" class="text-slate-300 font-medium flex items-center gap-1.5">
+                <i class="fa-solid fa-arrows-left-right text-emerald-400"></i> Spread Width
+              </label>
+              <span id="valSpread" class="font-mono text-emerald-400 font-semibold">3.0</span>
+            </div>
+            <input type="range" id="sliderSpread" min="1" max="12" step="0.5" value="3.0" oninput="updateParam('spread', this.value)" class="w-full accent-emerald-400 h-1.5 bg-slate-800 rounded-lg cursor-pointer">
+          </div>
+
+          <!-- Brightness Control -->
+          <div class="bg-slate-900/80 p-3 rounded-lg border border-slate-800 flex flex-col gap-2">
+            <div class="flex justify-between items-center text-xs">
+              <label for="sliderBrightness" class="text-slate-300 font-medium flex items-center gap-1.5">
+                <i class="fa-solid fa-sun text-yellow-400"></i> Brightness
+              </label>
+              <span id="valBrightness" class="font-mono text-yellow-400 font-semibold">200</span>
+            </div>
+            <input type="range" id="sliderBrightness" min="10" max="255" step="5" value="200" oninput="updateParam('brightness', this.value)" class="w-full accent-yellow-400 h-1.5 bg-slate-800 rounded-lg cursor-pointer">
+          </div>
+
+          <!-- Color Mode & Pickers -->
+          <div class="bg-slate-900/80 p-3 rounded-lg border border-slate-800 flex flex-col gap-2 col-span-1 sm:col-span-2">
+            <div class="flex justify-between items-center text-xs">
+              <label class="text-slate-300 font-medium flex items-center gap-1.5">
+                <i class="fa-solid fa-palette text-pink-400"></i> Color Palette & Mode
+              </label>
+              <div class="flex items-center gap-2">
+                <label class="text-[11px] text-slate-400 flex items-center gap-1">
+                  <input type="checkbox" id="rainbowModeToggle" onchange="updateParam('rainbow', this.checked)" class="accent-pink-500 rounded">
+                  Rainbow Dynamic
+                </label>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-3 pt-1">
+              <!-- Primary Color Picker -->
+              <div class="flex items-center gap-2">
+                <input type="color" id="primaryColorPicker" value="#00f0ff" onchange="updateColor('primary', this.value)" class="w-8 h-8 rounded border-0 bg-transparent cursor-pointer">
+                <span class="text-xs text-slate-400 font-mono" id="primaryColorHex">#00f0ff</span>
+              </div>
+
+              <!-- Secondary Color Picker -->
+              <div class="flex items-center gap-2 pl-3 border-l border-slate-800">
+                <input type="color" id="secondaryColorPicker" value="#ff007f" onchange="updateColor('secondary', this.value)" class="w-8 h-8 rounded border-0 bg-transparent cursor-pointer">
+                <span class="text-xs text-slate-400 font-mono" id="secondaryColorHex">#ff007f</span>
+              </div>
+
+              <!-- Preset Quick Colors -->
+              <div class="flex items-center gap-1.5 ml-auto">
+                <button onclick="setQuickColor('#00f0ff')" class="w-5 h-5 rounded-full bg-[#00f0ff] border border-white/20 hover:scale-110 transition-transform" title="Cyan"></button>
+                <button onclick="setQuickColor('#ff007f')" class="w-5 h-5 rounded-full bg-[#ff007f] border border-white/20 hover:scale-110 transition-transform" title="Pink"></button>
+                <button onclick="setQuickColor('#ffaa00')" class="w-5 h-5 rounded-full bg-[#ffaa00] border border-white/20 hover:scale-110 transition-transform" title="Gold"></button>
+                <button onclick="setQuickColor('#10b981')" class="w-5 h-5 rounded-full bg-[#10b981] border border-white/20 hover:scale-110 transition-transform" title="Emerald"></button>
+                <button onclick="setQuickColor('#a855f7')" class="w-5 h-5 rounded-full bg-[#a855f7] border border-white/20 hover:scale-110 transition-transform" title="Purple"></button>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </section>
+
+    <!-- Right Column: M5Stack / ESP32 Hardware Communication Studio (4 Cols) -->
+    <section class="lg:col-span-4 flex flex-col gap-4">
+
+      <!-- M5Stack Hardware Data & Sync Terminal -->
+      <div class="bg-cyber-panel border border-cyber-border rounded-xl p-4 flex flex-col gap-4 shadow-xl h-full">
+        
+        <!-- Header -->
+        <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+          <div class="flex items-center gap-2">
+            <i class="fa-solid fa-microchip text-emerald-400 text-base"></i>
+            <div>
+              <h2 class="text-sm font-bold text-slate-200 tracking-wider">LIGHTSYNC MCU SYNC</h2>
+              <p class="text-[10px] text-slate-400">Data-driven ESP32 / M5Stack Configuration</p>
+            </div>
+          </div>
+          <span class="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[10px] font-mono">READY</span>
+        </div>
+
+        <!-- M5Stack UI Mockup Card -->
+        <div class="bg-slate-950 border border-slate-800 rounded-xl p-4 flex flex-col items-center justify-center gap-3 relative shadow-inner">
+          <div class="text-[10px] font-mono text-slate-500 uppercase tracking-widest flex items-center gap-1">
+            <span class="w-2 h-2 rounded-full bg-red-500"></span> M5Stack Display Screen Mock
+          </div>
+          
+          <!-- Mock Screen -->
+          <div class="w-full bg-slate-900 border-2 border-slate-800 rounded-lg p-3 font-mono text-xs flex flex-col gap-2 text-slate-300">
+            <div class="flex justify-between items-center text-[10px] border-b border-slate-800 pb-1 text-slate-500">
+              <span>M5STACK LIGHTSYNC</span>
+              <span id="m5StatusText">SYNCED</span>
+            </div>
+
+            <div class="flex items-center justify-between">
+              <span class="text-slate-400">EFFECT:</span>
+              <span id="m5EffectName" class="text-cyan-400 font-bold uppercase">BOUNCE</span>
+            </div>
+
+            <div class="grid grid-cols-2 gap-1 text-[11px]">
+              <div>SPD: <span id="m5Speed" class="text-white">1.20</span></div>
+              <div>DEC: <span id="m5Decay" class="text-white">0.85</span></div>
+              <div>SPR: <span id="m5Spread" class="text-white">3.0</span></div>
+              <div>BRT: <span id="m5Brightness" class="text-white">200</span></div>
+            </div>
+
+            <div class="flex items-center justify-between pt-1 border-t border-slate-800 text-[10px]">
+              <span>COLOR:</span>
+              <div class="flex items-center gap-1.5">
+                <span id="m5ColorRgb" class="text-slate-400">(0, 240, 255)</span>
+                <span id="m5ColorSwatch" class="w-3 h-3 rounded-full bg-[#00f0ff] inline-block border border-white/20"></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Send Action Button -->
+          <button onclick="sendToDevice()" id="sendBtn" class="w-full py-2.5 rounded-lg bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-semibold text-xs shadow-lg shadow-cyan-600/30 flex items-center justify-center gap-2 transition-all active:scale-[0.98]">
+            <i class="fa-solid fa-paper-plane"></i>
+            <span>Send to LightSync Device</span>
+          </button>
+        </div>
+
+        <!-- Format Toggle (JSON vs CLI Text Protocol) -->
+        <div class="flex items-center justify-between text-xs bg-slate-900 p-1.5 rounded-lg border border-slate-800">
+          <span class="text-slate-400 font-medium px-2">Data Protocol:</span>
+          <div class="flex gap-1">
+            <button onclick="setProtocolFormat('cli')" id="fmtCliBtn" class="px-2.5 py-1 rounded bg-cyan-600 text-white font-mono text-[11px] transition-all">CLI Text</button>
+            <button onclick="setProtocolFormat('json')" id="fmtJsonBtn" class="px-2.5 py-1 rounded bg-slate-800 text-slate-400 hover:text-white font-mono text-[11px] transition-all">JSON</button>
+          </div>
+        </div>
+
+        <!-- Live Generated Payload Output Area -->
+        <div class="flex-1 flex flex-col gap-1.5">
+          <div class="flex items-center justify-between text-xs text-slate-400 font-mono">
+            <span>Generated Command Payload:</span>
+            <button onclick="copyPayload()" class="text-cyan-400 hover:text-cyan-300 text-[11px] flex items-center gap-1">
+              <i class="fa-solid fa-copy"></i> Copy
+            </button>
+          </div>
+          <textarea id="payloadOutput" readonly class="w-full flex-1 min-h-[140px] bg-slate-950 text-emerald-400 font-mono text-xs p-3 rounded-lg border border-slate-800 focus:outline-none resize-none select-all"></textarea>
+        </div>
+
+        <!-- Simulated Device Serial Terminal Logs -->
+        <div class="flex flex-col gap-1.5">
+          <div class="flex justify-between items-center text-[11px] text-slate-400 font-mono">
+            <span class="flex items-center gap-1"><i class="fa-solid fa-terminal text-slate-500"></i> Serial Terminal Console:</span>
+            <button onclick="clearConsole()" class="text-slate-500 hover:text-slate-300 text-[10px]">Clear</button>
+          </div>
+          <div id="serialConsole" class="h-24 bg-slate-950 border border-slate-800 rounded-lg p-2 font-mono text-[10px] text-slate-400 overflow-y-auto flex flex-col gap-1">
+            <div class="text-slate-600">[00:00:00] LightSync Visualizer initialized. Ready for parameter sync.</div>
+          </div>
+        </div>
+
+      </div>
+
+    </section>
+
+  </main>
+
+  <script>
+    // Studio State Configuration
+    const state = {
+      keyboardSize: 61,       // 61 or 88 keys
+      ledCount: 144,          // 144, 207, 300, 72
+      diffuseBlur: true,      // Diffuser silicone tube mask enabled
+      autoDemo: false,        // Auto play demo note triggers
+      protocolFormat: 'cli',  // 'cli' or 'json'
+      audioEnabled: true,     // Web Audio synth output enabled
+
+      // Active Effect Selection
+      effect: 'bounce',       // 'bounce', 'ripple', 'pulse', 'hold_beam', 'glitch', 'spark', 'sprinkle', 'rain', 'wave'
+
+      // Effect Parameters
+      speed: 1.2,
+      decay: 0.85,
+      spread: 3.0,
+      brightness: 200,
+      rainbow: false,
+      primaryColor: { r: 0, g: 240, b: 255 },     // #00f0ff
+      secondaryColor: { r: 255, g: 0, b: 127 },  // #ff007f
+
+      // Hardware Mock Status
+      deviceConnected: true,
+
+      // Runtime Engine Data
+      leds: [],               // Array of {r, g, b} colors for each LED
+      particles: [],          // Active effect particle dynamics
+      activeKeys: new Map(),  // Map of currently pressed key indexes -> { startTime, midi, centerLed, soundOsc }
+      lastFrameTime: performance.now(),
+      fps: 60,
+      activePointerId: null,
+      lastPointerKey: -1
+    };
+
+    // Expanded Effects Catalog with distinct animations & hold support
+    const EFFECTS_CATALOG = [
+      { id: 'bounce', name: 'Bounce', icon: 'fa-basketball-ball' },
+      { id: 'ripple', name: 'Ripple (Ring)', icon: 'fa-water' },
+      { id: 'pulse', name: 'Pulse (Heartbeat)', icon: 'fa-heart-pulse' },
+      { id: 'hold_beam', name: 'Hold Aura', icon: 'fa-hand-back-fist' },
+      { id: 'glitch', name: 'Cyber Glitch', icon: 'fa-terminal' },
+      { id: 'spark', name: 'Spark Burst', icon: 'fa-bolt' },
+      { id: 'sprinkle', name: 'Sprinkle Glow', icon: 'fa-wand-magic-sparkles' },
+      { id: 'rain', name: 'Neon Rain', icon: 'fa-cloud-showers-heavy' },
+      { id: 'wave', name: 'Harmonic Wave', icon: 'fa-wave-square' }
+    ];
+
+    // Canvas Context
+    let canvas, ctx;
+    let audioCtx = null;
+
+    // Polyphonic Synthesizer with Note Release Support
+    function startNoteSound(midiNote) {
+      if (!state.audioEnabled) return null;
+      try {
+        if (!audioCtx) {
+          audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume();
+        }
+
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+
+        const freq = 440 * Math.pow(2, (midiNote - 69) / 12);
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        osc.type = 'triangle';
+
+        gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+
+        return { osc, gain };
+      } catch (e) {
+        return null;
+      }
+    }
+
+    function stopNoteSound(soundObj) {
+      if (!soundObj || !audioCtx) return;
+      try {
+        soundObj.gain.gain.setValueAtTime(soundObj.gain.gain.value, audioCtx.currentTime);
+        soundObj.gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.25);
+        soundObj.osc.stop(audioCtx.currentTime + 0.26);
+      } catch(e) {}
+    }
+
+    // Keyboard Layout Helpers
+    function getPianoKeys(keyCount) {
+      const startMidi = keyCount === 61 ? 36 : 21;
+      const keys = [];
+      const blackPattern = [false, true, false, true, false, false, true, false, true, false, true, false];
+
+      let whiteIndex = 0;
+      for (let i = 0; i < keyCount; i++) {
+        const midi = startMidi + i;
+        const noteInOctave = midi % 12;
+        const isBlack = blackPattern[noteInOctave];
+
+        keys.push({
+          index: i,
+          midi: midi,
+          isBlack: isBlack,
+          whiteIndex: isBlack ? -1 : whiteIndex
+        });
+
+        if (!isBlack) whiteIndex++;
+      }
+      return keys;
+    }
+
+    function initEffectButtons() {
+      const container = document.getElementById('effectButtonsContainer');
+      container.innerHTML = '';
+
+      EFFECTS_CATALOG.forEach(eff => {
+        const isActive = state.effect === eff.id;
+        const btn = document.createElement('button');
+        btn.id = `effBtn_${eff.id}`;
+        btn.onclick = () => selectEffect(eff.id);
+        btn.className = `p-2.5 rounded-lg border text-xs font-semibold flex flex-col items-center gap-1.5 transition-all ${
+          isActive 
+            ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/60 shadow-lg shadow-cyan-500/20' 
+            : 'bg-slate-900/80 text-slate-400 border-slate-800 hover:bg-slate-800 hover:text-slate-200'
+        }`;
+
+        btn.innerHTML = `
+          <i class="fa-solid ${eff.icon} text-base ${isActive ? 'text-cyan-400' : 'text-slate-500'}"></i>
+          <span class="text-[11px] text-center leading-tight">${eff.name}</span>
+        `;
+        container.appendChild(btn);
+      });
+    }
+
+    function selectEffect(effectId) {
+      state.effect = effectId;
+      EFFECTS_CATALOG.forEach(eff => {
+        const btn = document.getElementById(`effBtn_${eff.id}`);
+        if (!btn) return;
+        const isActive = eff.id === effectId;
+        btn.className = `p-2.5 rounded-lg border text-xs font-semibold flex flex-col items-center gap-1.5 transition-all ${
+          isActive 
+            ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/60 shadow-lg shadow-cyan-500/20' 
+            : 'bg-slate-900/80 text-slate-400 border-slate-800 hover:bg-slate-800 hover:text-slate-200'
+        }`;
+        const icon = btn.querySelector('i');
+        if (icon) icon.className = `fa-solid ${eff.icon} text-base ${isActive ? 'text-cyan-400' : 'text-slate-500'}`;
+      });
+
+      state.particles = [];
+      updatePayloadOutput();
+      logConsole(`Effect mode switched to [${effectId.toUpperCase()}]`);
+    }
+
+    function updateParam(param, value) {
+      if (param === 'rainbow') {
+        state.rainbow = !!value;
+      } else {
+        state[param] = parseFloat(value);
+        const valElem = document.getElementById(`val${param.charAt(0).toUpperCase() + param.slice(1)}`);
+        if (valElem) {
+          valElem.innerText = typeof state[param] === 'number' ? state[param].toFixed(param === 'brightness' || param === 'spread' ? 1 : 2) : state[param];
+        }
+      }
+      updatePayloadOutput();
+    }
+
+    function updateColor(type, hex) {
+      const rgb = hexToRgb(hex);
+      if (type === 'primary') {
+        state.primaryColor = rgb;
+        document.getElementById('primaryColorHex').innerText = hex;
+      } else {
+        state.secondaryColor = rgb;
+        document.getElementById('secondaryColorHex').innerText = hex;
+      }
+      updatePayloadOutput();
+    }
+
+    function setQuickColor(hex) {
+      document.getElementById('primaryColorPicker').value = hex;
+      updateColor('primary', hex);
+    }
+
+    function hexToRgb(hex) {
+      const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+      return result ? {
+        r: parseInt(result[1], 16),
+        g: parseInt(result[2], 16),
+        b: parseInt(result[3], 16)
+      } : { r: 0, g: 240, b: 255 };
+    }
+
+    function rgbToHex(r, g, b) {
+      return "#" + (1 << 24 | r << 16 | g << 8 | b).toString(16).slice(1);
+    }
+
+    function setKeyboardSize(size) {
+      state.keyboardSize = size;
+      document.getElementById('btn61Keys').className = size === 61 
+        ? 'px-3 py-1 rounded-l-lg bg-cyan-600 text-white font-semibold border border-cyan-500 transition-all'
+        : 'px-3 py-1 rounded-l-lg bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700 transition-all';
+      
+      document.getElementById('btn88Keys').className = size === 88 
+        ? 'px-3 py-1 rounded-r-lg bg-cyan-600 text-white font-semibold border border-cyan-500 transition-all'
+        : 'px-3 py-1 rounded-r-lg bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700 transition-all';
+
+      if (size === 88 && state.ledCount === 144) {
+        document.getElementById('ledCountSelect').value = "207";
+        updateLedCount(207);
+      } else if (size === 61 && state.ledCount === 207) {
+        document.getElementById('ledCountSelect').value = "144";
+        updateLedCount(144);
+      } else {
+        updateLedCount(state.ledCount);
+      }
+    }
+
+    function updateLedCount(count) {
+      state.ledCount = parseInt(count);
+      state.leds = Array.from({ length: state.ledCount }, () => ({ r: 0, g: 0, b: 0 }));
+      
+      const ratio = (state.ledCount / state.keyboardSize).toFixed(2);
+      document.getElementById('ledDensityInfo').innerText = `${state.ledCount} LEDs mapped across ${state.keyboardSize} keys (~${ratio} LEDs/Key)`;
+      
+      logConsole(`LED Array resized: ${state.ledCount} LEDs`);
+      updatePayloadOutput();
+    }
+
+    function toggleDiffuser(enabled) {
+      state.diffuseBlur = enabled;
+      logConsole(`Diffuser silicone tube filter: ${enabled ? 'ON' : 'OFF'}`);
+    }
+
+    function toggleAudio() {
+      state.audioEnabled = !state.audioEnabled;
+      document.getElementById('audioLabel').innerText = state.audioEnabled ? 'Sound On' : 'Muted';
+      document.getElementById('audioIcon').className = state.audioEnabled ? 'fa-solid fa-volume-high text-cyan-400' : 'fa-solid fa-volume-xmark text-slate-500';
+    }
+
+    // Note ON Trigger logic
+    function noteOn(keyIndex) {
+      if (state.activeKeys.has(keyIndex)) return; // Already pressed
+
+      const keys = getPianoKeys(state.keyboardSize);
+      if (keyIndex < 0 || keyIndex >= keys.length) return;
+
+      const targetKey = keys[keyIndex];
+      const normalizedPos = keyIndex / (state.keyboardSize - 1);
+      const centerLed = Math.floor(normalizedPos * (state.ledCount - 1));
+
+      const soundObj = startNoteSound(targetKey.midi);
+
+      state.activeKeys.set(keyIndex, {
+        startTime: performance.now(),
+        midi: targetKey.midi,
+        centerLed: centerLed,
+        soundObj: soundObj
+      });
+
+      // Update UI displays
+      const noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+      const octave = Math.floor(targetKey.midi / 12) - 1;
+      const noteName = noteNames[targetKey.midi % 12] + octave;
+
+      document.getElementById('activeNoteDisplay').innerText = `${noteName} (Key ${keyIndex + 1})`;
+      document.getElementById('activeLedDisplay').innerText = `LED #${centerLed + 1}`;
+
+      // Primary Color or Rainbow calculation
+      let particleColor = { ...state.primaryColor };
+      if (state.rainbow) {
+        const hue = (keyIndex / state.keyboardSize) * 360;
+        particleColor = hslToRgb(hue / 360, 1.0, 0.5);
+      }
+
+      // Generate Distinct Effects
+      switch (state.effect) {
+        case 'bounce':
+          state.particles.push({
+            type: 'bounce',
+            pos: centerLed,
+            vel: (Math.random() - 0.5) * 2.5 * state.speed,
+            color: particleColor,
+            life: 1.0,
+            spread: state.spread
+          });
+          break;
+
+        case 'ripple':
+          // Sharp expanding ring wave (Distinct from Pulse!)
+          state.particles.push({
+            type: 'ripple',
+            center: centerLed,
+            radius: 0,
+            speed: state.speed * 2.2,
+            color: particleColor,
+            life: 1.0,
+            thickness: Math.max(1.5, state.spread * 0.6)
+          });
+          break;
+
+        case 'pulse':
+          // Breathing expand/contract rhythm (Distinct from Pulse!)
+          state.particles.push({
+            type: 'pulse',
+            center: centerLed,
+            radius: 0,
+            maxRadius: state.spread * 8,
+            speed: state.speed * 0.8,
+            color: particleColor,
+            life: 1.0,
+            phase: 0
+          });
+          break;
+
+        case 'hold_beam':
+          // Hold / Sustain effect burst initial flash
+          state.particles.push({
+            type: 'hold_flash',
+            center: centerLed,
+            color: particleColor,
+            life: 1.0,
+            spread: state.spread * 1.5
+          });
+          break;
+
+        case 'glitch':
+          // Cyberpunk digital bit glitch burst
+          for (let i = 0; i < 7; i++) {
+            const glitchOffset = (Math.random() - 0.5) * state.spread * 6;
+            state.particles.push({
+              type: 'glitch',
+              pos: Math.max(0, Math.min(state.ledCount - 1, Math.floor(centerLed + glitchOffset))),
+              color: Math.random() > 0.5 ? particleColor : state.secondaryColor,
+              life: 0.3 + Math.random() * 0.4,
+              stutterRate: Math.random() * 0.8
+            });
+          }
+          break;
+
+        case 'spark':
+          for (let i = 0; i < 6; i++) {
+            state.particles.push({
+              type: 'spark',
+              pos: centerLed,
+              vel: (Math.random() - 0.5) * 5 * state.speed,
+              color: particleColor,
+              life: 1.0,
+              spread: state.spread * 0.5
+            });
+          }
+          break;
+
+        case 'sprinkle':
+          for (let i = 0; i < 10; i++) {
+            const offset = (Math.random() - 0.5) * state.spread * 4;
+            state.particles.push({
+              type: 'sprinkle',
+              pos: Math.max(0, Math.min(state.ledCount - 1, centerLed + offset)),
+              color: particleColor,
+              life: 0.8 + Math.random() * 0.5,
+              blinkSpeed: Math.random() * 0.2 + 0.05
+            });
+          }
+          break;
+
+        case 'rain':
+          // Falling neon comets
+          state.particles.push({
+            type: 'rain',
+            pos: centerLed,
+            vel: (Math.random() > 0.5 ? 1 : -1) * state.speed * 1.8,
+            color: particleColor,
+            life: 1.0,
+            tailLen: state.spread * 3
+          });
+          break;
+
+        case 'wave':
+          state.particles.push({
+            type: 'wave',
+            center: centerLed,
+            phase: 0,
+            speed: state.speed * 0.2,
+            color: particleColor,
+            life: 1.0,
+            spread: state.spread * 4
+          });
+          break;
+      }
+    }
+
+    // Note OFF Release logic
+    function noteOff(keyIndex) {
+      if (!state.activeKeys.has(keyIndex)) return;
+      const keyData = state.activeKeys.get(keyIndex);
+
+      if (keyData && keyData.soundObj) {
+        stopNoteSound(keyData.soundObj);
+      }
+
+      state.activeKeys.delete(keyIndex);
+    }
+
+    // Main Physics & Frame Simulation Loop
+    function updateAndRender() {
+      const now = performance.now();
+      const rawDt = (now - state.lastFrameTime) / 1000;
+      const dt = Math.min(rawDt, 0.05); // Cap delta time to prevent physics glitches
+      state.lastFrameTime = now;
+      state.fps = Math.round(1 / dt);
+      document.getElementById('fpsCounter').innerText = isFinite(state.fps) ? state.fps : 60;
+
+      // Decay existing LED frame buffer
+      const decayFactor = state.decay;
+      for (let i = 0; i < state.ledCount; i++) {
+        state.leds[i].r *= decayFactor;
+        state.leds[i].g *= decayFactor;
+        state.leds[i].b *= decayFactor;
+      }
+
+      // 1. Process Continuous Held Note Animations (Hold / Sustain Aura)
+      state.activeKeys.forEach((keyData, keyIdx) => {
+        let activeColor = { ...state.primaryColor };
+        if (state.rainbow) {
+          const hue = (keyIdx / state.keyboardSize) * 360;
+          activeColor = hslToRgb(hue / 360, 1.0, 0.5);
+        }
+
+        // Always inject sustained key illumination while held
+        addSpreadLuminance(keyData.centerLed, state.spread * 1.2, activeColor, 1.0);
+
+        if (state.effect === 'hold_beam') {
+          // Sustained laser aura & rising particle sparks
+          addSpreadLuminance(keyData.centerLed, state.spread * 2.5, state.secondaryColor, 0.6);
+          if (Math.random() < 0.4) {
+            state.particles.push({
+              type: 'spark',
+              pos: keyData.centerLed,
+              vel: (Math.random() - 0.5) * 3 * state.speed,
+              color: activeColor,
+              life: 0.6,
+              spread: state.spread * 0.4
+            });
+          }
+        }
+      });
+
+      // 2. Update Dynamic Effect Particles
+      for (let i = state.particles.length - 1; i >= 0; i--) {
+        const p = state.particles[i];
+
+        switch (p.type) {
+          case 'bounce':
+            p.pos += p.vel;
+            if (p.pos <= 0 || p.pos >= state.ledCount - 1) {
+              p.vel *= -0.85;
+              p.pos = Math.max(0, Math.min(state.ledCount - 1, p.pos));
+            }
+            p.life *= (state.decay + 0.01);
+            addSpreadLuminance(p.pos, p.spread, p.color, p.life);
+            break;
+
+          case 'ripple':
+            // Expanding sharp ring (Distinct wave crest)
+            p.radius += p.speed * 0.8;
+            p.life -= (1 - state.decay) * 0.35;
+
+            for (let idx = 0; idx < state.ledCount; idx++) {
+              const dist = Math.abs(idx - p.center);
+              const distFromRing = Math.abs(dist - p.radius);
+              if (distFromRing < p.thickness) {
+                // Sharp sine crest ring intensity
+                const ringIntensity = Math.cos((distFromRing / p.thickness) * (Math.PI / 2)) * p.life;
+                addSpreadLuminance(idx, 0.8, p.color, Math.max(0, ringIntensity));
+              }
+            }
+            if (p.center - p.radius < 0 && p.center + p.radius >= state.ledCount) p.life = 0;
+            break;
+
+          case 'pulse':
+            // Heartbeat breathing radial pulse
+            p.radius += p.speed * 0.5;
+            p.phase += p.speed * 0.15;
+            p.life -= (1 - state.decay) * 0.25;
+
+            const pulseBreath = (Math.sin(p.phase * Math.PI * 2) * 0.5 + 0.5) * p.life;
+            for (let idx = 0; idx < state.ledCount; idx++) {
+              const dist = Math.abs(idx - p.center);
+              if (dist <= p.radius) {
+                const innerIntensity = (1 - (dist / p.radius)) * pulseBreath;
+                addSpreadLuminance(idx, state.spread, p.color, innerIntensity);
+              }
+            }
+            if (p.radius >= p.maxRadius) p.life = 0;
+            break;
+
+          case 'hold_flash':
+            p.life -= 0.05;
+            addSpreadLuminance(p.center, p.spread, p.color, p.life * 1.5);
+            break;
+
+          case 'glitch':
+            p.life -= 0.04;
+            // Digital noise stuttering
+            if (Math.random() > p.stutterRate) {
+              const rCol = { r: Math.min(255, p.color.r + 100), g: 0, b: p.color.b };
+              addSpreadLuminance(p.pos, 0.6, rCol, p.life);
+            }
+            break;
+
+          case 'spark':
+            p.pos += p.vel;
+            p.life -= 0.03 * (2.0 - state.decay);
+            addSpreadLuminance(p.pos, p.spread, p.color, Math.max(0, p.life));
+            break;
+
+          case 'sprinkle':
+            p.life -= p.blinkSpeed;
+            const sparkleIntensity = Math.sin(p.life * Math.PI) * Math.random();
+            addSpreadLuminance(p.pos, 0.8, p.color, Math.max(0, sparkleIntensity));
+            break;
+
+          case 'rain':
+            p.pos += p.vel;
+            p.life -= 0.02 * (2.0 - state.decay);
+            // Motion tail trailing behind
+            for (let t = 0; t < p.tailLen; t++) {
+              const tailPos = p.pos - (Math.sign(p.vel) * t);
+              if (tailPos >= 0 && tailPos < state.ledCount) {
+                const tailFactor = (1 - t / p.tailLen) * p.life;
+                addSpreadLuminance(tailPos, 0.8, p.color, tailFactor);
+              }
+            }
+            if (p.pos < 0 || p.pos >= state.ledCount) p.life = 0;
+            break;
+
+          case 'wave':
+            p.phase += p.speed;
+            p.life -= 0.015;
+            for (let idx = 0; idx < state.ledCount; idx++) {
+              const dist = Math.abs(idx - p.center);
+              if (dist <= p.spread * 2) {
+                const waveVal = Math.sin(dist * 0.5 - p.phase) * 0.5 + 0.5;
+                addSpreadLuminance(idx, 1.0, p.color, waveVal * p.life);
+              }
+            }
+            break;
+        }
+
+        if (p.life <= 0.02) {
+          state.particles.splice(i, 1);
+        }
+      }
+
+      drawCanvasFrame();
+      requestAnimationFrame(updateAndRender);
+    }
+
+    function addSpreadLuminance(centerPos, spread, color, factor) {
+      const brt = (state.brightness / 255) * factor;
+      const minLed = Math.max(0, Math.floor(centerPos - spread * 2));
+      const maxLed = Math.min(state.ledCount - 1, Math.ceil(centerPos + spread * 2));
+
+      for (let i = minLed; i <= maxLed; i++) {
+        const dist = Math.abs(i - centerPos);
+        const falloff = Math.exp(-(dist * dist) / (2 * spread * spread));
+        
+        state.leds[i].r = Math.min(255, state.leds[i].r + color.r * falloff * brt);
+        state.leds[i].g = Math.min(255, state.leds[i].g + color.g * falloff * brt);
+        state.leds[i].b = Math.min(255, state.leds[i].b + color.b * falloff * brt);
+      }
+    }
+
+    function hslToRgb(h, s, l) {
+      let r, g, b;
+      if (s === 0) {
+        r = g = b = l;
+      } else {
+        const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+        const p = 2 * l - q;
+        r = hueToRgb(p, q, h + 1/3);
+        g = hueToRgb(p, q, h);
+        b = hueToRgb(p, q, h - 1/3);
+      }
+      return { r: Math.round(r * 255), g: Math.round(g * 255), b: Math.round(b * 255) };
+    }
+
+    function hueToRgb(p, q, t) {
+      if (t < 0) t += 1;
+      if (t > 1) t -= 1;
+      if (t < 1/6) return p + (q - p) * 6 * t;
+      if (t < 1/2) return q;
+      if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+      return p;
+    }
+
+    // Draw Canvas Viewport (LED Array + Piano Keys)
+    function drawCanvasFrame() {
+      if (!ctx) return;
+
+      const width = canvas.width;
+      const height = canvas.height;
+
+      ctx.clearRect(0, 0, width, height);
+
+      const ledBarHeight = 36;
+      const keyAreaTop = ledBarHeight + 20;
+      const keyAreaHeight = height - keyAreaTop - 10;
+
+      // 1. Draw LED Array Strip Channel
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(10, 10, width - 20, ledBarHeight);
+      ctx.strokeStyle = '#334155';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(10, 10, width - 20, ledBarHeight);
+
+      const ledSpacing = (width - 40) / state.ledCount;
+
+      for (let i = 0; i < state.ledCount; i++) {
+        const ledX = 20 + i * ledSpacing + ledSpacing / 2;
+        const ledY = 10 + ledBarHeight / 2;
+        const ledColor = state.leds[i];
+
+        ctx.beginPath();
+        ctx.arc(ledX, ledY, Math.min(ledSpacing * 0.35, 4), 0, Math.PI * 2);
+        ctx.fillStyle = `rgb(${Math.round(ledColor.r)}, ${Math.round(ledColor.g)}, ${Math.round(ledColor.b)})`;
+        ctx.fill();
+
+        if (state.diffuseBlur && (ledColor.r > 5 || ledColor.g > 5 || ledColor.b > 5)) {
+          const glowGrad = ctx.createRadialGradient(ledX, ledY, 0, ledX, ledY, ledSpacing * 2.5);
+          glowGrad.addColorStop(0, `rgba(${Math.round(ledColor.r)}, ${Math.round(ledColor.g)}, ${Math.round(ledColor.b)}, 0.8)`);
+          glowGrad.addColorStop(0.5, `rgba(${Math.round(ledColor.r)}, ${Math.round(ledColor.g)}, ${Math.round(ledColor.b)}, 0.25)`);
+          glowGrad.addColorStop(1, `rgba(${Math.round(ledColor.r)}, ${Math.round(ledColor.g)}, ${Math.round(ledColor.b)}, 0)`);
+
+          ctx.fillStyle = glowGrad;
+          ctx.beginPath();
+          ctx.arc(ledX, ledY, ledSpacing * 2.5, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      // 2. Draw Piano Keys
+      const keys = getPianoKeys(state.keyboardSize);
+      const whiteKeys = keys.filter(k => !k.isBlack);
+      const whiteKeyWidth = (width - 40) / whiteKeys.length;
+
+      // Draw White Keys First
+      whiteKeys.forEach((key, wIdx) => {
+        const keyX = 20 + wIdx * whiteKeyWidth;
+        const isPressed = state.activeKeys.has(key.index);
+
+        ctx.fillStyle = isPressed ? '#00f0ff' : '#f8fafc';
+        ctx.fillRect(keyX + 1, keyAreaTop, whiteKeyWidth - 2, keyAreaHeight);
+
+        ctx.strokeStyle = '#64748b';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(keyX + 1, keyAreaTop, whiteKeyWidth - 2, keyAreaHeight);
+
+        ctx.fillStyle = isPressed ? '#00b8d4' : '#cbd5e1';
+        ctx.fillRect(keyX + 1, keyAreaTop + keyAreaHeight - 8, whiteKeyWidth - 2, 8);
+      });
+
+      // Draw Black Keys Second
+      keys.forEach((key) => {
+        if (!key.isBlack) return;
+
+        const prevWhiteIdx = keys.slice(0, key.index).filter(k => !k.isBlack).length - 1;
+        const keyX = 20 + (prevWhiteIdx + 0.65) * whiteKeyWidth;
+        const blackKeyWidth = whiteKeyWidth * 0.65;
+        const blackKeyHeight = keyAreaHeight * 0.6;
+        const isPressed = state.activeKeys.has(key.index);
+
+        ctx.fillStyle = isPressed ? '#ff007f' : '#0f172a';
+        ctx.fillRect(keyX, keyAreaTop, blackKeyWidth, blackKeyHeight);
+
+        ctx.strokeStyle = '#334155';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(keyX, keyAreaTop, blackKeyWidth, blackKeyHeight);
+
+        ctx.fillStyle = isPressed ? '#d9006c' : '#1e293b';
+        ctx.fillRect(keyX + 2, keyAreaTop, blackKeyWidth - 4, 4);
+      });
+    }
+
+    // Helper to calculate key index from screen coordinates
+    function getKeyFromCoords(clickX, clickY) {
+      const width = canvas.width;
+      const height = canvas.height;
+      const ledBarHeight = 36;
+      const keyAreaTop = ledBarHeight + 20;
+
+      if (clickY < keyAreaTop) return -1;
+
+      const keys = getPianoKeys(state.keyboardSize);
+      const whiteKeys = keys.filter(k => !k.isBlack);
+      const whiteKeyWidth = (width - 40) / whiteKeys.length;
+
+      const blackKeyHeight = (height - keyAreaTop - 10) * 0.6;
+      if (clickY < keyAreaTop + blackKeyHeight) {
+        for (let key of keys) {
+          if (!key.isBlack) continue;
+          const prevWhiteIdx = keys.slice(0, key.index).filter(k => !k.isBlack).length - 1;
+          const keyX = 20 + (prevWhiteIdx + 0.65) * whiteKeyWidth;
+          const blackKeyWidth = whiteKeyWidth * 0.65;
+
+          if (clickX >= keyX && clickX <= keyX + blackKeyWidth) {
+            return key.index;
+          }
+        }
+      }
+
+      const whiteIdx = Math.floor((clickX - 20) / whiteKeyWidth);
+      if (whiteIdx >= 0 && whiteIdx < whiteKeys.length) {
+        return whiteKeys[whiteIdx].index;
+      }
+
+      return -1;
+    }
+
+    // Interactive Pointer Handlers with Drag & Hold Support
+    function handlePointerDown(e) {
+      canvas.setPointerCapture(e.pointerId);
+      state.activePointerId = e.pointerId;
+
+      const rect = canvas.getBoundingClientRect();
+      const keyIdx = getKeyFromCoords(e.clientX - rect.left, e.clientY - rect.top);
+
+      if (keyIdx !== -1) {
+        state.lastPointerKey = keyIdx;
+        noteOn(keyIdx);
+      }
+    }
+
+    function handlePointerMove(e) {
+      if (state.activePointerId !== e.pointerId) return;
+
+      const rect = canvas.getBoundingClientRect();
+      const keyIdx = getKeyFromCoords(e.clientX - rect.left, e.clientY - rect.top);
+
+      if (keyIdx !== state.lastPointerKey) {
+        if (state.lastPointerKey !== -1) {
+          noteOff(state.lastPointerKey);
+        }
+        if (keyIdx !== -1) {
+          noteOn(keyIdx);
+        }
+        state.lastPointerKey = keyIdx;
+      }
+    }
+
+    function handlePointerUp(e) {
+      if (state.activePointerId === e.pointerId) {
+        if (state.lastPointerKey !== -1) {
+          noteOff(state.lastPointerKey);
+          state.lastPointerKey = -1;
+        }
+        state.activePointerId = null;
+      }
+    }
+
+    // QWERTY Key Mapping (Middle C octave)
+    const qwertyMap = {
+      'a': 24, 'w': 25, 's': 26, 'e': 27, 'd': 28, 'f': 29, 
+      't': 30, 'g': 31, 'y': 32, 'h': 33, 'u': 34, 'j': 35, 'k': 36
+    };
+
+    window.addEventListener('keydown', (e) => {
+      if (e.repeat || e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      const key = e.key.toLowerCase();
+      if (qwertyMap[key] !== undefined) {
+        noteOn(qwertyMap[key]);
+      }
+    });
+
+    window.addEventListener('keyup', (e) => {
+      const key = e.key.toLowerCase();
+      if (qwertyMap[key] !== undefined) {
+        noteOff(qwertyMap[key]);
+      }
+    });
+
+    // Web MIDI Input Connection
+    function initWebMIDI() {
+      if (navigator.requestMIDIAccess) {
+        navigator.requestMIDIAccess().then(
+          (midiAccess) => {
+            const inputs = midiAccess.inputs.values();
+            let count = 0;
+            for (let input of inputs) {
+              input.onmidimessage = handleMidiMessage;
+              count++;
+            }
+            if (count > 0) {
+              document.getElementById('midiDot').className = 'w-2 h-2 rounded-full bg-emerald-400';
+              document.getElementById('midiText').innerText = `MIDI: ${count} Device(s) Ready`;
+              logConsole(`Web MIDI connected: ${count} controller detected.`);
+            } else {
+              document.getElementById('midiDot').className = 'w-2 h-2 rounded-full bg-slate-500';
+              document.getElementById('midiText').innerText = 'MIDI: No devices found';
+            }
+          },
+          () => {
+            document.getElementById('midiText').innerText = 'MIDI: Not supported';
+          }
+        );
+      }
+    }
+
+    function handleMidiMessage(msg) {
+      const [command, note, velocity] = msg.data;
+      const startMidi = state.keyboardSize === 61 ? 36 : 21;
+      const keyIndex = note - startMidi;
+
+      if (command === 144 && velocity > 0) { // Note ON
+        if (keyIndex >= 0 && keyIndex < state.keyboardSize) {
+          noteOn(keyIndex);
+        }
+      } else if (command === 128 || (command === 144 && velocity === 0)) { // Note OFF
+        if (keyIndex >= 0 && keyIndex < state.keyboardSize) {
+          noteOff(keyIndex);
+        }
+      }
+    }
+
+    // Auto Play Demo Sequence Logic
+    let demoInterval = null;
+    function toggleAutoDemo() {
+      state.autoDemo = !state.autoDemo;
+      const btnText = document.getElementById('demoText');
+      const btnIcon = document.getElementById('demoIcon');
+
+      if (state.autoDemo) {
+        btnText.innerText = 'Stop Demo';
+        btnIcon.className = 'fa-solid fa-square text-xs';
+
+        const demoNotes = [12, 16, 19, 24, 28, 31, 36, 31, 28, 24, 19, 16];
+        let step = 0;
+
+        demoInterval = setInterval(() => {
+          const prevKey = demoNotes[(step - 1 + demoNotes.length) % demoNotes.length];
+          const currKey = demoNotes[step % demoNotes.length];
+          
+          noteOff(prevKey);
+          noteOn(currKey);
+
+          step++;
+        }, 220);
+
+        logConsole('Auto Demo mode started.');
+      } else {
+        btnText.innerText = 'Auto Demo';
+        btnIcon.className = 'fa-solid fa-play text-xs';
+        clearInterval(demoInterval);
+        state.activeKeys.forEach((_, kIdx) => noteOff(kIdx));
+        logConsole('Auto Demo mode stopped.');
+      }
+    }
+
+    // Data Protocol Generator for M5Stack / ESP32
+    function setProtocolFormat(fmt) {
+      state.protocolFormat = fmt;
+      document.getElementById('fmtCliBtn').className = fmt === 'cli'
+        ? 'px-2.5 py-1 rounded bg-cyan-600 text-white font-mono text-[11px] transition-all'
+        : 'px-2.5 py-1 rounded bg-slate-800 text-slate-400 hover:text-white font-mono text-[11px] transition-all';
+
+      document.getElementById('fmtJsonBtn').className = fmt === 'json'
+        ? 'px-2.5 py-1 rounded bg-cyan-600 text-white font-mono text-[11px] transition-all'
+        : 'px-2.5 py-1 rounded bg-slate-800 text-slate-400 hover:text-white font-mono text-[11px] transition-all';
+
+      updatePayloadOutput();
+    }
+
+    function updatePayloadOutput() {
+      const hexColor = rgbToHex(state.primaryColor.r, state.primaryColor.g, state.primaryColor.b);
+
+      document.getElementById('m5EffectName').innerText = state.effect.toUpperCase();
+      document.getElementById('m5Speed').innerText = state.speed.toFixed(2);
+      document.getElementById('m5Decay').innerText = state.decay.toFixed(2);
+      document.getElementById('m5Spread').innerText = state.spread.toFixed(1);
+      document.getElementById('m5Brightness').innerText = state.brightness;
+      document.getElementById('m5ColorRgb').innerText = `(${state.primaryColor.r},${state.primaryColor.g},${state.primaryColor.b})`;
+      document.getElementById('m5ColorSwatch').style.backgroundColor = hexColor;
+
+      let outputText = "";
+      if (state.protocolFormat === 'json') {
+        const payloadObj = {
+          device: "M5Stack_LightSync",
+          effect: state.effect,
+          speed: parseFloat(state.speed.toFixed(2)),
+          decay: parseFloat(state.decay.toFixed(2)),
+          spread: parseFloat(state.spread.toFixed(1)),
+          brightness: Math.round(state.brightness),
+          rainbow: state.rainbow,
+          color: [state.primaryColor.r, state.primaryColor.g, state.primaryColor.b],
+          led_count: state.ledCount,
+          key_count: state.keyboardSize
+        };
+        outputText = JSON.stringify(payloadObj, null, 2);
+      } else {
+        outputText = `EFFECT ${state.effect}\n` +
+          `speed=${state.speed.toFixed(2)}\n` +
+          `decay=${state.decay.toFixed(2)}\n` +
+          `spread=${state.spread.toFixed(1)}\n` +
+          `brightness=${Math.round(state.brightness)}\n` +
+          `rainbow=${state.rainbow ? 1 : 0}\n` +
+          `color=${state.primaryColor.r},${state.primaryColor.g},${state.primaryColor.b}\n` +
+          `leds=${state.ledCount}`;
+      }
+
+      document.getElementById('payloadOutput').value = outputText;
+    }
+
+    function copyPayload() {
+      const area = document.getElementById('payloadOutput');
+      area.select();
+      document.execCommand('copy');
+      logConsole('Payload copied to clipboard!');
+    }
+
+    function sendToDevice() {
+      const btn = document.getElementById('sendBtn');
+      btn.innerHTML = `<i class="fa-solid fa-spinner animate-spin"></i> Sending config...`;
+      btn.disabled = true;
+
+      setTimeout(() => {
+        btn.innerHTML = `<i class="fa-solid fa-check text-emerald-300"></i> Config Synced!`;
+        logConsole(`---> Sent configuration payload [${state.effect.toUpperCase()}] to M5Stack via Serial/BLE`);
+        document.getElementById('m5StatusText').innerText = "SYNCED " + new Date().toLocaleTimeString().split(' ')[0];
+        
+        setTimeout(() => {
+          btn.innerHTML = `<i class="fa-solid fa-paper-plane"></i> Send to LightSync Device`;
+          btn.disabled = false;
+        }, 1500);
+      }, 400);
+    }
+
+    function toggleDeviceConnection() {
+      state.deviceConnected = !state.deviceConnected;
+      const btn = document.getElementById('connectDeviceBtn');
+      const text = document.getElementById('connectBtnText');
+
+      if (state.deviceConnected) {
+        btn.className = "px-3.5 py-1.5 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/30 text-xs font-medium border border-emerald-500/40 flex items-center gap-2 transition-all";
+        text.innerText = "M5Stack Connected";
+        logConsole("Device re-connected: M5Stack LightSync on /dev/ttyUSB0");
+      } else {
+        btn.className = "px-3.5 py-1.5 rounded-lg bg-red-600/20 text-red-400 hover:bg-red-600/30 text-xs font-medium border border-red-500/40 flex items-center gap-2 transition-all";
+        text.innerText = "Device Offline";
+        logConsole("Device disconnected");
+      }
+    }
+
+    function logConsole(msg) {
+      const consoleElem = document.getElementById('serialConsole');
+      const time = new Date().toTimeString().split(' ')[0];
+      const logLine = document.createElement('div');
+      logLine.innerHTML = `<span class="text-slate-600">[${time}]</span> ${msg}`;
+      consoleElem.appendChild(logLine);
+      consoleElem.scrollTop = consoleElem.scrollHeight;
+    }
+
+    function clearConsole() {
+      document.getElementById('serialConsole').innerHTML = '';
+    }
+
+    // Initialization Bootstrap
+    window.onload = function() {
+      canvas = document.getElementById('studioCanvas');
+      ctx = canvas.getContext('2d');
+
+      function resizeCanvas() {
+        const container = canvas.parentElement;
+        canvas.width = container.clientWidth - 16;
+        canvas.height = window.innerWidth < 640 ? 280 : 340;
+      }
+      resizeCanvas();
+      window.addEventListener('resize', resizeCanvas);
+
+      // Canvas Pointer Event Listeners for drag & hold interaction
+      canvas.addEventListener('pointerdown', handlePointerDown);
+      canvas.addEventListener('pointermove', handlePointerMove);
+      canvas.addEventListener('pointerup', handlePointerUp);
+      canvas.addEventListener('pointercancel', handlePointerUp);
+
+      initEffectButtons();
+      updateLedCount(144);
+      initWebMIDI();
+      updatePayloadOutput();
+
+      requestAnimationFrame(updateAndRender);
+    };
+  </script>
+</body>
+</html>
