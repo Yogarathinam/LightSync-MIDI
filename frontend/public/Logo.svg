@@ -1,34 +1,30 @@
-<svg id="masterSVG" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" class="w-full h-full overflow-visible">
-                <defs>
-                    <linearGradient id="spotBeam1" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stop-color="#fde047" stop-opacity="0.9"></stop>
-                        <stop offset="100%" stop-color="#eab308" stop-opacity="0.2"></stop>
-                    </linearGradient>
-                    <linearGradient id="spotBeam2" x1="100%" y1="0%" x2="0%" y2="100%">
-                        <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.9"></stop>
-                        <stop offset="100%" stop-color="#1d4ed8" stop-opacity="0.2"></stop>
-                    </linearGradient>
-                    <radialGradient id="stageLight" cx="50%" cy="50%" r="50%">
-                        <stop offset="0%" stop-color="#ffffff" stop-opacity="0.8"></stop>
-                        <stop offset="50%" stop-color="#fde047" stop-opacity="0.3"></stop>
-                        <stop offset="100%" stop-color="#000000" stop-opacity="0"></stop>
-                    </radialGradient>
-                    <filter id="spotGlow">
-                        <feGaussianBlur id="blurNode" stdDeviation="2.4000000000000004" result="blur"></feGaussianBlur>
-                        <feMerge><feMergeNode in="blur"></feMergeNode><feMergeNode in="SourceGraphic"></feMergeNode></feMerge>
-                    </filter>
-                </defs>
-                <g filter="url(#spotGlow)">
-                    <polygon points="180,120 620,620 180,620" fill="url(#spotBeam1)"></polygon>
-                    <polygon points="620,120 220,620 620,620" fill="url(#spotBeam2)"></polygon>
-                    <path d="M 240,200 L 310,200 L 310,480 L 440,480 L 440,540 L 240,540 Z" fill="#38bdf8"></path>
-                    <path d="M 370,270 L 435,270 L 435,430 C 435,475 460,495 500,495 C 540,495 565,475 565,430 L 565,270 L 630,270 L 630,430 C 630,515 565,555 500,555 C 435,555 370,515 370,430 Z" fill="#fde047"></path>
-                    <ellipse cx="400" cy="460" rx="220" ry="80" fill="url(#stageLight)"></ellipse>
-                    <circle cx="180" cy="120" r="16" fill="#fde047"></circle>
-                    <circle cx="620" cy="120" r="16" fill="#38bdf8"></circle>
-                </g>
-                <g id="wordmarkGroup" opacity="1" class="transition-opacity duration-300">
-                    <text x="400" y="675" text-anchor="middle" font-family="'Space Grotesk', sans-serif" font-weight="700" font-size="28" letter-spacing="12" fill="#fde047" filter="url(#spotGlow)">LU STAGE</text>
-                    <text x="400" y="710" text-anchor="middle" font-family="'Plus Jakarta Sans', sans-serif" font-weight="600" font-size="11" letter-spacing="8" fill="#38bdf8">LIGHTING &amp; PRODUCTION</text>
-                </g>
-            </svg>
+<svg id="masterSVG" xmlns="http://www.w3.org/2000/svg" viewBox="145 85 510 550" class="w-full h-full overflow-visible">
+    <defs>
+        <linearGradient id="spotBeam1" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#fde047" stop-opacity="0.9"></stop>
+            <stop offset="100%" stop-color="#eab308" stop-opacity="0.2"></stop>
+        </linearGradient>
+        <linearGradient id="spotBeam2" x1="100%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.9"></stop>
+            <stop offset="100%" stop-color="#1d4ed8" stop-opacity="0.2"></stop>
+        </linearGradient>
+        <radialGradient id="stageLight" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="#ffffff" stop-opacity="0.8"></stop>
+            <stop offset="50%" stop-color="#fde047" stop-opacity="0.3"></stop>
+            <stop offset="100%" stop-color="#000000" stop-opacity="0"></stop>
+        </radialGradient>
+        <filter id="spotGlow">
+            <feGaussianBlur id="blurNode" stdDeviation="2.4" result="blur"></feGaussianBlur>
+            <feMerge><feMergeNode in="blur"></feMergeNode><feMergeNode in="SourceGraphic"></feMergeNode></feMerge>
+        </filter>
+    </defs>
+    <g filter="url(#spotGlow)">
+        <polygon points="180,120 620,620 180,620" fill="url(#spotBeam1)"></polygon>
+        <polygon points="620,120 220,620 620,620" fill="url(#spotBeam2)"></polygon>
+        <path d="M 240,200 L 310,200 L 310,480 L 440,480 L 440,540 L 240,540 Z" fill="#38bdf8"></path>
+        <path d="M 370,270 L 435,270 L 435,430 C 435,475 460,495 500,495 C 540,495 565,475 565,430 L 565,270 L 630,270 L 630,430 C 630,515 565,555 500,555 C 435,555 370,515 370,430 Z" fill="#fde047"></path>
+        <ellipse cx="400" cy="460" rx="220" ry="80" fill="url(#stageLight)"></ellipse>
+        <circle cx="180" cy="120" r="16" fill="#fde047"></circle>
+        <circle cx="620" cy="120" r="16" fill="#38bdf8"></circle>
+    </g>
+</svg>
