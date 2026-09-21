@@ -395,9 +395,12 @@ export const SettingsModal: React.FC = () => {
 
       {/* 6. Restore Defaults */}
       <div className="flex items-center justify-between pt-2">
-        <span className="text-xs text-slate-400 dark:text-zinc-500 font-mono">
-          LightSync Studio v2.0 • Hardware Spec Rev 2
-        </span>
+        <div className="flex items-center gap-2 select-none">
+          <img src="/Logo.svg" alt="LightSync Logo" className="w-5 h-5 object-contain" />
+          <span className="text-xs text-slate-400 dark:text-zinc-500 font-mono">
+            LightSync Studio v2.0 • Hardware Spec Rev 2
+          </span>
+        </div>
         <button
           onClick={handleResetDefaults}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-zinc-800 text-xs text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-zinc-900 transition-all font-medium"

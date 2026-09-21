@@ -70,8 +70,8 @@ export const AppHeader: React.FC<{
         
         {/* Left: Brand Identity */}
         <div className="flex items-center gap-2.5 shrink-0 select-none">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-sky-500 flex items-center justify-center text-white font-bold shadow-md shadow-indigo-500/25">
-            <span className="font-mono text-xs tracking-wider">LS</span>
+          <div className="w-9 h-9 rounded-xl bg-slate-900 dark:bg-zinc-900 border border-slate-700/60 dark:border-zinc-800 flex items-center justify-center shadow-md shadow-indigo-500/10 overflow-hidden p-1 transition-transform hover:scale-105">
+            <img src="/Logo.svg" alt="LightSync Logo" className="w-full h-full object-contain" />
           </div>
           <div>
             <div className="flex items-center gap-1.5">
