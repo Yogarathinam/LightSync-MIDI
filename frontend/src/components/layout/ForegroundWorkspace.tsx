@@ -24,7 +24,7 @@ import { DeviceMonitor } from '../device/DeviceMonitor';
 export const ForegroundWorkspace: React.FC = () => {
   const { activeWorkspace, closeWorkspace } = useLightSyncStore();
 
-  const [renderedWorkspace, setRenderedWorkspace] = useState<WorkspaceId | null>(activeWorkspace);
+  const [displayedWorkspace, setDisplayedWorkspace] = useState<WorkspaceId | null>(activeWorkspace);
   const [isOpen, setIsOpen] = useState(activeWorkspace !== null);
   const exitTimerRef = useRef<number | null>(null);
 
@@ -34,22 +34,19 @@ export const ForegroundWorkspace: React.FC = () => {
         clearTimeout(exitTimerRef.current);
         exitTimerRef.current = null;
       }
-      setRenderedWorkspace(activeWorkspace);
-      // Small frame delay to ensure browser applies initial hidden state before transition
-      requestAnimationFrame(() => {
-        setIsOpen(true);
-      });
+      setDisplayedWorkspace(activeWorkspace);
+      setIsOpen(true);
     } else {
       setIsOpen(false);
-      // After transition (550ms), unmount rendered workspace content
+      // Wait for CSS exit transition (300ms) before unmounting studio contents
       exitTimerRef.current = window.setTimeout(() => {
-        setRenderedWorkspace(null);
+        setDisplayedWorkspace(null);
         exitTimerRef.current = null;
         if (document.activeElement instanceof HTMLElement) {
           document.activeElement.blur();
         }
         window.focus();
-      }, 560);
+      }, 310);
     }
 
     return () => {
@@ -66,17 +63,17 @@ export const ForegroundWorkspace: React.FC = () => {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && renderedWorkspace !== null) {
+      if (e.key === 'Escape' && displayedWorkspace !== null) {
         handleRequestClose();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [renderedWorkspace, handleRequestClose]);
+  }, [displayedWorkspace, handleRequestClose]);
 
-  if (!renderedWorkspace) return null;
+  if (!displayedWorkspace && !isOpen) return null;
 
-  const getWorkspaceMeta = (ws: WorkspaceId) => {
+  const getWorkspaceMeta = (ws: WorkspaceId | null) => {
     switch (ws) {
       case 'play':
         return {
@@ -129,17 +126,17 @@ export const ForegroundWorkspace: React.FC = () => {
     }
   };
 
-  const meta = getWorkspaceMeta(renderedWorkspace);
+  const meta = getWorkspaceMeta(displayedWorkspace);
 
   return (
-    <div className="fixed inset-0 z-30 pointer-events-none flex items-center justify-center p-2 sm:p-4 md:p-6">
+    <div className="absolute inset-0 z-30 pointer-events-none flex items-center justify-center p-2 sm:p-4 md:p-5">
       <div 
         onClick={(e) => e.stopPropagation()}
-        className={`pointer-events-auto max-w-5xl w-[95vw] h-[88vh] flex flex-col rounded-2xl bg-white/95 dark:bg-[#0c0c0e]/95 backdrop-blur-2xl border border-slate-200/90 dark:border-zinc-800 shadow-2xl overflow-hidden spatial-fg-workspace ${
+        className={`pointer-events-auto max-w-5xl w-[95vw] h-[92%] flex flex-col rounded-2xl bg-white dark:bg-[#0c0c0e] border border-slate-200 dark:border-zinc-800 shadow-2xl overflow-hidden spatial-fg-workspace ${
           isOpen ? 'spatial-fg-workspace--enter' : 'spatial-fg-workspace--hidden'
         }`}
         style={{
-          boxShadow: '0 30px 70px -15px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(120, 120, 140, 0.2)'
+          boxShadow: '0 25px 65px -12px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(120, 120, 140, 0.2)'
         }}
       >
         {/* Top Gesture Dismiss Pill */}
@@ -178,17 +175,17 @@ export const ForegroundWorkspace: React.FC = () => {
 
         {/* Workspace Scrollable Body */}
         <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4">
-          {renderedWorkspace === 'play' && <PlayStudio />}
-          {renderedWorkspace === 'effects' && <EffectStudio />}
-          {renderedWorkspace === 'learn' && <LearnStudio />}
-          {renderedWorkspace === 'practice' && <PracticeStudio />}
-          {renderedWorkspace === 'analyze' && <AnalyzeStudio />}
-          {renderedWorkspace === 'aicoach' && <AICoachStudio />}
-          {renderedWorkspace === 'device' && <DeviceMonitor />}
+          {displayedWorkspace === 'play' && <PlayStudio />}
+          {displayedWorkspace === 'effects' && <EffectStudio />}
+          {displayedWorkspace === 'learn' && <LearnStudio />}
+          {displayedWorkspace === 'practice' && <PracticeStudio />}
+          {displayedWorkspace === 'analyze' && <AnalyzeStudio />}
+          {displayedWorkspace === 'aicoach' && <AICoachStudio />}
+          {displayedWorkspace === 'device' && <DeviceMonitor />}
         </div>
 
         {/* Workspace Footer */}
-        <div className="px-5 py-2 bg-slate-50/90 dark:bg-zinc-950/90 border-t border-slate-100 dark:border-zinc-800 flex items-center justify-between text-[11px] text-slate-400 dark:text-zinc-500 font-mono shrink-0 select-none">
+        <div className="px-5 py-2 bg-slate-50 dark:bg-zinc-950 border-t border-slate-100 dark:border-zinc-800 flex items-center justify-between text-[11px] text-slate-400 dark:text-zinc-500 font-mono shrink-0 select-none">
           <span className="flex items-center gap-1">
             <ChevronDown className="w-3 h-3" /> Click background or press Esc to return to visualizer
           </span>
