@@ -56,16 +56,6 @@ export const AppHeader: React.FC<{
     { id: 'device', label: 'Hardware', icon: <Cpu className="w-3.5 h-3.5 text-teal-500" /> },
   ];
 
-  const handleMouseEnter = (target: StudioTab | 'quick_settings' | 'settings') => {
-    openOverlay(target);
-    if (onHoverMenu) onHoverMenu(target);
-  };
-
-  const handleMouseLeave = () => {
-    scheduleOverlayClose(300);
-    if (onHoverMenu) onHoverMenu(null);
-  };
-
   const handleTabClick = (tabId: StudioTab) => {
     if (activeOverlay === tabId) {
       closeOverlay();
@@ -98,17 +88,13 @@ export const AppHeader: React.FC<{
           </div>
         </div>
 
-        {/* Center: Studio Tabs with Hover-to-Open Overlay */}
-        <nav 
-          onMouseLeave={handleMouseLeave}
-          className="hidden md:flex items-center p-1 rounded-2xl bg-slate-100/90 dark:bg-zinc-900/80 border border-slate-200/80 dark:border-zinc-800"
-        >
+        {/* Center: Studio Tabs with Click-to-Open Overlay */}
+        <nav className="hidden md:flex items-center p-1 rounded-2xl bg-slate-100/90 dark:bg-zinc-900/80 border border-slate-200/80 dark:border-zinc-800">
           {tabs.map((tab) => {
             const isOpen = activeOverlay === tab.id;
             return (
               <button
                 key={tab.id}
-                onMouseEnter={() => handleMouseEnter(tab.id)}
                 onClick={() => handleTabClick(tab.id)}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all select-none ${
                   isOpen
@@ -179,12 +165,8 @@ export const AppHeader: React.FC<{
             </div>
 
             {/* Quick Settings Dropdown Trigger */}
-            <div 
-              onMouseLeave={handleMouseLeave}
-              className="relative"
-            >
+            <div className="relative">
               <button
-                onMouseEnter={() => handleMouseEnter('quick_settings')}
                 onClick={() => {
                   if (activeOverlay === 'quick_settings') closeOverlay();
                   else openOverlay('quick_settings');
@@ -243,7 +225,6 @@ export const AppHeader: React.FC<{
 
             {/* Full Settings Modal Button */}
             <button
-              onMouseEnter={() => handleMouseEnter('settings')}
               onClick={() => {
                 if (activeOverlay === 'settings') closeOverlay();
                 else openOverlay('settings');
@@ -276,10 +257,7 @@ export const AppHeader: React.FC<{
       </div>
 
       {/* Mobile Single Tab Bar */}
-      <div 
-        onMouseLeave={handleMouseLeave}
-        className="md:hidden flex items-center justify-around px-2 py-1.5 bg-slate-50 dark:bg-black border-t border-slate-200 dark:border-zinc-800 overflow-x-auto"
-      >
+      <div className="md:hidden flex items-center justify-around px-2 py-1.5 bg-slate-50 dark:bg-black border-t border-slate-200 dark:border-zinc-800 overflow-x-auto">
         {tabs.map((tab) => (
           <button
             key={tab.id}

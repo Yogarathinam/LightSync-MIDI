@@ -60,6 +60,7 @@ def main():
         from PyQt6.QtCore import QUrl, Qt
         from PyQt6.QtWidgets import QApplication, QMainWindow
         from PyQt6.QtWebEngineWidgets import QWebEngineView
+        from PyQt6.QtWebEngineCore import QWebEngineSettings
 
         # Stable hardware-accelerated GPU flags for PyQt6 WebEngine
         os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = (
@@ -85,6 +86,15 @@ def main():
             window.move(max(0, x), max(0, y))
 
         view = QWebEngineView()
+        
+        # Explicitly enable hardware accelerated rendering and animation settings
+        web_settings = view.settings()
+        web_settings.setAttribute(QWebEngineSettings.WebAttribute.Accelerated2dCanvasEnabled, True)
+        web_settings.setAttribute(QWebEngineSettings.WebAttribute.WebGLEnabled, True)
+        web_settings.setAttribute(QWebEngineSettings.WebAttribute.ScrollAnimatorEnabled, True)
+        web_settings.setAttribute(QWebEngineSettings.WebAttribute.LocalContentCanAccessRemoteUrls, True)
+        web_settings.setAttribute(QWebEngineSettings.WebAttribute.LocalContentCanAccessFileUrls, True)
+
         view.load(QUrl(target_url))
         window.setCentralWidget(view)
         window.show()

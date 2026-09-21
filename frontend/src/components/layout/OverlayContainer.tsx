@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { 
   X, 
   Music, 
@@ -26,28 +26,54 @@ import { SettingsModal } from './SettingsModal';
 export const OverlayContainer: React.FC = () => {
   const { 
     activeOverlay, 
-    closeOverlay, 
-    cancelOverlayClose, 
-    scheduleOverlayClose 
+    closeOverlay 
   } = useLightSyncStore();
   
+  const [renderedOverlay, setRenderedOverlay] = useState(activeOverlay);
+  const [isClosing, setIsClosing] = useState(false);
   const cardRef = useRef<HTMLDivElement | null>(null);
+
+  // Sync activeOverlay state with smooth exit animation
+  useEffect(() => {
+    if (activeOverlay) {
+      setRenderedOverlay(activeOverlay);
+      setIsClosing(false);
+    } else if (renderedOverlay && !isClosing) {
+      setIsClosing(true);
+      const timer = setTimeout(() => {
+        setRenderedOverlay(null);
+        setIsClosing(false);
+      }, 160);
+      return () => clearTimeout(timer);
+    }
+  }, [activeOverlay, renderedOverlay, isClosing]);
+
+  // Request close with smooth exit animation
+  const handleRequestClose = useCallback(() => {
+    if (isClosing) return;
+    setIsClosing(true);
+    setTimeout(() => {
+      closeOverlay();
+      setRenderedOverlay(null);
+      setIsClosing(false);
+    }, 160);
+  }, [isClosing, closeOverlay]);
 
   // Close on Escape key
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && activeOverlay !== null) {
-        closeOverlay();
+      if (e.key === 'Escape' && renderedOverlay !== null) {
+        handleRequestClose();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activeOverlay, closeOverlay]);
+  }, [renderedOverlay, handleRequestClose]);
 
-  if (!activeOverlay) return null;
+  if (!renderedOverlay) return null;
 
   const getOverlayMeta = () => {
-    switch (activeOverlay) {
+    switch (renderedOverlay) {
       case 'play':
         return {
           title: 'Play Studio',
@@ -112,39 +138,41 @@ export const OverlayContainer: React.FC = () => {
   };
 
   const meta = getOverlayMeta();
-  const isCompact = activeOverlay === 'quick_settings';
+  const isCompact = renderedOverlay === 'quick_settings';
 
   return (
     <div 
       className="fixed inset-0 z-50 pointer-events-none"
       onPointerDown={(e) => {
         if (e.target === e.currentTarget) {
-          closeOverlay();
+          handleRequestClose();
         }
       }}
     >
-      {/* Click-away backdrop: starts below header so it does not intercept hover trajectory */}
+      {/* Click-away backdrop: starts below header, smoothly fades in/out */}
       <div 
-        onClick={closeOverlay}
-        className="absolute top-16 inset-x-0 bottom-0 bg-black/20 dark:bg-black/50 pointer-events-auto transition-opacity"
+        onClick={handleRequestClose}
+        className={`absolute top-16 inset-x-0 bottom-0 bg-black/30 dark:bg-black/60 pointer-events-auto ${
+          isClosing ? 'animate-backdrop-exit' : 'animate-backdrop-enter'
+        }`}
       />
 
-      {/* Floating Card: high-performance solid surface without GPU-stalling blur shaders */}
+      {/* Floating Card: high-performance hardware-accelerated animated surface */}
       <div 
         ref={cardRef}
-        onMouseEnter={cancelOverlayClose}
-        onMouseLeave={() => scheduleOverlayClose(300)}
         onClick={(e) => e.stopPropagation()}
-        className={`pointer-events-auto absolute top-[62px] left-1/2 -translate-x-1/2 ${
+        className={`pointer-events-auto absolute top-[62px] left-1/2 ${
           isCompact ? 'max-w-md w-[92vw]' : 'max-w-4xl w-[94vw]'
-        } max-h-[82vh] flex flex-col rounded-2xl bg-white dark:bg-[#0c0c0e] border border-slate-300 dark:border-zinc-800 shadow-2xl overflow-hidden transition-opacity duration-150 ease-out`}
+        } max-h-[82vh] flex flex-col rounded-2xl bg-white dark:bg-[#0c0c0e] border border-slate-300 dark:border-zinc-800 shadow-2xl overflow-hidden ${
+          isClosing ? 'animate-overlay-exit' : 'animate-overlay-enter'
+        }`}
         style={{
           boxShadow: '0 25px 60px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(120, 120, 140, 0.18)'
         }}
       >
         {/* Top Gesture Pill Handle */}
         <div 
-          onClick={closeOverlay}
+          onClick={handleRequestClose}
           className="w-full pt-2 pb-1 flex flex-col items-center justify-center cursor-pointer group select-none shrink-0"
           title="Click to dismiss"
         >
@@ -169,7 +197,7 @@ export const OverlayContainer: React.FC = () => {
             </div>
 
             <button
-              onClick={closeOverlay}
+              onClick={handleRequestClose}
               className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white bg-slate-100 dark:bg-zinc-900 hover:bg-slate-200 dark:hover:bg-zinc-800 border border-slate-200 dark:border-zinc-800 transition-all"
               title="Close (Esc)"
             >
@@ -180,21 +208,21 @@ export const OverlayContainer: React.FC = () => {
 
         {/* Card Content */}
         <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4">
-          {activeOverlay === 'play' && <PlayStudio />}
-          {activeOverlay === 'effects' && <EffectStudio />}
-          {activeOverlay === 'learn' && <LearnStudio />}
-          {activeOverlay === 'practice' && <PracticeStudio />}
-          {activeOverlay === 'analyze' && <AnalyzeStudio />}
-          {activeOverlay === 'aicoach' && <AICoachStudio />}
-          {activeOverlay === 'device' && <DeviceMonitor />}
-          {activeOverlay === 'quick_settings' && <QuickSettingsDropdown />}
-          {activeOverlay === 'settings' && <SettingsModal />}
+          {renderedOverlay === 'play' && <PlayStudio />}
+          {renderedOverlay === 'effects' && <EffectStudio />}
+          {renderedOverlay === 'learn' && <LearnStudio />}
+          {renderedOverlay === 'practice' && <PracticeStudio />}
+          {renderedOverlay === 'analyze' && <AnalyzeStudio />}
+          {renderedOverlay === 'aicoach' && <AICoachStudio />}
+          {renderedOverlay === 'device' && <DeviceMonitor />}
+          {renderedOverlay === 'quick_settings' && <QuickSettingsDropdown />}
+          {renderedOverlay === 'settings' && <SettingsModal />}
         </div>
 
         {/* Footer info */}
         <div className="px-5 py-1.5 bg-slate-50 dark:bg-zinc-950 border-t border-slate-100 dark:border-zinc-850 flex items-center justify-between text-[10px] text-slate-400 dark:text-zinc-500 font-mono shrink-0 select-none">
           <span className="flex items-center gap-1">
-            <ChevronDown className="w-3 h-3" /> Move cursor off or click piano to play
+            <ChevronDown className="w-3 h-3" /> Click outside or press Esc to close
           </span>
           <span>LightSync v2.0</span>
         </div>

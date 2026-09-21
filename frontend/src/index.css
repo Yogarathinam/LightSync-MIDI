@@ -90,3 +90,64 @@
 .dark .elevation-3 {
   box-shadow: 0 0 0 1px #3f3f46, 0 12px 24px rgba(0, 0, 0, 0.95);
 }
+
+/* Smooth Hardware-Accelerated Overlay Card Animations */
+@keyframes overlayCardEnter {
+  0% {
+    opacity: 0;
+    transform: translate3d(-50%, -14px, 0) scale3d(0.97, 0.97, 1);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(-50%, 0, 0) scale3d(1, 1, 1);
+  }
+}
+
+@keyframes overlayCardExit {
+  0% {
+    opacity: 1;
+    transform: translate3d(-50%, 0, 0) scale3d(1, 1, 1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(-50%, -10px, 0) scale3d(0.98, 0.98, 1);
+  }
+}
+
+@keyframes overlayBackdropEnter {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes overlayBackdropExit {
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.animate-overlay-enter {
+  animation: overlayCardEnter 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity;
+}
+
+.animate-overlay-exit {
+  animation: overlayCardExit 0.16s cubic-bezier(0.4, 0, 1, 1) forwards;
+  will-change: transform, opacity;
+}
+
+.animate-backdrop-enter {
+  animation: overlayBackdropEnter 0.2s ease-out forwards;
+  will-change: opacity;
+}
+
+.animate-backdrop-exit {
+  animation: overlayBackdropExit 0.16s ease-in forwards;
+  will-change: opacity;
+}
