@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { 
   StudioTab, 
+  WorkspaceId,
+  UtilityOverlayId,
   OverlayModalType,
   InstrumentType, 
   EffectType, 
@@ -85,9 +87,15 @@ export const COLOR_SYNC_PRESETS: Record<ColorSyncPresetId, {
 };
 
 interface LightSyncState {
-  // Navigation & Overlay Modal
+  // Navigation & Spatial Workspace / Overlay Modal
   activeTab: StudioTab;
   setActiveTab: (tab: StudioTab) => void;
+  activeWorkspace: WorkspaceId | null;
+  openWorkspace: (ws: WorkspaceId) => void;
+  closeWorkspace: () => void;
+  activeUtilityOverlay: UtilityOverlayId | null;
+  openUtilityOverlay: (id: UtilityOverlayId) => void;
+  closeUtilityOverlay: () => void;
   activeOverlay: OverlayModalType;
   setActiveOverlay: (overlay: OverlayModalType) => void;
   openOverlay: (overlay: OverlayModalType) => void;
@@ -194,45 +202,82 @@ interface LightSyncState {
 let overlayTimer: number | null = null;
 
 export const useLightSyncStore = create<LightSyncState>((set, get) => ({
-  // Navigation & Overlay
+  // Navigation & Spatial Workspace / Overlay State
   activeTab: 'play',
   setActiveTab: (tab) => set({ activeTab: tab, activeOverlay: tab }),
+  activeWorkspace: null,
+  activeUtilityOverlay: null,
   activeOverlay: null,
+
+  openWorkspace: (ws) => {
+    set({
+      activeWorkspace: ws,
+      activeUtilityOverlay: null,
+      activeOverlay: ws,
+      activeTab: ws,
+    });
+  },
+
+  closeWorkspace: () => {
+    set({
+      activeWorkspace: null,
+      activeOverlay: get().activeUtilityOverlay,
+    });
+  },
+
+  openUtilityOverlay: (id) => {
+    set({
+      activeUtilityOverlay: id,
+      activeOverlay: id,
+    });
+  },
+
+  closeUtilityOverlay: () => {
+    set({
+      activeUtilityOverlay: null,
+      activeOverlay: get().activeWorkspace,
+    });
+  },
+
+  // Universal / Legacy compat
   setActiveOverlay: (overlay) => {
-    if (overlayTimer) {
-      clearTimeout(overlayTimer);
-      overlayTimer = null;
+    if (!overlay) {
+      set({
+        activeWorkspace: null,
+        activeUtilityOverlay: null,
+        activeOverlay: null,
+      });
+      return;
     }
-    set({ activeOverlay: overlay });
+    const UTILITY_IDS: UtilityOverlayId[] = ['quick_settings', 'settings'];
+    if (UTILITY_IDS.includes(overlay as UtilityOverlayId)) {
+      set({
+        activeUtilityOverlay: overlay as UtilityOverlayId,
+        activeOverlay: overlay,
+      });
+    } else {
+      set({
+        activeWorkspace: overlay as WorkspaceId,
+        activeUtilityOverlay: null,
+        activeOverlay: overlay,
+        activeTab: overlay as StudioTab,
+      });
+    }
   },
+
   openOverlay: (overlay) => {
-    if (overlayTimer) {
-      clearTimeout(overlayTimer);
-      overlayTimer = null;
-    }
-    set({ activeOverlay: overlay });
+    get().setActiveOverlay(overlay);
   },
-  cancelOverlayClose: () => {
-    if (overlayTimer) {
-      clearTimeout(overlayTimer);
-      overlayTimer = null;
-    }
-  },
-  scheduleOverlayClose: (delayMs = 320) => {
-    if (overlayTimer) {
-      clearTimeout(overlayTimer);
-    }
-    overlayTimer = window.setTimeout(() => {
-      set({ activeOverlay: null });
-      overlayTimer = null;
-    }, delayMs);
-  },
+
+  cancelOverlayClose: () => {},
+  scheduleOverlayClose: () => {},
+
   closeOverlay: () => {
-    if (overlayTimer) {
-      clearTimeout(overlayTimer);
-      overlayTimer = null;
-    }
-    set({ activeOverlay: null });
+    set({
+      activeWorkspace: null,
+      activeUtilityOverlay: null,
+      activeOverlay: null,
+    });
   },
 
   // Notes & Chord

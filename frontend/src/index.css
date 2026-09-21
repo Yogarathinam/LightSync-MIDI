@@ -91,63 +91,74 @@
   box-shadow: 0 0 0 1px #3f3f46, 0 12px 24px rgba(0, 0, 0, 0.95);
 }
 
-/* Smooth Hardware-Accelerated Overlay Card Animations */
-@keyframes overlayCardEnter {
-  0% {
-    opacity: 0;
-    transform: translate3d(0, -12px, 0) scale(0.98);
-  }
-  100% {
-    opacity: 1;
-    transform: translate3d(0, 0, 0) scale(1);
-  }
+/* ========================================
+   SPATIAL DEPTH TRANSITION SYSTEM
+   ======================================== */
+
+/* Background layer: the main app recedes into 3D space */
+.spatial-bg-layer {
+  transition: transform 550ms cubic-bezier(0.32, 0.72, 0, 1),
+              filter 550ms cubic-bezier(0.32, 0.72, 0, 1),
+              opacity 550ms cubic-bezier(0.32, 0.72, 0, 1);
+  transform-origin: center top;
+  will-change: transform, filter, opacity;
+}
+.spatial-bg-layer--active {
+  transform: scale(1) translateY(0);
+  filter: blur(0px) brightness(1);
+  opacity: 1;
+}
+.spatial-bg-layer--receded {
+  transform: scale(0.84) translateY(14px);
+  filter: blur(6px) brightness(0.55);
+  opacity: 0.82;
+  pointer-events: none;
 }
 
-@keyframes overlayCardExit {
-  0% {
-    opacity: 1;
-    transform: translate3d(0, 0, 0) scale(1);
-  }
-  100% {
-    opacity: 0;
-    transform: translate3d(0, -8px, 0) scale(0.985);
-  }
-}
-
-@keyframes overlayBackdropEnter {
-  0% {
-    opacity: 0;
-  }
-  100% {
-    opacity: 1;
-  }
-}
-
-@keyframes overlayBackdropExit {
-  0% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 0;
-  }
-}
-
-.animate-overlay-enter {
-  animation: overlayCardEnter 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  will-change: transform, opacity;
-}
-
-.animate-overlay-exit {
-  animation: overlayCardExit 0.14s cubic-bezier(0.4, 0, 1, 1) forwards;
-  will-change: transform, opacity;
-}
-
-.animate-backdrop-enter {
-  animation: overlayBackdropEnter 0.2s ease-out forwards;
+/* Scrim between receded visualizer and foreground workspace */
+.spatial-scrim {
+  transition: opacity 550ms cubic-bezier(0.32, 0.72, 0, 1);
   will-change: opacity;
 }
+.spatial-scrim--active {
+  opacity: 1;
+  pointer-events: auto;
+}
+.spatial-scrim--hidden {
+  opacity: 0;
+  pointer-events: none;
+}
 
-.animate-backdrop-exit {
-  animation: overlayBackdropExit 0.16s ease-in forwards;
-  will-change: opacity;
+/* Foreground workspace surface */
+.spatial-fg-workspace {
+  transition: transform 550ms cubic-bezier(0.32, 0.72, 0, 1),
+              opacity 550ms cubic-bezier(0.32, 0.72, 0, 1);
+  will-change: transform, opacity;
+}
+.spatial-fg-workspace--enter {
+  transform: scale(1) translateY(0);
+  opacity: 1;
+  pointer-events: auto;
+}
+.spatial-fg-workspace--hidden {
+  transform: scale(0.94) translateY(24px);
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Utility popover (Quick Settings, Settings) */
+.utility-popover {
+  transition: transform 200ms cubic-bezier(0.16, 1, 0.3, 1),
+              opacity 200ms cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform, opacity;
+}
+.utility-popover--enter {
+  transform: translateY(0) scale(1);
+  opacity: 1;
+  pointer-events: auto;
+}
+.utility-popover--hidden {
+  transform: translateY(-8px) scale(0.97);
+  opacity: 0;
+  pointer-events: none;
 }

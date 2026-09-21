@@ -1,8 +1,11 @@
 export type ThemeMode = 'light' | 'dark';
 
+export type WorkspaceId = 'play' | 'effects' | 'learn' | 'practice' | 'analyze' | 'aicoach' | 'device';
+export type UtilityOverlayId = 'quick_settings' | 'settings';
+
 export type StudioTab = 'play' | 'effects' | 'learn' | 'practice' | 'analyze' | 'aicoach' | 'device';
 
-export type OverlayModalType = StudioTab | 'quick_settings' | 'settings' | null;
+export type OverlayModalType = WorkspaceId | UtilityOverlayId | null;
 
 export type InstrumentType = 'acoustic_grand' | 'electric_rhodes' | 'warm_synth' | 'marimba';
 

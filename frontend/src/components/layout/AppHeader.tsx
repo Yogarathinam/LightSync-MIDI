@@ -26,11 +26,12 @@ export const AppHeader: React.FC<{
 }> = ({ onHoverMenu }) => {
   const { theme, toggleTheme } = useTheme();
   const { 
-    activeOverlay,
-    openOverlay,
-    cancelOverlayClose,
-    scheduleOverlayClose,
-    closeOverlay,
+    activeWorkspace,
+    openWorkspace,
+    closeWorkspace,
+    activeUtilityOverlay,
+    openUtilityOverlay,
+    closeUtilityOverlay,
     deviceStatus, 
     volume, 
     setVolume, 
@@ -57,10 +58,26 @@ export const AppHeader: React.FC<{
   ];
 
   const handleTabClick = (tabId: StudioTab) => {
-    if (activeOverlay === tabId) {
-      closeOverlay();
+    closeUtilityOverlay();
+
+    if (tabId === 'play') {
+      if (activeWorkspace !== null && activeWorkspace !== 'play') {
+        // Any other workspace is open -> return to normal default mode
+        closeWorkspace();
+      } else if (activeWorkspace === 'play') {
+        // PlayStudio is open -> return to normal default mode
+        closeWorkspace();
+      } else {
+        // Already in normal default mode -> open PlayStudio
+        openWorkspace('play');
+      }
     } else {
-      openOverlay(tabId);
+      // Non-play workspace tabs
+      if (activeWorkspace === tabId) {
+        closeWorkspace();
+      } else {
+        openWorkspace(tabId);
+      }
     }
   };
 
@@ -91,19 +108,30 @@ export const AppHeader: React.FC<{
         {/* Center: Studio Tabs with Click-to-Open Overlay */}
         <nav className="hidden md:flex items-center p-1 rounded-2xl bg-slate-100/90 dark:bg-zinc-900/80 border border-slate-200/80 dark:border-zinc-800">
           {tabs.map((tab) => {
-            const isOpen = activeOverlay === tab.id;
+            const isWorkspaceActive = activeWorkspace === tab.id;
+            const isDefaultPlay = tab.id === 'play' && activeWorkspace === null;
             return (
               <button
                 key={tab.id}
                 onClick={() => handleTabClick(tab.id)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all select-none ${
-                  isOpen
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all select-none cursor-pointer ${
+                  isWorkspaceActive
                     ? 'bg-indigo-600 text-white shadow-sm font-semibold'
+                    : isDefaultPlay
+                    ? 'bg-indigo-50/90 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border border-indigo-200/70 dark:border-indigo-800/60 font-semibold'
                     : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200 hover:bg-slate-200/60 dark:hover:bg-zinc-800/60'
                 }`}
+                title={
+                  tab.id === 'play' 
+                    ? (activeWorkspace !== null ? 'Return to Live Visualizer' : 'Open Play Studio Controls')
+                    : `Open ${tab.label}`
+                }
               >
                 {tab.icon}
                 <span>{tab.label}</span>
+                {isDefaultPlay && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
+                )}
               </button>
             );
           })}
@@ -168,11 +196,11 @@ export const AppHeader: React.FC<{
             <div className="relative">
               <button
                 onClick={() => {
-                  if (activeOverlay === 'quick_settings') closeOverlay();
-                  else openOverlay('quick_settings');
+                  if (activeUtilityOverlay === 'quick_settings') closeUtilityOverlay();
+                  else openUtilityOverlay('quick_settings');
                 }}
-                className={`h-8.5 flex items-center gap-1.5 px-2.5 sm:px-3 rounded-xl border text-xs font-medium transition-all shadow-sm ${
-                  activeOverlay === 'quick_settings'
+                className={`h-8.5 flex items-center gap-1.5 px-2.5 sm:px-3 rounded-xl border text-xs font-medium transition-all shadow-sm cursor-pointer ${
+                  activeUtilityOverlay === 'quick_settings'
                     ? 'bg-indigo-600 text-white border-indigo-600'
                     : 'bg-slate-100 dark:bg-zinc-900 text-slate-700 dark:text-zinc-300 hover:bg-slate-200 dark:hover:bg-zinc-800 border-slate-200 dark:border-zinc-800'
                 }`}
@@ -190,7 +218,7 @@ export const AppHeader: React.FC<{
             <button
               onClick={() => setMetronomeActive(!metronomeActive)}
               title={`Metronome (${metronomeBpm} BPM)`}
-              className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all ${
+              className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all cursor-pointer ${
                 metronomeActive
                   ? 'bg-indigo-600 text-white shadow-sm'
                   : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white hover:bg-white dark:hover:bg-zinc-800'
@@ -203,7 +231,7 @@ export const AppHeader: React.FC<{
             <div className="hidden xl:flex items-center gap-1 px-1">
               <button
                 onClick={toggleMute}
-                className="p-1 rounded text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white"
+                className="p-1 rounded text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white cursor-pointer"
                 title={isMuted ? 'Unmute' : 'Mute'}
               >
                 {isMuted ? <VolumeX className="w-3.5 h-3.5 text-rose-500" /> : <Volume2 className="w-3.5 h-3.5" />}
@@ -226,11 +254,11 @@ export const AppHeader: React.FC<{
             {/* Full Settings Modal Button */}
             <button
               onClick={() => {
-                if (activeOverlay === 'settings') closeOverlay();
-                else openOverlay('settings');
+                if (activeUtilityOverlay === 'settings') closeUtilityOverlay();
+                else openUtilityOverlay('settings');
               }}
-              className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all ${
-                activeOverlay === 'settings'
+              className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all cursor-pointer ${
+                activeUtilityOverlay === 'settings'
                   ? 'bg-indigo-600 text-white'
                   : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white hover:bg-white dark:hover:bg-zinc-800'
               }`}
@@ -242,7 +270,7 @@ export const AppHeader: React.FC<{
             {/* Application-Wide Light / Pure-Black Dark Toggle */}
             <button
               onClick={toggleTheme}
-              className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-700 dark:text-zinc-300 hover:text-slate-900 dark:hover:text-white hover:bg-white dark:hover:bg-zinc-800 transition-all"
+              className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-700 dark:text-zinc-300 hover:text-slate-900 dark:hover:text-white hover:bg-white dark:hover:bg-zinc-800 transition-all cursor-pointer"
               title={`Switch whole application to ${theme === 'dark' ? 'Studio Daylight' : 'Pure Black OLED'} Theme`}
             >
               {theme === 'dark' ? (
@@ -258,20 +286,26 @@ export const AppHeader: React.FC<{
 
       {/* Mobile Single Tab Bar */}
       <div className="md:hidden flex items-center justify-around px-2 py-1.5 bg-slate-50 dark:bg-black border-t border-slate-200 dark:border-zinc-800 overflow-x-auto">
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => handleTabClick(tab.id)}
-            className={`p-1 rounded-lg text-xs flex flex-col items-center gap-0.5 shrink-0 ${
-              activeOverlay === tab.id
-                ? 'text-indigo-600 dark:text-indigo-400 font-bold'
-                : 'text-slate-500 dark:text-zinc-500'
-            }`}
-          >
-            {tab.icon}
-            <span className="text-[9px]">{tab.label}</span>
-          </button>
-        ))}
+        {tabs.map((tab) => {
+          const isWorkspaceActive = activeWorkspace === tab.id;
+          const isDefaultPlay = tab.id === 'play' && activeWorkspace === null;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => handleTabClick(tab.id)}
+              className={`p-1 rounded-lg text-xs flex flex-col items-center gap-0.5 shrink-0 cursor-pointer ${
+                isWorkspaceActive
+                  ? 'text-indigo-600 dark:text-indigo-400 font-bold'
+                  : isDefaultPlay
+                  ? 'text-indigo-500 font-semibold'
+                  : 'text-slate-500 dark:text-zinc-500'
+              }`}
+            >
+              {tab.icon}
+              <span className="text-[9px]">{tab.label}</span>
+            </button>
+          );
+        })}
       </div>
     </header>
   );
