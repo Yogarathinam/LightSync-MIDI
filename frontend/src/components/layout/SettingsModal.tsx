@@ -12,7 +12,9 @@ import {
   RotateCcw,
   Zap,
   Activity,
-  Music
+  Music,
+  Minus,
+  Plus
 } from 'lucide-react';
 import { useLightSyncStore } from '../../store/useLightSyncStore';
 import { useTheme } from '../../context/ThemeContext';
@@ -35,6 +37,12 @@ export const SettingsModal: React.FC = () => {
     setKeyLabels,
     octaveShift,
     setOctaveShift,
+    incrementOctave,
+    decrementOctave,
+    transpose,
+    setTranspose,
+    incrementTranspose,
+    decrementTranspose,
     volume,
     setVolume,
     isMuted,
@@ -279,25 +287,56 @@ export const SettingsModal: React.FC = () => {
           </div>
         </div>
 
-        {/* Octave Shift */}
-        <div>
-          <label className="text-xs text-slate-500 dark:text-zinc-400 font-medium block mb-1.5">
-            Pitch Octave Transpose:
-          </label>
-          <div className="flex items-center gap-1.5 bg-white dark:bg-zinc-900 p-1 rounded-xl border border-slate-200 dark:border-zinc-800 w-fit">
-            {([-2, -1, 0, 1, 2]).map((shift) => (
+        {/* Octave & Pitch Transpose Controls */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="text-xs text-slate-500 dark:text-zinc-400 font-medium block mb-1.5">
+              Octave Shift:
+            </label>
+            <div className="flex items-center justify-between bg-white dark:bg-zinc-900 p-1.5 rounded-xl border border-slate-200 dark:border-zinc-800">
               <button
-                key={shift}
-                onClick={() => setOctaveShift(shift)}
-                className={`w-9 py-1 rounded-lg font-mono text-xs font-bold transition-all ${
-                  octaveShift === shift
-                    ? 'bg-indigo-600 text-white shadow-sm'
-                    : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white'
-                }`}
+                onClick={decrementOctave}
+                className="w-8 h-7 rounded-lg bg-slate-100 dark:bg-zinc-800 flex items-center justify-center text-slate-700 dark:text-zinc-200 hover:bg-slate-200 dark:hover:bg-zinc-700 active:scale-95 transition-all"
+                title="Shift Down 1 Octave"
               >
-                {shift > 0 ? `+${shift}` : shift}
+                <Minus className="w-3.5 h-3.5" />
               </button>
-            ))}
+              <div className="font-mono font-bold text-xs text-slate-900 dark:text-white">
+                {octaveShift === 0 ? 'Oct 0 (Default)' : `Oct ${octaveShift > 0 ? `+${octaveShift}` : octaveShift}`}
+              </div>
+              <button
+                onClick={incrementOctave}
+                className="w-8 h-7 rounded-lg bg-slate-100 dark:bg-zinc-800 flex items-center justify-center text-slate-700 dark:text-zinc-200 hover:bg-slate-200 dark:hover:bg-zinc-700 active:scale-95 transition-all"
+                title="Shift Up 1 Octave"
+              >
+                <Plus className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs text-slate-500 dark:text-zinc-400 font-medium block mb-1.5">
+              Pitch Transpose:
+            </label>
+            <div className="flex items-center justify-between bg-white dark:bg-zinc-900 p-1.5 rounded-xl border border-slate-200 dark:border-zinc-800">
+              <button
+                onClick={decrementTranspose}
+                className="w-8 h-7 rounded-lg bg-slate-100 dark:bg-zinc-800 flex items-center justify-center text-slate-700 dark:text-zinc-200 hover:bg-slate-200 dark:hover:bg-zinc-700 active:scale-95 transition-all"
+                title="Transpose -1 Semitone"
+              >
+                <Minus className="w-3.5 h-3.5" />
+              </button>
+              <div className="font-mono font-bold text-xs text-slate-900 dark:text-white">
+                {transpose === 0 ? '0 Semitones' : `${transpose > 0 ? `+${transpose}` : transpose} st`}
+              </div>
+              <button
+                onClick={incrementTranspose}
+                className="w-8 h-7 rounded-lg bg-slate-100 dark:bg-zinc-800 flex items-center justify-center text-slate-700 dark:text-zinc-200 hover:bg-slate-200 dark:hover:bg-zinc-700 active:scale-95 transition-all"
+                title="Transpose +1 Semitone"
+              >
+                <Plus className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
         </div>
       </div>

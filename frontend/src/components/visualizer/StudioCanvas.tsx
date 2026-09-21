@@ -92,6 +92,8 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
 
   const {
     keyboardSize,
+    octaveShift,
+    transpose,
     keyLabels,
     diffuseBlur,
     fallingNotes,
@@ -107,7 +109,8 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
   } = useLightSyncStore();
 
   const ledCount = 144;
-  const startMidi = keyboardSize === 25 ? 48 : keyboardSize === 49 ? 36 : keyboardSize === 61 ? 36 : 21;
+  const baseStartMidi = keyboardSize === 25 ? 48 : keyboardSize === 49 ? 36 : keyboardSize === 61 ? 36 : 21;
+  const startMidi = baseStartMidi + octaveShift * 12 + transpose;
 
   // Particle pool for LED strip and impact sparks
   const particlesRef = useRef<Particle[]>(
@@ -380,8 +383,8 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
 
       ctx.clearRect(0, 0, width, height);
 
-      // 1. Draw Waterfall Runway Background
-      ctx.fillStyle = isDark ? '#000000' : '#f8fafc';
+      // 1. Draw Waterfall Runway Background (Dark grey in light mode for vibrant flow key visibility)
+      ctx.fillStyle = isDark ? '#000000' : '#1e293b';
       ctx.fillRect(0, 0, width, height);
 
       // Subtle Vertical Key Lane Separators in Waterfall Runway
@@ -391,7 +394,7 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
       ctx.lineWidth = 1;
       for (let i = 0; i <= whiteKeys.length; i++) {
         const laneX = 16 + i * whiteKeyWidth;
-        ctx.strokeStyle = isDark ? 'rgba(39, 39, 42, 0.4)' : 'rgba(226, 232, 240, 0.8)';
+        ctx.strokeStyle = isDark ? 'rgba(39, 39, 42, 0.4)' : 'rgba(71, 85, 105, 0.45)';
         ctx.beginPath();
         ctx.moveTo(laneX, waterfallTop);
         ctx.lineTo(laneX, ledBarTop);
@@ -849,7 +852,7 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
   }, []);
 
   return (
-    <div className="relative w-full bg-white dark:bg-black rounded-3xl border border-slate-200 dark:border-zinc-800 p-2 overflow-hidden shadow-md transition-colors">
+    <div className="relative w-full bg-slate-900 dark:bg-black rounded-3xl border border-slate-700/50 dark:border-zinc-800 p-2 overflow-hidden shadow-xl transition-colors">
       {/* Visualizer Top Info Bar */}
       <div className="w-full flex justify-between items-center px-3 py-1.5 text-[11px] text-slate-400 dark:text-zinc-500 font-mono">
         <span className="flex items-center gap-2">

@@ -9,6 +9,7 @@ import {
   Sparkles, 
   Cpu, 
   Settings as SettingsIcon,
+  SlidersHorizontal,
   ChevronDown
 } from 'lucide-react';
 import { useLightSyncStore } from '../../store/useLightSyncStore';
@@ -19,13 +20,17 @@ import { PracticeStudio } from '../practice/PracticeStudio';
 import { AnalyzeStudio } from '../analyze/AnalyzeStudio';
 import { AICoachStudio } from '../aicoach/AICoachStudio';
 import { DeviceMonitor } from '../device/DeviceMonitor';
+import { QuickSettingsDropdown } from './QuickSettingsDropdown';
 import { SettingsModal } from './SettingsModal';
 
-export const OverlayContainer: React.FC = () => {
+export const OverlayContainer: React.FC<{
+  onMouseEnter?: () => void;
+  onMouseLeave?: () => void;
+}> = ({ onMouseEnter, onMouseLeave }) => {
   const { activeOverlay, closeOverlay } = useLightSyncStore();
   const cardRef = useRef<HTMLDivElement | null>(null);
 
-  // Close on Escape key press
+  // Close on Escape key
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && activeOverlay !== null) {
@@ -43,123 +48,136 @@ export const OverlayContainer: React.FC = () => {
       case 'play':
         return {
           title: 'Play Studio',
-          badge: 'Harmonics & Synth',
-          icon: <Music className="w-5 h-5 text-indigo-500" />
+          badge: 'Live Harmonics & Synth',
+          icon: <Music className="w-4 h-4 text-indigo-500" />
         };
       case 'effects':
         return {
           title: 'WS2812B Effect Studio',
-          badge: 'Optical Simulation',
-          icon: <Sliders className="w-5 h-5 text-indigo-500" />
+          badge: 'Optical Simulation Engine',
+          icon: <Sliders className="w-4 h-4 text-indigo-500" />
         };
       case 'learn':
         return {
           title: 'Learn Studio',
-          badge: 'Interactive Score',
-          icon: <GraduationCap className="w-5 h-5 text-indigo-500" />
+          badge: 'Interactive Score Curriculum',
+          icon: <GraduationCap className="w-4 h-4 text-indigo-500" />
         };
       case 'practice':
         return {
-          title: 'Practice & Drills',
-          badge: 'Real-Time Timing',
-          icon: <Activity className="w-5 h-5 text-indigo-500" />
+          title: 'Practice Studio & Drills',
+          badge: 'Sub-tempo & A-B Looper',
+          icon: <Activity className="w-4 h-4 text-indigo-500" />
         };
       case 'analyze':
         return {
-          title: 'Music Analysis Engine',
-          badge: 'Chords & Scales',
-          icon: <BarChart2 className="w-5 h-5 text-indigo-500" />
+          title: 'Performance Analysis',
+          badge: 'Micro-timing & Chords',
+          icon: <BarChart2 className="w-4 h-4 text-indigo-500" />
         };
       case 'aicoach':
         return {
-          title: 'AI Music Coach',
-          badge: 'Copilot Feedback',
-          icon: <Sparkles className="w-5 h-5 text-indigo-500" />
+          title: 'LightSync AI Coach',
+          badge: 'Offline Heuristic Copilot',
+          icon: <Sparkles className="w-4 h-4 text-indigo-500" />
         };
       case 'device':
         return {
           title: 'Hardware Controller Bridge',
-          badge: 'M5Stack Core Serial',
-          icon: <Cpu className="w-5 h-5 text-indigo-500" />
+          badge: 'M5Stack Serial Protocol',
+          icon: <Cpu className="w-4 h-4 text-indigo-500" />
+        };
+      case 'quick_settings':
+        return {
+          title: 'Quick Settings',
+          badge: 'Live Adjustments',
+          icon: <SlidersHorizontal className="w-4 h-4 text-indigo-500" />
         };
       case 'settings':
         return {
           title: 'Studio Preferences',
-          badge: 'System Settings',
-          icon: <SettingsIcon className="w-5 h-5 text-indigo-500" />
+          badge: 'Theme, Hardware & Engine',
+          icon: <SettingsIcon className="w-4 h-4 text-indigo-500" />
         };
       default:
         return {
           title: 'Studio Panel',
-          badge: 'Overlay',
-          icon: <Sliders className="w-5 h-5 text-indigo-500" />
+          badge: 'Controls',
+          icon: <Sliders className="w-4 h-4 text-indigo-500" />
         };
     }
   };
 
   const meta = getOverlayMeta();
+  const isCompact = activeOverlay === 'quick_settings';
 
   return (
     <div 
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/60 backdrop-blur-sm transition-all animate-in fade-in duration-200"
-      onClick={(e) => {
-        // Autohide on click anywhere outside the card
+      className="fixed inset-0 z-50 pointer-events-none transition-colors duration-150"
+      onPointerDown={(e) => {
+        // Autohide if clicked outside the card
         if (e.target === e.currentTarget) {
           closeOverlay();
         }
       }}
     >
+      {/* Click-away transparent overlay */}
+      <div 
+        onClick={closeOverlay}
+        className="absolute inset-0 bg-black/25 dark:bg-black/50 pointer-events-auto transition-opacity"
+      />
+
+      {/* Floating Card positioned directly beneath the single top navbar */}
       <div 
         ref={cardRef}
+        onMouseEnter={onMouseEnter}
+        onMouseLeave={onMouseLeave}
         onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-4xl max-h-[86vh] flex flex-col rounded-3xl bg-white dark:bg-black border border-slate-200 dark:border-zinc-800 shadow-2xl elevation-3 overflow-hidden animate-in zoom-in-95 duration-200 transition-colors"
+        className={`pointer-events-auto absolute top-16 left-1/2 -translate-x-1/2 ${
+          isCompact ? 'max-w-md w-[92vw]' : 'max-w-4xl w-[94vw]'
+        } max-h-[82vh] flex flex-col rounded-2xl bg-white/95 dark:bg-zinc-950/95 backdrop-blur-xl border border-slate-200 dark:border-zinc-800 shadow-2xl overflow-hidden transition-all duration-150`}
+        style={{
+          boxShadow: '0 20px 50px -10px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(120, 120, 140, 0.15)'
+        }}
       >
-        {/* Gesture Drag-Handle Pill */}
+        {/* Top Gesture Pill Handle */}
         <div 
           onClick={closeOverlay}
-          title="Click or swipe to close overlay"
-          className="w-full pt-3 pb-1 flex flex-col items-center justify-center cursor-pointer group select-none"
+          className="w-full pt-2.5 pb-1 flex flex-col items-center justify-center cursor-pointer group select-none shrink-0"
+          title="Click to dismiss"
         >
-          <div className="w-12 h-1.5 rounded-full bg-slate-300 dark:bg-zinc-700 group-hover:bg-slate-400 dark:group-hover:bg-zinc-500 transition-colors" />
-          <span className="text-[9px] text-slate-400 dark:text-zinc-500 opacity-0 group-hover:opacity-100 transition-opacity mt-0.5 font-mono">
-            Click to dismiss
-          </span>
+          <div className="w-12 h-1 rounded-full bg-slate-300 dark:bg-zinc-700 group-hover:bg-indigo-500 transition-colors" />
         </div>
 
-        {/* Modal Card Header */}
-        <div className="px-6 py-3 border-b border-slate-100 dark:border-zinc-850 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-xl bg-slate-100 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800">
-              {meta.icon}
-            </div>
-            <div>
+        {/* Card Header (unless compact) */}
+        {!isCompact && (
+          <div className="px-5 py-2.5 border-b border-slate-100 dark:border-zinc-850 flex items-center justify-between shrink-0">
+            <div className="flex items-center gap-2.5">
+              <div className="p-1.5 rounded-xl bg-slate-100 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800">
+                {meta.icon}
+              </div>
               <div className="flex items-center gap-2">
-                <h2 className="text-base font-bold text-slate-900 dark:text-white tracking-tight">
+                <h2 className="text-sm font-bold text-slate-900 dark:text-white tracking-tight">
                   {meta.title}
                 </h2>
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-zinc-900 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-zinc-800 font-semibold">
                   {meta.badge}
                 </span>
               </div>
-              <p className="text-[11px] text-slate-500 dark:text-zinc-400">
-                Tap anywhere outside this card to return to piano
-              </p>
             </div>
-          </div>
 
-          <div className="flex items-center gap-2">
             <button
               onClick={closeOverlay}
-              className="p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-white bg-slate-100 dark:bg-zinc-900 hover:bg-slate-200 dark:hover:bg-zinc-800 border border-slate-200 dark:border-zinc-800 transition-all"
+              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white bg-slate-100 dark:bg-zinc-900 hover:bg-slate-200 dark:hover:bg-zinc-800 border border-slate-200 dark:border-zinc-800 transition-all"
               title="Close (Esc)"
             >
-              <X className="w-4 h-4" />
+              <X className="w-3.5 h-3.5" />
             </button>
           </div>
-        </div>
+        )}
 
-        {/* Modal Scrollable Body */}
-        <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-5">
+        {/* Card Content */}
+        <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4">
           {activeOverlay === 'play' && <PlayStudio />}
           {activeOverlay === 'effects' && <EffectStudio />}
           {activeOverlay === 'learn' && <LearnStudio />}
@@ -167,15 +185,16 @@ export const OverlayContainer: React.FC = () => {
           {activeOverlay === 'analyze' && <AnalyzeStudio />}
           {activeOverlay === 'aicoach' && <AICoachStudio />}
           {activeOverlay === 'device' && <DeviceMonitor />}
+          {activeOverlay === 'quick_settings' && <QuickSettingsDropdown />}
           {activeOverlay === 'settings' && <SettingsModal />}
         </div>
 
-        {/* Bottom Gesture / Auto-hide hint */}
-        <div className="px-6 py-2.5 bg-slate-50 dark:bg-zinc-950 border-t border-slate-100 dark:border-zinc-850 flex items-center justify-between text-xs text-slate-400 dark:text-zinc-500 font-mono shrink-0">
+        {/* Footer info */}
+        <div className="px-5 py-2 bg-slate-50/80 dark:bg-zinc-950/80 border-t border-slate-100 dark:border-zinc-850 flex items-center justify-between text-[10px] text-slate-400 dark:text-zinc-500 font-mono shrink-0">
           <span className="flex items-center gap-1">
-            <ChevronDown className="w-3.5 h-3.5" /> Click outside to autohide
+            <ChevronDown className="w-3 h-3" /> Move mouse away or click piano to play
           </span>
-          <span>LightSync v2.0 Material Card</span>
+          <span>LightSync v2.0</span>
         </div>
       </div>
     </div>

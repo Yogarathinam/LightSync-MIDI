@@ -20,8 +20,12 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const root = document.documentElement;
     if (theme === 'dark') {
       root.classList.add('dark');
+      root.setAttribute('data-theme', 'dark');
+      document.body.classList.add('dark');
     } else {
       root.classList.remove('dark');
+      root.setAttribute('data-theme', 'light');
+      document.body.classList.remove('dark');
     }
     localStorage.setItem('lightsync_theme', theme);
   }, [theme]);

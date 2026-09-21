@@ -1,44 +1,54 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { ThemeProvider } from './context/ThemeContext';
 import { useWebSocketBridge } from './hooks/useWebSocketBridge';
 import { useKeyboardInput } from './hooks/useKeyboardInput';
+import { useLightSyncStore } from './store/useLightSyncStore';
 
 import { AppHeader } from './components/layout/AppHeader';
 import { StatusBar } from './components/layout/StatusBar';
 import { OverlayContainer } from './components/layout/OverlayContainer';
 import { StudioCanvas } from './components/visualizer/StudioCanvas';
-import { VisualizerToolbar } from './components/visualizer/VisualizerToolbar';
 
 const MainApp: React.FC = () => {
   // Real-time hooks
   useWebSocketBridge();
   useKeyboardInput();
 
+  const { activeOverlay, setActiveOverlay, closeOverlay } = useLightSyncStore();
   const [fps, setFps] = useState(60);
+  const hoverGraceTimerRef = useRef<number | null>(null);
+
+  const handleOverlayMouseEnter = () => {
+    if (hoverGraceTimerRef.current) {
+      window.clearTimeout(hoverGraceTimerRef.current);
+      hoverGraceTimerRef.current = null;
+    }
+  };
+
+  const handleOverlayMouseLeave = () => {
+    hoverGraceTimerRef.current = window.setTimeout(() => {
+      closeOverlay();
+    }, 220);
+  };
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-black text-slate-900 dark:text-zinc-100 antialiased transition-colors duration-200 selection:bg-indigo-500 selection:text-white">
       
-      {/* Top Universal App Header & Navigation */}
+      {/* 1. Single Unified Top Navigation Bar */}
       <AppHeader />
 
-      {/* Main Immersive Visualizer Viewport */}
-      <main className="flex-1 max-w-[1800px] w-full mx-auto p-3 sm:p-4 flex flex-col gap-3">
-        
-        {/* Quick Mode & Config Toolbar */}
-        <VisualizerToolbar />
-
-        {/* Waterfall Flow Keys Runway & Bottom Piano Keyboard Engine */}
-        <div className="flex-1 flex flex-col">
-          <StudioCanvas onFpsUpdate={setFps} />
-        </div>
-
+      {/* 2. Main Immersive Visualizer Engine (Single Viewport) */}
+      <main className="flex-1 max-w-[1850px] w-full mx-auto p-2 sm:p-3 flex flex-col">
+        <StudioCanvas onFpsUpdate={setFps} />
       </main>
 
-      {/* Floating Elevated Card Overlay System with Autohide */}
-      <OverlayContainer />
+      {/* 3. Floating Semi-Transparent Acrylic Hover Card Overlays with Autohide */}
+      <OverlayContainer 
+        onMouseEnter={handleOverlayMouseEnter}
+        onMouseLeave={handleOverlayMouseLeave}
+      />
 
-      {/* Bottom Real-time Engine Status Bar */}
+      {/* 4. Bottom Real-time Engine Status Bar */}
       <StatusBar fps={fps} />
 
     </div>

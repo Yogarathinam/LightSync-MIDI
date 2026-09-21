@@ -33,6 +33,7 @@ interface LightSyncState {
   // Keyboard & Visualizer Settings
   keyboardSize: 25 | 49 | 61 | 88;
   octaveShift: number;
+  transpose: number;
   keyLabels: 'notes' | 'solfege' | 'qwerty' | 'none';
   diffuseBlur: boolean;
   fallingNotes: boolean;
@@ -40,6 +41,11 @@ interface LightSyncState {
   isAutoDemo: boolean;
   setKeyboardSize: (size: 25 | 49 | 61 | 88) => void;
   setOctaveShift: (shift: number) => void;
+  incrementOctave: () => void;
+  decrementOctave: () => void;
+  setTranspose: (semitones: number) => void;
+  incrementTranspose: () => void;
+  decrementTranspose: () => void;
   setKeyLabels: (labels: 'notes' | 'solfege' | 'qwerty' | 'none') => void;
   setDiffuseBlur: (enabled: boolean) => void;
   setFallingNotes: (enabled: boolean) => void;
@@ -118,11 +124,12 @@ export const useLightSyncStore = create<LightSyncState>((set, get) => ({
   setCurrentChord: (chord) => set({ currentChord: chord }),
 
   triggerNoteOn: (pitch, velocity = 100, sendWs = true) => {
-    const { activeNotes, keyboardSize, effectConfig, wsSender } = get();
+    const { activeNotes, keyboardSize, octaveShift, transpose, effectConfig, wsSender } = get();
     if (activeNotes.has(pitch)) return;
 
     // Calculate normalized LED center
-    const startMidi = keyboardSize === 25 ? 48 : keyboardSize === 49 ? 36 : keyboardSize === 61 ? 36 : 21;
+    const baseStartMidi = keyboardSize === 25 ? 48 : keyboardSize === 49 ? 36 : keyboardSize === 61 ? 36 : 21;
+    const startMidi = baseStartMidi + (octaveShift * 12) + transpose;
     const keyIdx = Math.max(0, Math.min(keyboardSize - 1, pitch - startMidi));
     const centerLed = Math.floor((keyIdx / (keyboardSize - 1)) * 143);
 
@@ -170,13 +177,19 @@ export const useLightSyncStore = create<LightSyncState>((set, get) => ({
   // Keyboard Viewport
   keyboardSize: 61,
   octaveShift: 0,
+  transpose: 0,
   keyLabels: 'notes',
   diffuseBlur: true,
   fallingNotes: true,
   flowSpeed: 1.2,
   isAutoDemo: false,
   setKeyboardSize: (size) => set({ keyboardSize: size }),
-  setOctaveShift: (shift) => set({ octaveShift: shift }),
+  setOctaveShift: (shift) => set({ octaveShift: Math.max(-4, Math.min(4, shift)) }),
+  incrementOctave: () => set((state) => ({ octaveShift: Math.max(-4, Math.min(4, state.octaveShift + 1)) })),
+  decrementOctave: () => set((state) => ({ octaveShift: Math.max(-4, Math.min(4, state.octaveShift - 1)) })),
+  setTranspose: (semitones) => set({ transpose: Math.max(-12, Math.min(12, semitones)) }),
+  incrementTranspose: () => set((state) => ({ transpose: Math.max(-12, Math.min(12, state.transpose + 1)) })),
+  decrementTranspose: () => set((state) => ({ transpose: Math.max(-12, Math.min(12, state.transpose - 1)) })),
   setKeyLabels: (labels) => set({ keyLabels: labels }),
   setDiffuseBlur: (enabled) => set({ diffuseBlur: enabled }),
   setFallingNotes: (enabled) => set({ fallingNotes: enabled }),
