@@ -462,32 +462,38 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
         });
       }
 
-      // D. Horizontal Time & Measure Divisions (Giving sense of distance & tempo)
+      // D. Horizontal Time & Measure Divisions (Moving AWAY from the keyboard towards the horizon)
       if (curBg.showHorizontalBeatLines) {
         const beatSpacing = 44;
-        const scrollOffset = curBg.scrollGrid ? bgScrollOffsetRef.current % (beatSpacing * 4) : 0;
+        // Continuous upward travel distance: increases over time (moves away from keyboard)
+        const scrollDistance = curBg.scrollGrid ? (now * 0.001 * 50 * curFlow.flowSpeed) : 0;
+        const phase = scrollDistance % beatSpacing;
 
-        for (let y = waterfallTop + scrollOffset; y <= ledBarTop; y += beatSpacing) {
-          const isMeasureBar = Math.round((y - scrollOffset) / beatSpacing) % 4 === 0;
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(16, waterfallTop, width - 32, waterfallHeight);
+        ctx.clip(); // Keep grid strictly contained inside the runway
+
+        // Step upwards from ledBarTop towards waterfallTop:
+        for (let y = ledBarTop + beatSpacing - phase; y >= waterfallTop - beatSpacing; y -= beatSpacing) {
+          const indexFromBottom = Math.round((ledBarTop - y) / beatSpacing);
+          const isMeasureBar = (indexFromBottom + Math.floor(scrollDistance / beatSpacing)) % 4 === 0;
+
+          ctx.beginPath();
+          ctx.moveTo(16, y);
+          ctx.lineTo(width - 16, y);
 
           if (isMeasureBar) {
-            // Stronger measure line
             ctx.strokeStyle = isDark ? 'rgba(148, 163, 184, 0.22)' : 'rgba(100, 116, 139, 0.35)';
             ctx.lineWidth = 1.5;
-            ctx.beginPath();
-            ctx.moveTo(16, y);
-            ctx.lineTo(width - 16, y);
             ctx.stroke();
           } else if (curBg.showSubtleGrid) {
-            // Subtle beat sub-line
             ctx.strokeStyle = isDark ? 'rgba(148, 163, 184, 0.08)' : 'rgba(100, 116, 139, 0.14)';
             ctx.lineWidth = 1;
-            ctx.beginPath();
-            ctx.moveTo(16, y);
-            ctx.lineTo(width - 16, y);
             ctx.stroke();
           }
         }
+        ctx.restore();
       }
 
       // E. Stronger Markings around Important Divisions (Octave Boundaries & C-Markers)
@@ -623,27 +629,29 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
       const trails = flowTrailsRef.current;
       const speedPxPerSec = 170 * curFlow.flowSpeed;
 
-      // A. Register new trails for actively pressed keys
-      curActiveNotes.forEach((_noteData, pitch) => {
-        const existing = trails.find(t => t.pitch === pitch && t.endTime === null);
-        if (!existing) {
-          const geom = getKeyGeometry(pitch, width, keyAreaTop, keyAreaHeight);
-          if (geom) {
-            const cols = getNoteColors(pitch, curEff, curFlow);
-            trails.push({
-              id: Math.random(),
-              pitch,
-              startTime: now,
-              endTime: null,
-              x: geom.x + 1,
-              width: geom.width - 2,
-              isBlack: geom.isBlack,
-              color: cols.primary,
-              secondaryColor: cols.secondary
-            });
+      // A. Register new trails for actively pressed keys (only when NOT in auto-demo)
+      if (!isAutoDemoRef.current) {
+        curActiveNotes.forEach((_noteData, pitch) => {
+          const existing = trails.find(t => t.pitch === pitch && t.endTime === null);
+          if (!existing) {
+            const geom = getKeyGeometry(pitch, width, keyAreaTop, keyAreaHeight);
+            if (geom) {
+              const cols = getNoteColors(pitch, curEff, curFlow);
+              trails.push({
+                id: Math.random(),
+                pitch,
+                startTime: now,
+                endTime: null,
+                x: geom.x + 1,
+                width: geom.width - 2,
+                isBlack: geom.isBlack,
+                color: cols.primary,
+                secondaryColor: cols.secondary
+              });
+            }
           }
-        }
-      });
+        });
+      }
 
       // B. Release trails when note is released
       for (let i = 0; i < trails.length; i++) {
@@ -685,10 +693,16 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
           continue;
         }
 
-        // Clamp to visible runway
+        // Clamped bounds inside waterfall runway
         const barTop = Math.max(waterfallTop, headY);
         const barBottom = Math.min(ledBarTop, tailY);
         const barHeight = barBottom - barTop;
+
+        // Dynamic geometry lookup so trails stay 100% aligned during screen resizes
+        const geom = getKeyGeometry(t.pitch, width, keyAreaTop, keyAreaHeight);
+        if (!geom) continue;
+        const trailX = geom.x + 1;
+        const trailWidth = geom.width - 2;
 
         if (barHeight > 2) {
           const col = t.color;
@@ -723,7 +737,7 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
 
           ctx.fillStyle = barGrad;
           ctx.beginPath();
-          ctx.roundRect(t.x, barTop, t.width, barHeight, [5, 5, 3, 3]);
+          ctx.roundRect(trailX, barTop, trailWidth, barHeight, [5, 5, 3, 3]);
           ctx.fill();
 
           // Neon outline
@@ -732,12 +746,12 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
           ctx.stroke();
 
           // Acrylic glass reflection highlight
-          const glassGrad = ctx.createLinearGradient(t.x, 0, t.x + t.width, 0);
+          const glassGrad = ctx.createLinearGradient(trailX, 0, trailX + trailWidth, 0);
           glassGrad.addColorStop(0, 'rgba(255, 255, 255, 0.45)');
           glassGrad.addColorStop(0.35, 'rgba(255, 255, 255, 0.1)');
           glassGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
           ctx.fillStyle = glassGrad;
-          ctx.fillRect(t.x + 1, barTop, Math.max(2, t.width * 0.35), barHeight);
+          ctx.fillRect(trailX + 1, barTop, Math.max(2, trailWidth * 0.35), barHeight);
 
           ctx.shadowBlur = 0; // Reset shadow
 
@@ -746,7 +760,7 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
             ctx.fillStyle = '#ffffff';
             ctx.shadowColor = `rgb(${col.r}, ${col.g}, ${col.b})`;
             ctx.shadowBlur = 10;
-            ctx.fillRect(t.x - 1, ledBarTop - 2, t.width + 2, 3);
+            ctx.fillRect(trailX - 1, ledBarTop - 2, trailWidth + 2, 3);
             ctx.shadowBlur = 0;
           }
         }
@@ -1049,6 +1063,11 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
         activePointerKeyRef.current = null;
       }
       isPointerDownRef.current = false;
+      try {
+        if (e.currentTarget && e.currentTarget.hasPointerCapture(e.pointerId)) {
+          e.currentTarget.releasePointerCapture(e.pointerId);
+        }
+      } catch {}
     }
   };
 
@@ -1149,6 +1168,7 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
           onPointerCancel={handlePointerUp}
+          onPointerLeave={handlePointerUp}
           className="w-full h-full cursor-pointer touch-none block"
         />
       </div>
