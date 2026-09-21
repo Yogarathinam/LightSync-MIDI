@@ -95,35 +95,28 @@
    SPATIAL DEPTH TRANSITION SYSTEM
    ======================================== */
 
-/* ========================================
-   SPATIAL DEPTH TRANSITION SYSTEM
-   ======================================== */
-
-/* Background layer: the visualizer recedes subtly into 3D space */
+/* Background layer: the visualizer recedes subtly into 3D space (pure transform + opacity, NO blur filter for 60fps canvas) */
 .spatial-bg-layer {
-  transition: transform 320ms cubic-bezier(0.16, 1, 0.3, 1),
-              filter 320ms cubic-bezier(0.16, 1, 0.3, 1),
-              opacity 320ms ease;
+  transition: transform 260ms cubic-bezier(0.16, 1, 0.3, 1),
+              opacity 260ms ease;
   transform-origin: center top;
-  will-change: transform, filter, opacity;
+  will-change: transform, opacity;
   backface-visibility: hidden;
   transform: translateZ(0);
 }
 .spatial-bg-layer--active {
   transform: scale(1) translateY(0) translateZ(0);
-  filter: blur(0px) brightness(1);
   opacity: 1;
 }
 .spatial-bg-layer--receded {
   transform: scale(0.96) translateY(4px) translateZ(0);
-  filter: blur(2px) brightness(0.8);
-  opacity: 0.92;
+  opacity: 0.82;
   pointer-events: none;
 }
 
 /* Scrim between receded visualizer and foreground workspace */
 .spatial-scrim {
-  transition: opacity 320ms cubic-bezier(0.16, 1, 0.3, 1);
+  transition: opacity 260ms cubic-bezier(0.16, 1, 0.3, 1);
   will-change: opacity;
 }
 .spatial-scrim--active {
@@ -135,40 +128,95 @@
   pointer-events: none;
 }
 
-/* Foreground workspace surface */
-.spatial-fg-workspace {
-  transition: transform 300ms cubic-bezier(0.16, 1, 0.3, 1),
-              opacity 300ms cubic-bezier(0.16, 1, 0.3, 1);
+/* Foreground workspace animations: hardware-accelerated keyframes that run on mount and lock into static */
+@keyframes spatialFgEnter {
+  0% {
+    opacity: 0;
+    transform: scale(0.96) translateY(12px) translateZ(0);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0) translateZ(0);
+  }
+}
+
+@keyframes spatialFgExit {
+  0% {
+    opacity: 1;
+    transform: scale(1) translateY(0) translateZ(0);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.96) translateY(10px) translateZ(0);
+  }
+}
+
+.spatial-fg-enter {
+  animation: spatialFgEnter 240ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
   will-change: transform, opacity;
   backface-visibility: hidden;
   transform: translateZ(0);
-}
-.spatial-fg-workspace--enter {
-  transform: scale(1) translateY(0) translateZ(0);
-  opacity: 1;
   pointer-events: auto;
+  contain: paint layout;
 }
-.spatial-fg-workspace--hidden {
-  transform: scale(0.96) translateY(14px) translateZ(0);
-  opacity: 0;
+
+.spatial-fg-static {
+  opacity: 1;
+  transform: scale(1) translateY(0) translateZ(0);
+  pointer-events: auto;
+  contain: paint layout;
+}
+
+.spatial-fg-exit {
+  animation: spatialFgExit 180ms cubic-bezier(0.4, 0, 1, 1) forwards;
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+  transform: translateZ(0);
   pointer-events: none;
+  contain: paint layout;
 }
 
 /* Utility popover (Quick Settings, Settings) */
-.utility-popover {
-  transition: transform 200ms cubic-bezier(0.16, 1, 0.3, 1),
-              opacity 200ms cubic-bezier(0.16, 1, 0.3, 1);
+@keyframes utilityPopoverEnter {
+  0% {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.97) translateZ(0);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1) translateZ(0);
+  }
+}
+
+@keyframes utilityPopoverExit {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(1) translateZ(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98) translateZ(0);
+  }
+}
+
+.utility-popover-enter {
+  animation: utilityPopoverEnter 180ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
   will-change: transform, opacity;
   backface-visibility: hidden;
   transform: translateZ(0);
-}
-.utility-popover--enter {
-  transform: translateY(0) scale(1) translateZ(0);
-  opacity: 1;
   pointer-events: auto;
 }
-.utility-popover--hidden {
-  transform: translateY(-8px) scale(0.97) translateZ(0);
-  opacity: 0;
+
+.utility-popover-static {
+  opacity: 1;
+  transform: translateY(0) scale(1) translateZ(0);
+  pointer-events: auto;
+}
+
+.utility-popover-exit {
+  animation: utilityPopoverExit 140ms cubic-bezier(0.4, 0, 1, 1) forwards;
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+  transform: translateZ(0);
   pointer-events: none;
 }

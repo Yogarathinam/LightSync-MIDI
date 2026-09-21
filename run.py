@@ -66,7 +66,7 @@ def main():
         os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = (
             "--enable-gpu-rasterization "
             "--enable-accelerated-2d-canvas "
-            "--disable-software-rasterizer "
+            "--enable-zero-copy "
             "--disable-backgrounding-occluded-windows"
         )
 

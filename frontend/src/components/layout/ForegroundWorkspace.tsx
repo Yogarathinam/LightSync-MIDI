@@ -25,7 +25,7 @@ export const ForegroundWorkspace: React.FC = () => {
   const { activeWorkspace, closeWorkspace } = useLightSyncStore();
 
   const [displayedWorkspace, setDisplayedWorkspace] = useState<WorkspaceId | null>(activeWorkspace);
-  const [isOpen, setIsOpen] = useState(activeWorkspace !== null);
+  const [animPhase, setAnimPhase] = useState<'enter' | 'static' | 'exit'>('enter');
   const exitTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -35,10 +35,9 @@ export const ForegroundWorkspace: React.FC = () => {
         exitTimerRef.current = null;
       }
       setDisplayedWorkspace(activeWorkspace);
-      setIsOpen(true);
-    } else {
-      setIsOpen(false);
-      // Wait for CSS exit transition (300ms) before unmounting studio contents
+      setAnimPhase('enter');
+    } else if (displayedWorkspace) {
+      setAnimPhase('exit');
       exitTimerRef.current = window.setTimeout(() => {
         setDisplayedWorkspace(null);
         exitTimerRef.current = null;
@@ -46,7 +45,7 @@ export const ForegroundWorkspace: React.FC = () => {
           document.activeElement.blur();
         }
         window.focus();
-      }, 310);
+      }, 190);
     }
 
     return () => {
@@ -54,7 +53,7 @@ export const ForegroundWorkspace: React.FC = () => {
         clearTimeout(exitTimerRef.current);
       }
     };
-  }, [activeWorkspace]);
+  }, [activeWorkspace, displayedWorkspace]);
 
   // Close on Escape key
   const handleRequestClose = useCallback(() => {
@@ -71,7 +70,7 @@ export const ForegroundWorkspace: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [displayedWorkspace, handleRequestClose]);
 
-  if (!displayedWorkspace && !isOpen) return null;
+  if (!displayedWorkspace) return null;
 
   const getWorkspaceMeta = (ws: WorkspaceId | null) => {
     switch (ws) {
@@ -128,16 +127,21 @@ export const ForegroundWorkspace: React.FC = () => {
 
   const meta = getWorkspaceMeta(displayedWorkspace);
 
+  const animClass = 
+    animPhase === 'enter' ? 'spatial-fg-enter' :
+    animPhase === 'exit' ? 'spatial-fg-exit' :
+    'spatial-fg-static';
+
   return (
     <div className="absolute inset-0 z-30 pointer-events-none flex items-center justify-center p-2 sm:p-4 md:p-5">
       <div 
         onClick={(e) => e.stopPropagation()}
-        className={`pointer-events-auto max-w-5xl w-[95vw] h-[92%] flex flex-col rounded-2xl bg-white dark:bg-[#0c0c0e] border border-slate-200 dark:border-zinc-800 shadow-2xl overflow-hidden spatial-fg-workspace ${
-          isOpen ? 'spatial-fg-workspace--enter' : 'spatial-fg-workspace--hidden'
-        }`}
-        style={{
-          boxShadow: '0 25px 65px -12px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(120, 120, 140, 0.2)'
+        onAnimationEnd={() => {
+          if (animPhase === 'enter') {
+            setAnimPhase('static');
+          }
         }}
+        className={`pointer-events-auto max-w-5xl w-[95vw] h-[92%] flex flex-col rounded-2xl bg-white dark:bg-[#0c0c0e] border border-slate-200 dark:border-zinc-800 shadow-2xl overflow-hidden ${animClass}`}
       >
         {/* Top Gesture Dismiss Pill */}
         <div 

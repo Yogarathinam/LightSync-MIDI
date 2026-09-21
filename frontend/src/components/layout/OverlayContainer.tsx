@@ -17,10 +17,9 @@ export const OverlayContainer: React.FC = () => {
   } = useLightSyncStore();
   
   const [renderedOverlay, setRenderedOverlay] = useState<UtilityOverlayId | null>(activeUtilityOverlay);
-  const [isOpen, setIsOpen] = useState(activeUtilityOverlay !== null);
+  const [animPhase, setAnimPhase] = useState<'enter' | 'static' | 'exit'>('enter');
   const exitTimerRef = useRef<number | null>(null);
 
-  // Sync activeUtilityOverlay state with smooth CSS transition exit
   useEffect(() => {
     if (activeUtilityOverlay) {
       if (exitTimerRef.current) {
@@ -28,11 +27,9 @@ export const OverlayContainer: React.FC = () => {
         exitTimerRef.current = null;
       }
       setRenderedOverlay(activeUtilityOverlay);
-      requestAnimationFrame(() => {
-        setIsOpen(true);
-      });
-    } else {
-      setIsOpen(false);
+      setAnimPhase('enter');
+    } else if (renderedOverlay) {
+      setAnimPhase('exit');
       exitTimerRef.current = window.setTimeout(() => {
         setRenderedOverlay(null);
         exitTimerRef.current = null;
@@ -40,7 +37,7 @@ export const OverlayContainer: React.FC = () => {
           document.activeElement.blur();
         }
         window.focus();
-      }, 210);
+      }, 150);
     }
 
     return () => {
@@ -48,7 +45,7 @@ export const OverlayContainer: React.FC = () => {
         clearTimeout(exitTimerRef.current);
       }
     };
-  }, [activeUtilityOverlay]);
+  }, [activeUtilityOverlay, renderedOverlay]);
 
   // Request close
   const handleRequestClose = useCallback(() => {
@@ -94,13 +91,18 @@ export const OverlayContainer: React.FC = () => {
   const meta = getOverlayMeta();
   const isCompact = renderedOverlay === 'quick_settings';
 
+  const animClass = 
+    animPhase === 'enter' ? 'utility-popover-enter' :
+    animPhase === 'exit' ? 'utility-popover-exit' :
+    'utility-popover-static';
+
   return (
     <div className="fixed inset-0 z-50 pointer-events-none">
       {/* Click-away backdrop */}
       <div 
         onClick={handleRequestClose}
-        className={`absolute top-16 inset-x-0 bottom-0 bg-black/40 dark:bg-black/70 backdrop-blur-sm pointer-events-auto transition-opacity duration-200 ${
-          isOpen ? 'opacity-100' : 'opacity-0'
+        className={`absolute top-16 inset-x-0 bottom-0 bg-black/40 dark:bg-black/70 backdrop-blur-sm pointer-events-auto transition-opacity duration-150 ${
+          animPhase !== 'exit' ? 'opacity-100' : 'opacity-0'
         }`}
       />
 
@@ -108,14 +110,14 @@ export const OverlayContainer: React.FC = () => {
       <div className="absolute top-16 inset-x-0 bottom-0 flex justify-center items-start pt-2 sm:pt-3 pointer-events-none overflow-hidden">
         <div 
           onClick={(e) => e.stopPropagation()}
+          onAnimationEnd={() => {
+            if (animPhase === 'enter') {
+              setAnimPhase('static');
+            }
+          }}
           className={`pointer-events-auto ${
             isCompact ? 'max-w-md w-[92vw]' : 'max-w-4xl w-[94vw]'
-          } max-h-[82vh] flex flex-col rounded-2xl bg-white dark:bg-[#0c0c0e] border border-slate-300 dark:border-zinc-800 shadow-2xl overflow-hidden utility-popover ${
-            isOpen ? 'utility-popover--enter' : 'utility-popover--hidden'
-          }`}
-          style={{
-            boxShadow: '0 25px 60px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(120, 120, 140, 0.18)'
-          }}
+          } max-h-[82vh] flex flex-col rounded-2xl bg-white dark:bg-[#0c0c0e] border border-slate-300 dark:border-zinc-800 shadow-2xl overflow-hidden ${animClass}`}
         >
           {/* Top Gesture Pill Handle */}
           <div 
