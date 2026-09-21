@@ -43,7 +43,7 @@ export const OverlayContainer: React.FC = () => {
       const timer = setTimeout(() => {
         setRenderedOverlay(null);
         setIsClosing(false);
-      }, 160);
+      }, 140);
       return () => clearTimeout(timer);
     }
   }, [activeOverlay, renderedOverlay, isClosing]);
@@ -52,11 +52,7 @@ export const OverlayContainer: React.FC = () => {
   const handleRequestClose = useCallback(() => {
     if (isClosing) return;
     setIsClosing(true);
-    setTimeout(() => {
-      closeOverlay();
-      setRenderedOverlay(null);
-      setIsClosing(false);
-    }, 160);
+    closeOverlay();
   }, [isClosing, closeOverlay]);
 
   // Close on Escape key
@@ -143,33 +139,29 @@ export const OverlayContainer: React.FC = () => {
   return (
     <div 
       className="fixed inset-0 z-50 pointer-events-none"
-      onPointerDown={(e) => {
-        if (e.target === e.currentTarget) {
-          handleRequestClose();
-        }
-      }}
     >
-      {/* Click-away backdrop: starts below header, smoothly fades in/out */}
+      {/* Click-away backdrop: starts below header, smoothly fades in/out with soft blur */}
       <div 
         onClick={handleRequestClose}
-        className={`absolute top-16 inset-x-0 bottom-0 bg-black/30 dark:bg-black/60 pointer-events-auto ${
+        className={`absolute top-16 inset-x-0 bottom-0 bg-black/40 dark:bg-black/70 backdrop-blur-sm pointer-events-auto ${
           isClosing ? 'animate-backdrop-exit' : 'animate-backdrop-enter'
         }`}
       />
 
-      {/* Floating Card: high-performance hardware-accelerated animated surface */}
-      <div 
-        ref={cardRef}
-        onClick={(e) => e.stopPropagation()}
-        className={`pointer-events-auto absolute top-[62px] left-1/2 ${
-          isCompact ? 'max-w-md w-[92vw]' : 'max-w-4xl w-[94vw]'
-        } max-h-[82vh] flex flex-col rounded-2xl bg-white dark:bg-[#0c0c0e] border border-slate-300 dark:border-zinc-800 shadow-2xl overflow-hidden ${
-          isClosing ? 'animate-overlay-exit' : 'animate-overlay-enter'
-        }`}
-        style={{
-          boxShadow: '0 25px 60px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(120, 120, 140, 0.18)'
-        }}
-      >
+      {/* Centered Floating Card: integer-aligned flexbox centering without subpixel translate jitter */}
+      <div className="absolute top-16 inset-x-0 bottom-0 flex justify-center items-start pt-2 sm:pt-3 pointer-events-none overflow-hidden">
+        <div 
+          ref={cardRef}
+          onClick={(e) => e.stopPropagation()}
+          className={`pointer-events-auto ${
+            isCompact ? 'max-w-md w-[92vw]' : 'max-w-4xl w-[94vw]'
+          } max-h-[82vh] flex flex-col rounded-2xl bg-white dark:bg-[#0c0c0e] border border-slate-300 dark:border-zinc-800 shadow-2xl overflow-hidden ${
+            isClosing ? 'animate-overlay-exit' : 'animate-overlay-enter'
+          }`}
+          style={{
+            boxShadow: '0 25px 60px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(120, 120, 140, 0.18)'
+          }}
+        >
         {/* Top Gesture Pill Handle */}
         <div 
           onClick={handleRequestClose}
@@ -225,6 +217,7 @@ export const OverlayContainer: React.FC = () => {
             <ChevronDown className="w-3 h-3" /> Click outside or press Esc to close
           </span>
           <span>LightSync v2.0</span>
+        </div>
         </div>
       </div>
     </div>

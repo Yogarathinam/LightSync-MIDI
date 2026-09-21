@@ -11,9 +11,78 @@ import {
   SongItem, 
   SessionResult, 
   AICoachFeedback, 
-  DeviceStatus 
+  DeviceStatus,
+  FlowKeyConfig,
+  VisualizerBackgroundConfig,
+  ColorSyncPresetId
 } from '../types';
 import { synthEngine } from '../audio/synthEngine';
+
+export const COLOR_SYNC_PRESETS: Record<ColorSyncPresetId, {
+  name: string;
+  desc: string;
+  primary: string;
+  secondary: string;
+  rainbow: boolean;
+  effect: EffectType;
+}> = {
+  cyberpunk: {
+    name: 'Cyberpunk Neon',
+    desc: 'Electric Cyan & Hot Magenta',
+    primary: '#00f0ff',
+    secondary: '#ec4899',
+    rainbow: false,
+    effect: 'spark'
+  },
+  synthwave: {
+    name: 'Synthwave Sunset',
+    desc: 'Golden Amber & Deep Violet',
+    primary: '#f59e0b',
+    secondary: '#8b5cf6',
+    rainbow: false,
+    effect: 'pulse'
+  },
+  emerald_matrix: {
+    name: 'Emerald Matrix',
+    desc: 'Digital Mint & Luminous Teal',
+    primary: '#10b981',
+    secondary: '#06b6d4',
+    rainbow: false,
+    effect: 'glitch'
+  },
+  sunset_horizon: {
+    name: 'Sunset Horizon',
+    desc: 'Rose Red & Warm Peach',
+    primary: '#f43f5e',
+    secondary: '#fb923c',
+    rainbow: false,
+    effect: 'ripple'
+  },
+  electric_indigo: {
+    name: 'Electric Indigo',
+    desc: 'Deep Indigo & Cobalt Sky',
+    primary: '#6366f1',
+    secondary: '#38bdf8',
+    rainbow: false,
+    effect: 'wave'
+  },
+  crimson_nova: {
+    name: 'Crimson Nova',
+    desc: 'Intense Flame & Blaze Orange',
+    primary: '#ef4444',
+    secondary: '#f97316',
+    rainbow: false,
+    effect: 'bounce'
+  },
+  rainbow_spectrum: {
+    name: 'Pitch Spectrum',
+    desc: 'Dynamic Chromatic Frequencies',
+    primary: '#6366f1',
+    secondary: '#ec4899',
+    rainbow: true,
+    effect: 'rain'
+  }
+};
 
 interface LightSyncState {
   // Navigation & Overlay Modal
@@ -84,6 +153,13 @@ interface LightSyncState {
   presets: PresetItem[];
   setPresets: (presets: PresetItem[]) => void;
   loadPreset: (preset: PresetItem) => void;
+
+  // Flow Key & Background FX State
+  flowKeyConfig: FlowKeyConfig;
+  setFlowKeyParam: <K extends keyof FlowKeyConfig>(param: K, value: FlowKeyConfig[K]) => void;
+  bgConfig: VisualizerBackgroundConfig;
+  setBgConfigParam: <K extends keyof VisualizerBackgroundConfig>(param: K, value: VisualizerBackgroundConfig[K]) => void;
+  applyColorPreset: (presetId: ColorSyncPresetId) => void;
 
   // Learning & Practice Mode State
   currentSong: SongItem | null;
@@ -321,6 +397,50 @@ export const useLightSyncStore = create<LightSyncState>((set, get) => ({
       secondaryColor: preset.secondaryColor
     });
     get().addConsoleLog(`Loaded preset: "${preset.name}" [${preset.effect.toUpperCase()}]`);
+  },
+
+  // Flow Key Visualizer & Background FX
+  flowKeyConfig: {
+    trailDuration: 1.8,
+    flowSpeed: 1.2,
+    trailStyle: 'neon_bar',
+    colorPreset: 'cyberpunk',
+    glowIntensity: 85,
+    showParticles: true,
+    bloomGlow: true
+  },
+  setFlowKeyParam: (param, value) => {
+    set((state) => ({
+      flowKeyConfig: { ...state.flowKeyConfig, [param]: value }
+    }));
+  },
+  bgConfig: {
+    showVerticalPitchLanes: true,
+    showKeyRegions: true,
+    showOctaveDividers: true,
+    showHorizontalBeatLines: true,
+    showSubtleGrid: true,
+    scrollGrid: true
+  },
+  setBgConfigParam: (param, value) => {
+    set((state) => ({
+      bgConfig: { ...state.bgConfig, [param]: value }
+    }));
+  },
+  applyColorPreset: (presetId) => {
+    const preset = COLOR_SYNC_PRESETS[presetId];
+    if (!preset) return;
+    set((state) => ({
+      flowKeyConfig: { ...state.flowKeyConfig, colorPreset: presetId },
+      effectConfig: {
+        ...state.effectConfig,
+        primaryColor: preset.primary,
+        secondaryColor: preset.secondary,
+        rainbow: preset.rainbow,
+        effect: preset.effect
+      }
+    }));
+    get().addConsoleLog(`Applied Visual Sync Preset: ${preset.name}`);
   },
 
   // Learning & Practice

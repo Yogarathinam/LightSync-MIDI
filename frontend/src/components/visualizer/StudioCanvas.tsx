@@ -1,7 +1,7 @@
-import React, { useRef, useEffect, useCallback } from 'react';
+import React, { useRef, useEffect, useCallback, useMemo } from 'react';
 import { useLightSyncStore } from '../../store/useLightSyncStore';
 import { useTheme } from '../../context/ThemeContext';
-import { EffectType } from '../../types';
+import { EffectType, EffectConfig, FlowKeyConfig } from '../../types';
 
 interface Particle {
   active: boolean;
@@ -31,20 +31,20 @@ interface WaterfallNote {
   active: boolean;
 }
 
-interface RisingBeam {
+interface FlowTrail {
   id: number;
   pitch: number;
+  startTime: number;
+  endTime: number | null; // null while key is actively held down
   x: number;
   width: number;
-  y: number;
-  height: number;
-  alpha: number;
+  isBlack: boolean;
   color: { r: number; g: number; b: number };
+  secondaryColor: { r: number; g: number; b: number };
 }
 
 const MAX_PARTICLES = 64;
 const MAX_FALLING_NOTES = 128;
-const MAX_RISING_BEAMS = 32;
 
 const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 const SOLFEGE = ["Do", "Di", "Re", "Ri", "Mi", "Fa", "Fi", "Sol", "Si", "La", "Li", "Ti"];
@@ -86,6 +86,22 @@ function hslToRgb(h: number, s: number, l: number): { r: number; g: number; b: n
   return { r: Math.round(r * 255), g: Math.round(g * 255), b: Math.round(b * 255) };
 }
 
+function getNoteColors(pitch: number, effectConfig: EffectConfig, flowKeyConfig: FlowKeyConfig): {
+  primary: { r: number; g: number; b: number };
+  secondary: { r: number; g: number; b: number };
+} {
+  if (flowKeyConfig.colorPreset === 'rainbow_spectrum' || effectConfig.rainbow) {
+    const hue = (pitch % 12) / 12;
+    const p = hslToRgb(hue, 1.0, 0.55);
+    const s = hslToRgb((hue + 0.08) % 1.0, 0.9, 0.65);
+    return { primary: p, secondary: s };
+  }
+
+  const p = hexToRgb(effectConfig.primaryColor);
+  const s = hexToRgb(effectConfig.secondaryColor || effectConfig.primaryColor);
+  return { primary: p, secondary: s };
+}
+
 export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = ({ onFpsUpdate }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const { theme } = useTheme();
@@ -102,6 +118,8 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
     flowSpeed,
     isAutoDemo,
     effectConfig,
+    flowKeyConfig,
+    bgConfig,
     activeNotes,
     triggerNoteOn,
     triggerNoteOff,
@@ -142,15 +160,16 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
     Array.from({ length: ledCount }, () => ({ r: 0, g: 0, b: 0 }))
   );
 
-  // Falling waterfall bars pool
+  // Falling waterfall bars pool (Auto Demo / practice)
   const fallingBarsRef = useRef<WaterfallNote[]>([]);
-  // Rising freestyle beams pool
-  const risingBeamsRef = useRef<RisingBeam[]>([]);
+  // Flow Key trails pool (User play / MIDI input)
+  const flowTrailsRef = useRef<FlowTrail[]>([]);
+  // Moving perspective grid offset
+  const bgScrollOffsetRef = useRef<number>(0);
 
   // Pointer drag interaction
   const isPointerDownRef = useRef(false);
   const activePointerKeyRef = useRef<number | null>(null);
-  const prevActivePitchesRef = useRef<Set<number>>(new Set());
 
   // Demo step timer
   const demoTimerRef = useRef<number>(0);
@@ -220,7 +239,7 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
   }, [effectConfig, ledCount]);
 
   // Keyboard layout metadata
-  const keys = React.useMemo(() => {
+  const keys = useMemo(() => {
     const blackPattern = [false, true, false, true, false, false, true, false, true, false, true, false];
     const keyList = [];
     let whiteIndex = 0;
@@ -246,7 +265,7 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
   }, [keyboardSize, startMidi]);
 
   // Calculate key geometry helper
-  const getKeyGeometry = useCallback((midi: number, width: number, keyAreaTop: number, keyAreaHeight: number) => {
+  const getKeyGeometry = useCallback((midi: number, width: number, _keyAreaTop: number, _keyAreaHeight: number) => {
     const keyObj = keys.find(k => k.midi === midi);
     if (!keyObj) return null;
 
@@ -272,60 +291,60 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
     }
   }, [keys]);
 
-  // Listen for key presses to spawn effects and rising fountain beams
+  // Mutable refs for ultra-smooth 60/120 FPS render loop without recreation jitter
+  const activeNotesRef = useRef(activeNotes);
+  activeNotesRef.current = activeNotes;
+  const keyboardHeightRef = useRef(keyboardHeight);
+  keyboardHeightRef.current = keyboardHeight;
+  const flowKeyConfigRef = useRef(flowKeyConfig);
+  flowKeyConfigRef.current = flowKeyConfig;
+  const bgConfigRef = useRef(bgConfig);
+  bgConfigRef.current = bgConfig;
+  const effectConfigRef = useRef(effectConfig);
+  effectConfigRef.current = effectConfig;
+  const themeRef = useRef(theme);
+  themeRef.current = theme;
+  const isAutoDemoRef = useRef(isAutoDemo);
+  isAutoDemoRef.current = isAutoDemo;
+  const keyLabelsRef = useRef(keyLabels);
+  keyLabelsRef.current = keyLabels;
+  const diffuseBlurRef = useRef(diffuseBlur);
+  diffuseBlurRef.current = diffuseBlur;
+  const fallingNotesRef = useRef(fallingNotes);
+  fallingNotesRef.current = fallingNotes;
+  const keysRef = useRef(keys);
+  keysRef.current = keys;
+  const onFpsUpdateRef = useRef(onFpsUpdate);
+  onFpsUpdateRef.current = onFpsUpdate;
+
+  // Listen for newly pressed keys to trigger LED strip effects
+  const prevPitchesRef = useRef<Set<number>>(new Set());
   useEffect(() => {
     const currentPitches = new Set(activeNotes.keys());
-    const prevPitches = prevActivePitchesRef.current;
-    const canvas = canvasRef.current;
+    const prevPitches = prevPitchesRef.current;
 
     for (const pitch of currentPitches) {
       if (!prevPitches.has(pitch)) {
         const noteData = activeNotes.get(pitch);
         const centerLed = noteData ? noteData.centerLed : 72;
-
-        let col = hexToRgb(effectConfig.primaryColor);
-        if (effectConfig.rainbow) {
-          const hue = (pitch % 12) / 12;
-          col = hslToRgb(hue, 1.0, 0.5);
-        }
+        const cols = getNoteColors(pitch, effectConfig, flowKeyConfig);
 
         // Spawn LED strip burst
         if (effectConfig.effect === 'spark') {
-          for (let i = 0; i < 6; i++) spawnParticle('spark', centerLed, col);
+          for (let i = 0; i < 6; i++) spawnParticle('spark', centerLed, cols.primary);
         } else if (effectConfig.effect === 'glitch') {
-          for (let i = 0; i < 5; i++) spawnParticle('glitch', centerLed, col);
+          for (let i = 0; i < 5; i++) spawnParticle('glitch', centerLed, cols.primary);
         } else if (effectConfig.effect === 'sprinkle') {
-          for (let i = 0; i < 8; i++) spawnParticle('sprinkle', centerLed, col);
+          for (let i = 0; i < 8; i++) spawnParticle('sprinkle', centerLed, cols.primary);
         } else {
-          spawnParticle(effectConfig.effect, centerLed, col);
-        }
-
-        // Spawn rising fountain beam into the waterfall lane if not in auto-demo
-        if (!isAutoDemo && canvas) {
-          const geom = getKeyGeometry(pitch, canvas.width, 0, 0);
-          if (geom) {
-            risingBeamsRef.current.push({
-              id: Date.now() + Math.random(),
-              pitch,
-              x: geom.x + 2,
-              width: geom.width - 4,
-              y: canvas.height - 150,
-              height: 40,
-              alpha: 0.9,
-              color: col
-            });
-            if (risingBeamsRef.current.length > MAX_RISING_BEAMS) {
-              risingBeamsRef.current.shift();
-            }
-          }
+          spawnParticle(effectConfig.effect, centerLed, cols.primary);
         }
       }
     }
+    prevPitchesRef.current = currentPitches;
+  }, [activeNotes, effectConfig, flowKeyConfig, spawnParticle]);
 
-    prevActivePitchesRef.current = currentPitches;
-  }, [activeNotes, effectConfig, spawnParticle, isAutoDemo, getKeyGeometry]);
-
-  // Main 60 FPS Render Loop
+  // Main Rock-Solid 60/120 FPS Render Loop (Zero teardown on keypress or resize)
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -350,7 +369,8 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
     ];
 
     const addSpreadLuminance = (centerPos: number, spread: number, color: { r: number; g: number; b: number }, factor: number) => {
-      const brt = (effectConfig.brightness / 255) * factor;
+      const curEff = effectConfigRef.current;
+      const brt = (curEff.brightness / 255) * factor;
       const minLed = Math.max(0, Math.floor(centerPos - spread * 2));
       const maxLed = Math.min(ledCount - 1, Math.ceil(centerPos + spread * 2));
       const leds = ledsRef.current;
@@ -371,54 +391,150 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
 
       frameCounter++;
       if (now - fpsTimer >= 1000) {
-        if (onFpsUpdate) onFpsUpdate(frameCounter);
+        if (onFpsUpdateRef.current) onFpsUpdateRef.current(frameCounter);
         frameCounter = 0;
         fpsTimer = now;
       }
 
       const width = canvas.width;
       const height = canvas.height;
-      const isDark = theme === 'dark';
+      const isDark = themeRef.current === 'dark';
+      const curHeight = keyboardHeightRef.current;
+      const curFlow = flowKeyConfigRef.current;
+      const curBg = bgConfigRef.current;
+      const curEff = effectConfigRef.current;
+      const curActiveNotes = activeNotesRef.current;
+      const curKeys = keysRef.current;
 
-      // Dimensions: Dynamic resizable tall keyboard anchored directly at bottom
-      const keyAreaHeight = Math.max(100, Math.min(keyboardHeight, Math.floor(height * 0.52)));
+      // Scroll background grid offset smoothly with tempo
+      bgScrollOffsetRef.current = (bgScrollOffsetRef.current + dt * 48 * curFlow.flowSpeed) % 176;
+
+      // Dynamic resizable tall keyboard anchored directly at bottom
+      const keyAreaHeight = Math.max(100, Math.min(curHeight, Math.floor(height * 0.52)));
       const keyAreaTop = height - keyAreaHeight - 1;
       const ledBarHeight = 24;
+      // CRITICAL: ledBarTop is the EXACT boundary where note trails emerge into the runway!
       const ledBarTop = keyAreaTop - ledBarHeight - 1;
       const waterfallTop = 6;
       const waterfallHeight = ledBarTop - waterfallTop;
 
       ctx.clearRect(0, 0, width, height);
 
-      // 1. Draw Waterfall Runway Background (Dark grey in light mode for vibrant flow key visibility)
-      ctx.fillStyle = isDark ? '#000000' : '#1e293b';
+      // ==========================================
+      // 1. RUNWAY BACKGROUND & PERSPECTIVE SPACE
+      // ==========================================
+      
+      // A. Runway Deep Canvas Base
+      ctx.fillStyle = isDark ? '#050608' : '#0f172a';
       ctx.fillRect(0, 0, width, height);
 
-      // Subtle Vertical Key Lane Separators in Waterfall Runway
-      const whiteKeys = keys.filter(k => !k.isBlack);
-      const whiteKeyWidth = (width - 32) / whiteKeys.length;
+      // B. Key Region Zebra Columns (Tinting for black vs white keys)
+      if (curBg.showKeyRegions) {
+        curKeys.forEach((key) => {
+          const geom = getKeyGeometry(key.midi, width, keyAreaTop, keyAreaHeight);
+          if (!geom) return;
 
-      ctx.lineWidth = 1;
-      for (let i = 0; i <= whiteKeys.length; i++) {
-        const laneX = 16 + i * whiteKeyWidth;
-        ctx.strokeStyle = isDark ? 'rgba(39, 39, 42, 0.4)' : 'rgba(71, 85, 105, 0.45)';
-        ctx.beginPath();
-        ctx.moveTo(laneX, waterfallTop);
-        ctx.lineTo(laneX, ledBarTop);
-        ctx.stroke();
+          if (key.isBlack) {
+            // Darker obsidian column for black keys giving visual depth
+            ctx.fillStyle = isDark ? 'rgba(0, 0, 0, 0.55)' : 'rgba(15, 23, 42, 0.7)';
+            ctx.fillRect(geom.x, waterfallTop, geom.width, waterfallHeight);
+          } else if (curActiveNotes.has(key.midi)) {
+            // Subtle active lane illumination
+            ctx.fillStyle = isDark ? 'rgba(99, 102, 241, 0.08)' : 'rgba(99, 102, 241, 0.15)';
+            ctx.fillRect(geom.x, waterfallTop, geom.width, waterfallHeight);
+          }
+        });
       }
 
-      // Waterfall Lane Guide Glow Header
-      const headerGrad = ctx.createLinearGradient(0, waterfallTop, 0, waterfallTop + 40);
-      headerGrad.addColorStop(0, isDark ? 'rgba(99, 102, 241, 0.12)' : 'rgba(99, 102, 241, 0.06)');
+      // C. Vertical Pitch Lanes matching piano keys
+      if (curBg.showVerticalPitchLanes) {
+        ctx.lineWidth = 1;
+        curKeys.forEach((key) => {
+          if (key.isBlack) return;
+          const geom = getKeyGeometry(key.midi, width, keyAreaTop, keyAreaHeight);
+          if (!geom) return;
+
+          ctx.strokeStyle = isDark ? 'rgba(39, 39, 42, 0.45)' : 'rgba(71, 85, 105, 0.45)';
+          ctx.beginPath();
+          ctx.moveTo(geom.x, waterfallTop);
+          ctx.lineTo(geom.x, ledBarTop);
+          ctx.stroke();
+        });
+      }
+
+      // D. Horizontal Time & Measure Divisions (Giving sense of distance & tempo)
+      if (curBg.showHorizontalBeatLines) {
+        const beatSpacing = 44;
+        const scrollOffset = curBg.scrollGrid ? bgScrollOffsetRef.current % (beatSpacing * 4) : 0;
+
+        for (let y = waterfallTop + scrollOffset; y <= ledBarTop; y += beatSpacing) {
+          const isMeasureBar = Math.round((y - scrollOffset) / beatSpacing) % 4 === 0;
+
+          if (isMeasureBar) {
+            // Stronger measure line
+            ctx.strokeStyle = isDark ? 'rgba(148, 163, 184, 0.22)' : 'rgba(100, 116, 139, 0.35)';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(16, y);
+            ctx.lineTo(width - 16, y);
+            ctx.stroke();
+          } else if (curBg.showSubtleGrid) {
+            // Subtle beat sub-line
+            ctx.strokeStyle = isDark ? 'rgba(148, 163, 184, 0.08)' : 'rgba(100, 116, 139, 0.14)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(16, y);
+            ctx.lineTo(width - 16, y);
+            ctx.stroke();
+          }
+        }
+      }
+
+      // E. Stronger Markings around Important Divisions (Octave Boundaries & C-Markers)
+      if (curBg.showOctaveDividers) {
+        curKeys.forEach((key) => {
+          if (key.midi % 12 === 0) { // Every C note (C1, C2, C3, C4, C5, C6...)
+            const geom = getKeyGeometry(key.midi, width, keyAreaTop, keyAreaHeight);
+            if (!geom) return;
+
+            // Prominent octave divider
+            ctx.strokeStyle = isDark ? 'rgba(99, 102, 241, 0.6)' : 'rgba(129, 140, 248, 0.7)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(geom.x, waterfallTop);
+            ctx.lineTo(geom.x, ledBarTop);
+            ctx.stroke();
+
+            // Octave badge at runway header
+            ctx.fillStyle = isDark ? 'rgba(15, 23, 42, 0.9)' : 'rgba(30, 41, 59, 0.9)';
+            ctx.beginPath();
+            ctx.roundRect(geom.x + 2, waterfallTop + 4, 22, 14, 4);
+            ctx.fill();
+            ctx.strokeStyle = isDark ? 'rgba(99, 102, 241, 0.7)' : 'rgba(129, 140, 248, 0.8)';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            ctx.font = 'bold 9px JetBrains Mono, monospace';
+            ctx.fillStyle = '#a5b4fc';
+            ctx.textAlign = 'center';
+            ctx.fillText(key.name, geom.x + 13, waterfallTop + 14);
+          }
+        });
+      }
+
+      // F. Runway Top Glow Header
+      const headerGrad = ctx.createLinearGradient(0, waterfallTop, 0, waterfallTop + 35);
+      headerGrad.addColorStop(0, isDark ? 'rgba(99, 102, 241, 0.15)' : 'rgba(99, 102, 241, 0.08)');
       headerGrad.addColorStop(1, 'transparent');
       ctx.fillStyle = headerGrad;
-      ctx.fillRect(16, waterfallTop, width - 32, 40);
+      ctx.fillRect(16, waterfallTop, width - 32, 35);
 
-      // 2. Auto Demo Spawner
-      if (isAutoDemo) {
+      // ==========================================
+      // 2. AUTO-DEMO WATERFALL FALLING BARS
+      // ==========================================
+      if (isAutoDemoRef.current) {
         demoTimerRef.current += dt;
-        if (demoTimerRef.current > 0.35 / flowSpeed) {
+        if (demoTimerRef.current > 0.38 / curFlow.flowSpeed) {
           demoTimerRef.current = 0;
           const chord = demoChords[demoStepRef.current % demoChords.length];
           demoStepRef.current++;
@@ -426,20 +542,16 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
           chord.forEach((pitch) => {
             const geom = getKeyGeometry(pitch, width, keyAreaTop, keyAreaHeight);
             if (geom) {
-              let col = hexToRgb(effectConfig.primaryColor);
-              if (effectConfig.rainbow) {
-                col = hslToRgb((pitch % 12) / 12, 1.0, 0.5);
-              }
-
+              const cols = getNoteColors(pitch, curEff, curFlow);
               fallingBarsRef.current.push({
                 id: Math.random(),
                 pitch,
                 x: geom.x + 2,
                 width: geom.width - 4,
                 y: waterfallTop,
-                length: Math.max(30, 60 * flowSpeed),
-                speed: 180 * flowSpeed,
-                color: col,
+                length: Math.max(32, 65 * curFlow.flowSpeed),
+                speed: 170 * curFlow.flowSpeed,
+                color: cols.primary,
                 triggered: false,
                 active: true
               });
@@ -448,19 +560,18 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
         }
       }
 
-      // 3. Update & Draw Waterfall Falling Note Bars
-      if (fallingNotes) {
+      // Draw Falling Waterfall Bars (Auto Demo / Practice)
+      if (fallingNotesRef.current) {
         const bars = fallingBarsRef.current;
         for (let i = bars.length - 1; i >= 0; i--) {
           const bar = bars[i];
           bar.y += bar.speed * dt;
 
-          // Check if bar has reached LED strip impact line
+          // Impact at LED strip line
           if (!bar.triggered && (bar.y + bar.length) >= ledBarTop) {
             bar.triggered = true;
             triggerNoteOn(bar.pitch, 100);
 
-            // Impact Sparkles
             const keyIdx = Math.max(0, Math.min(keyboardSize - 1, bar.pitch - startMidi));
             const centerLed = Math.floor((keyIdx / (keyboardSize - 1)) * 143);
             for (let s = 0; s < 4; s++) {
@@ -468,7 +579,6 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
             }
           }
 
-          // Check if tail passed bottom of key area
           if (bar.y >= ledBarTop) {
             if (bar.triggered && bar.active) {
               triggerNoteOff(bar.pitch);
@@ -476,7 +586,6 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
             }
           }
 
-          // Remove completed bar
           if (bar.y > height) {
             bars.splice(i, 1);
             continue;
@@ -493,46 +602,160 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
           ctx.roundRect(bar.x, bar.y, bar.width, bar.length, [6, 6, 4, 4]);
           ctx.fill();
 
-          // Bar Outline
-          ctx.strokeStyle = `rgba(${bar.color.r}, ${bar.color.g}, ${bar.color.b}, 0.8)`;
-          ctx.lineWidth = 1.5;
+          ctx.strokeStyle = `rgba(${bar.color.r}, ${bar.color.g}, ${bar.color.b}, 0.85)`;
+          ctx.lineWidth = 1.2;
           ctx.stroke();
 
-          // Impact Glow when hitting LED strip
+          // Impact Glow
           if (bar.y + bar.length >= ledBarTop && bar.y < ledBarTop + 10) {
             ctx.fillStyle = '#ffffff';
             ctx.shadowColor = `rgb(${bar.color.r}, ${bar.color.g}, ${bar.color.b})`;
-            ctx.shadowBlur = 15;
+            ctx.shadowBlur = 14;
             ctx.fillRect(bar.x - 2, ledBarTop - 2, bar.width + 4, 4);
             ctx.shadowBlur = 0;
           }
         }
       }
 
-      // 4. Update & Draw Rising Freestyle Beams (when user presses keys manually)
-      const risingBeams = risingBeamsRef.current;
-      for (let i = risingBeams.length - 1; i >= 0; i--) {
-        const beam = risingBeams[i];
-        beam.y -= 260 * dt;
-        beam.alpha -= 1.1 * dt;
+      // ==========================================
+      // 3. INTERACTIVE FLOW KEY TRAILS (LIVE USER PLAY)
+      // ==========================================
+      const trails = flowTrailsRef.current;
+      const speedPxPerSec = 170 * curFlow.flowSpeed;
 
-        if (beam.alpha <= 0 || beam.y < waterfallTop) {
-          risingBeams.splice(i, 1);
+      // A. Register new trails for actively pressed keys
+      curActiveNotes.forEach((_noteData, pitch) => {
+        const existing = trails.find(t => t.pitch === pitch && t.endTime === null);
+        if (!existing) {
+          const geom = getKeyGeometry(pitch, width, keyAreaTop, keyAreaHeight);
+          if (geom) {
+            const cols = getNoteColors(pitch, curEff, curFlow);
+            trails.push({
+              id: Math.random(),
+              pitch,
+              startTime: now,
+              endTime: null,
+              x: geom.x + 1,
+              width: geom.width - 2,
+              isBlack: geom.isBlack,
+              color: cols.primary,
+              secondaryColor: cols.secondary
+            });
+          }
+        }
+      });
+
+      // B. Release trails when note is released
+      for (let i = 0; i < trails.length; i++) {
+        const t = trails[i];
+        if (t.endTime === null && !curActiveNotes.has(t.pitch)) {
+          t.endTime = now;
+        }
+      }
+
+      // C. Render all Flow Key Trails moving up the runway
+      for (let i = trails.length - 1; i >= 0; i--) {
+        const t = trails[i];
+        const elapsedHeadMs = now - t.startTime;
+        const headDist = (elapsedHeadMs / 1000) * speedPxPerSec;
+        // Trail head moves upward from ledBarTop!
+        const headY = ledBarTop - headDist;
+
+        let tailY: number;
+        if (t.endTime === null) {
+          // Actively held: tail stays anchored right at ledBarTop!
+          tailY = ledBarTop;
+
+          // Continuous contact sparks
+          if (curFlow.showParticles && Math.random() < 0.25) {
+            const keyIdx = Math.max(0, Math.min(keyboardSize - 1, t.pitch - startMidi));
+            const centerLed = Math.floor((keyIdx / (keyboardSize - 1)) * 143);
+            spawnParticle('spark', centerLed, t.color);
+          }
+        } else {
+          // Released: tail lifts off ledBarTop and floats upward
+          const elapsedTailMs = now - t.endTime;
+          const tailDist = (elapsedTailMs / 1000) * speedPxPerSec;
+          tailY = ledBarTop - tailDist;
+        }
+
+        // Remove trail once it completely clears the top of the runway
+        if (tailY < waterfallTop || headY < -300) {
+          trails.splice(i, 1);
           continue;
         }
 
-        const beamGrad = ctx.createLinearGradient(0, beam.y + beam.height, 0, beam.y);
-        beamGrad.addColorStop(0, `rgba(${beam.color.r}, ${beam.color.g}, ${beam.color.b}, ${beam.alpha * 0.8})`);
-        beamGrad.addColorStop(1, `rgba(${beam.color.r}, ${beam.color.g}, ${beam.color.b}, 0)`);
+        // Clamp to visible runway
+        const barTop = Math.max(waterfallTop, headY);
+        const barBottom = Math.min(ledBarTop, tailY);
+        const barHeight = barBottom - barTop;
 
-        ctx.fillStyle = beamGrad;
-        ctx.beginPath();
-        ctx.roundRect(beam.x, beam.y, beam.width, beam.height, 4);
-        ctx.fill();
+        if (barHeight > 2) {
+          const col = t.color;
+          const sec = t.secondaryColor;
+
+          // Optical Bloom Aura
+          if (curFlow.bloomGlow && curFlow.glowIntensity > 0) {
+            const glowAlpha = (curFlow.glowIntensity / 100) * 0.7;
+            ctx.shadowColor = `rgba(${col.r}, ${col.g}, ${col.b}, ${glowAlpha})`;
+            ctx.shadowBlur = Math.max(4, Math.round((curFlow.glowIntensity / 100) * 16));
+          }
+
+          // Shaders matching Flow Key Trail Style
+          const barGrad = ctx.createLinearGradient(0, barBottom, 0, barTop);
+          if (curFlow.trailStyle === 'glow_laser') {
+            barGrad.addColorStop(0, '#ffffff');
+            barGrad.addColorStop(0.2, `rgba(${col.r}, ${col.g}, ${col.b}, 0.95)`);
+            barGrad.addColorStop(1, `rgba(${sec.r}, ${sec.g}, ${sec.b}, 0.15)`);
+          } else if (curFlow.trailStyle === 'gradient_ribbon') {
+            barGrad.addColorStop(0, `rgba(${col.r}, ${col.g}, ${col.b}, 0.9)`);
+            barGrad.addColorStop(0.5, `rgba(${sec.r}, ${sec.g}, ${sec.b}, 0.7)`);
+            barGrad.addColorStop(1, `rgba(${col.r}, ${col.g}, ${col.b}, 0.1)`);
+          } else if (curFlow.trailStyle === 'particle_cascade') {
+            barGrad.addColorStop(0, `rgba(${col.r}, ${col.g}, ${col.b}, 0.9)`);
+            barGrad.addColorStop(0.8, `rgba(${sec.r}, ${sec.g}, ${sec.b}, 0.6)`);
+            barGrad.addColorStop(1, `rgba(${col.r}, ${col.g}, ${col.b}, 0.05)`);
+          } else { // 'neon_bar' (default)
+            barGrad.addColorStop(0, `rgba(${col.r}, ${col.g}, ${col.b}, 0.95)`);
+            barGrad.addColorStop(0.7, `rgba(${col.r}, ${col.g}, ${col.b}, 0.75)`);
+            barGrad.addColorStop(1, `rgba(${sec.r}, ${sec.g}, ${sec.b}, 0.2)`);
+          }
+
+          ctx.fillStyle = barGrad;
+          ctx.beginPath();
+          ctx.roundRect(t.x, barTop, t.width, barHeight, [5, 5, 3, 3]);
+          ctx.fill();
+
+          // Neon outline
+          ctx.strokeStyle = `rgba(${col.r}, ${col.g}, ${col.b}, 0.85)`;
+          ctx.lineWidth = 1.2;
+          ctx.stroke();
+
+          // Acrylic glass reflection highlight
+          const glassGrad = ctx.createLinearGradient(t.x, 0, t.x + t.width, 0);
+          glassGrad.addColorStop(0, 'rgba(255, 255, 255, 0.45)');
+          glassGrad.addColorStop(0.35, 'rgba(255, 255, 255, 0.1)');
+          glassGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+          ctx.fillStyle = glassGrad;
+          ctx.fillRect(t.x + 1, barTop, Math.max(2, t.width * 0.35), barHeight);
+
+          ctx.shadowBlur = 0; // Reset shadow
+
+          // White contact flare right at ledBarTop when key is actively held
+          if (t.endTime === null && tailY >= ledBarTop - 2) {
+            ctx.fillStyle = '#ffffff';
+            ctx.shadowColor = `rgb(${col.r}, ${col.g}, ${col.b})`;
+            ctx.shadowBlur = 10;
+            ctx.fillRect(t.x - 1, ledBarTop - 2, t.width + 2, 3);
+            ctx.shadowBlur = 0;
+          }
+        }
       }
 
-      // 5. Decay LED Buffer
-      const decay = effectConfig.decay;
+      // ==========================================
+      // 4. LED BUFFER DECAY & AURA
+      // ==========================================
+      const decay = curEff.decay;
       const leds = ledsRef.current;
       for (let i = 0; i < ledCount; i++) {
         leds[i].r *= decay;
@@ -540,21 +763,13 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
         leds[i].b *= decay;
       }
 
-      // 6. Sustain aura on held keys
-      activeNotes.forEach((noteData) => {
-        let col = hexToRgb(effectConfig.primaryColor);
-        if (effectConfig.rainbow) {
-          col = hslToRgb((noteData.pitch % 12) / 12, 1.0, 0.5);
-        }
-        addSpreadLuminance(noteData.centerLed, effectConfig.spread * 1.2, col, 1.0);
-
-        if (effectConfig.effect === 'hold_beam') {
-          const secCol = hexToRgb(effectConfig.secondaryColor);
-          addSpreadLuminance(noteData.centerLed, effectConfig.spread * 2.2, secCol, 0.6);
-        }
+      // Sustain aura on held keys
+      curActiveNotes.forEach((noteData) => {
+        const cols = getNoteColors(noteData.pitch, curEff, curFlow);
+        addSpreadLuminance(noteData.centerLed, curEff.spread * 1.2, cols.primary, 1.0);
       });
 
-      // 7. Update Particles
+      // Update active particles
       const particles = particlesRef.current;
       for (let i = 0; i < particles.length; i++) {
         const p = particles[i];
@@ -613,7 +828,9 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
         }
       }
 
-      // 8. Draw WS2812B LED Strip Mount (Directly above piano keys)
+      // ==========================================
+      // 5. DRAW WS2812B LED STRIP MOUNT
+      // ==========================================
       ctx.fillStyle = isDark ? '#09090b' : '#f1f5f9';
       ctx.fillRect(8, ledBarTop, width - 16, ledBarHeight);
       ctx.strokeStyle = isDark ? '#27272a' : '#cbd5e1';
@@ -634,7 +851,7 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
         ctx.fill();
 
         // Silicone optical diffuser blur
-        if (diffuseBlur && (col.r > 8 || col.g > 8 || col.b > 8)) {
+        if (diffuseBlurRef.current && (col.r > 8 || col.g > 8 || col.b > 8)) {
           const glowGrad = ctx.createRadialGradient(ledX, ledY, 0, ledX, ledY, ledSpacing * 2.8);
           glowGrad.addColorStop(0, `rgba(${Math.round(col.r)}, ${Math.round(col.g)}, ${Math.round(col.b)}, 0.85)`);
           glowGrad.addColorStop(0.5, `rgba(${Math.round(col.r)}, ${Math.round(col.g)}, ${Math.round(col.b)}, 0.3)`);
@@ -647,15 +864,22 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
         }
       }
 
-      // 9. Draw Piano Keys (Anchored at the very bottom)
+      // ==========================================
+      // 6. DRAW PIANO KEYS (Anchored directly at bottom)
+      // ==========================================
+      const whiteKeys = curKeys.filter(k => !k.isBlack);
+      const whiteKeyWidth = (width - 32) / whiteKeys.length;
+      const blackKeyHeight = keyAreaHeight * 0.64;
+
       // A. White Keys
       whiteKeys.forEach((key, wIdx) => {
         const keyX = 16 + wIdx * whiteKeyWidth;
-        const isPressed = activeNotes.has(key.midi);
+        const isPressed = curActiveNotes.has(key.midi);
         const isExpected = expectedPitch === key.midi;
 
         if (isPressed) {
-          ctx.fillStyle = isDark ? '#6366f1' : '#4f46e5';
+          const cols = getNoteColors(key.midi, curEff, curFlow);
+          ctx.fillStyle = `rgb(${cols.primary.r}, ${cols.primary.g}, ${cols.primary.b})`;
         } else if (isExpected) {
           ctx.fillStyle = '#10b981';
         } else {
@@ -667,39 +891,41 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
         ctx.lineWidth = 1;
         ctx.strokeRect(keyX + 1, keyAreaTop, whiteKeyWidth - 2, keyAreaHeight);
 
-        // Bottom key border lip
-        ctx.fillStyle = isPressed ? (isDark ? '#4338ca' : '#3730a3') : (isDark ? '#27272a' : '#e2e8f0');
-        ctx.fillRect(keyX + 1, keyAreaTop + keyAreaHeight - 8, whiteKeyWidth - 2, 8);
+        // Pressed bottom accent line
+        if (isPressed) {
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(keyX + 2, keyAreaTop + keyAreaHeight - 6, whiteKeyWidth - 4, 4);
+        }
 
         // Key Labels
-        if (keyLabels !== 'none') {
-          let labelText = '';
-          if (keyLabels === 'notes') labelText = key.name;
-          else if (keyLabels === 'solfege') labelText = key.solfege;
-          else if (keyLabels === 'qwerty') labelText = key.qwerty;
+        const lblType = keyLabelsRef.current;
+        if (lblType !== 'none') {
+          ctx.fillStyle = isPressed ? '#ffffff' : (isDark ? '#71717a' : '#94a3b8');
+          ctx.font = '10px JetBrains Mono, monospace';
+          ctx.textAlign = 'center';
 
-          if (labelText) {
-            ctx.fillStyle = isPressed ? '#ffffff' : (isDark ? '#71717a' : '#64748b');
-            ctx.font = '10px JetBrains Mono, monospace';
-            ctx.textAlign = 'center';
-            ctx.fillText(labelText, keyX + whiteKeyWidth / 2, keyAreaTop + keyAreaHeight - 14);
-          }
+          let label = '';
+          if (lblType === 'notes') label = key.name;
+          else if (lblType === 'solfege') label = key.solfege;
+          else if (lblType === 'qwerty') label = key.qwerty;
+
+          ctx.fillText(label, keyX + whiteKeyWidth / 2, keyAreaTop + keyAreaHeight - 12);
         }
       });
 
-      // B. Black Keys (Overlapping top)
-      keys.forEach((key) => {
+      // B. Black Keys (Overlaid on top)
+      curKeys.forEach((key) => {
         if (!key.isBlack) return;
 
-        const prevWhiteIdx = keys.slice(0, key.index).filter(k => !k.isBlack).length - 1;
+        const prevWhiteIdx = curKeys.slice(0, key.index).filter(k => !k.isBlack).length - 1;
         const keyX = 16 + (prevWhiteIdx + 0.65) * whiteKeyWidth;
         const blackKeyWidth = whiteKeyWidth * 0.65;
-        const blackKeyHeight = keyAreaHeight * 0.62;
-        const isPressed = activeNotes.has(key.midi);
+        const isPressed = curActiveNotes.has(key.midi);
         const isExpected = expectedPitch === key.midi;
 
         if (isPressed) {
-          ctx.fillStyle = '#ec4899';
+          const cols = getNoteColors(key.midi, curEff, curFlow);
+          ctx.fillStyle = `rgb(${cols.primary.r}, ${cols.primary.g}, ${cols.primary.b})`;
         } else if (isExpected) {
           ctx.fillStyle = '#059669';
         } else {
@@ -712,10 +938,10 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
         ctx.strokeRect(keyX, keyAreaTop, blackKeyWidth, blackKeyHeight);
 
         // Black key accent top
-        ctx.fillStyle = isPressed ? '#be185d' : (isDark ? '#27272a' : '#1e293b');
+        ctx.fillStyle = isPressed ? '#ffffff' : (isDark ? '#27272a' : '#1e293b');
         ctx.fillRect(keyX + 1, keyAreaTop, blackKeyWidth - 2, 4);
 
-        if (keyLabels === 'qwerty' && key.qwerty) {
+        if (keyLabelsRef.current === 'qwerty' && key.qwerty) {
           ctx.fillStyle = '#ffffff';
           ctx.font = '9px JetBrains Mono, monospace';
           ctx.textAlign = 'center';
@@ -730,25 +956,12 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
 
     return () => cancelAnimationFrame(animId);
   }, [
-    theme,
     keyboardSize,
-    keyLabels,
-    diffuseBlur,
-    fallingNotes,
-    flowSpeed,
-    isAutoDemo,
-    effectConfig,
-    activeNotes,
-    expectedPitch,
-    keys,
-    ledCount,
     startMidi,
-    triggerNoteOn,
-    triggerNoteOff,
-    spawnParticle,
     getKeyGeometry,
-    keyboardHeight,
-    onFpsUpdate
+    spawnParticle,
+    triggerNoteOn,
+    triggerNoteOff
   ]);
 
   // Coordinate mapping for touch/mouse interaction
@@ -794,11 +1007,10 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
     }
 
     return null;
-  }, [keys]);
+  }, [keys, keyboardHeight]);
 
   // Pointer Handlers with Drag Capture & Overlay Autohide
   const handlePointerDown = (e: React.PointerEvent) => {
-    // Autohide card overlay on canvas click
     if (activeOverlay !== null) {
       closeOverlay();
     }

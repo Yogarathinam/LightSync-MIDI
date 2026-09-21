@@ -95,22 +95,22 @@
 @keyframes overlayCardEnter {
   0% {
     opacity: 0;
-    transform: translate3d(-50%, -14px, 0) scale3d(0.97, 0.97, 1);
+    transform: translate3d(0, -12px, 0) scale(0.98);
   }
   100% {
     opacity: 1;
-    transform: translate3d(-50%, 0, 0) scale3d(1, 1, 1);
+    transform: translate3d(0, 0, 0) scale(1);
   }
 }
 
 @keyframes overlayCardExit {
   0% {
     opacity: 1;
-    transform: translate3d(-50%, 0, 0) scale3d(1, 1, 1);
+    transform: translate3d(0, 0, 0) scale(1);
   }
   100% {
     opacity: 0;
-    transform: translate3d(-50%, -10px, 0) scale3d(0.98, 0.98, 1);
+    transform: translate3d(0, -8px, 0) scale(0.985);
   }
 }
 
@@ -133,12 +133,12 @@
 }
 
 .animate-overlay-enter {
-  animation: overlayCardEnter 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: overlayCardEnter 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   will-change: transform, opacity;
 }
 
 .animate-overlay-exit {
-  animation: overlayCardExit 0.16s cubic-bezier(0.4, 0, 1, 1) forwards;
+  animation: overlayCardExit 0.14s cubic-bezier(0.4, 0, 1, 1) forwards;
   will-change: transform, opacity;
 }
 

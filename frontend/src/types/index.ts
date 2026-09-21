@@ -28,6 +28,36 @@ export interface EffectConfig {
   secondaryColor: string;
 }
 
+export type FlowKeyTrailStyle = 'neon_bar' | 'glow_laser' | 'particle_cascade' | 'gradient_ribbon';
+
+export type ColorSyncPresetId = 
+  | 'cyberpunk' 
+  | 'synthwave' 
+  | 'emerald_matrix' 
+  | 'sunset_horizon' 
+  | 'electric_indigo' 
+  | 'crimson_nova' 
+  | 'rainbow_spectrum';
+
+export interface FlowKeyConfig {
+  trailDuration: number;          // in seconds: 0.5 to 4.0
+  flowSpeed: number;              // 0.5 to 3.0
+  trailStyle: FlowKeyTrailStyle;
+  colorPreset: ColorSyncPresetId;
+  glowIntensity: number;          // 0 to 100
+  showParticles: boolean;         // Sparks at impact/head
+  bloomGlow: boolean;             // Outer glow aura
+}
+
+export interface VisualizerBackgroundConfig {
+  showVerticalPitchLanes: boolean;    // Vertical lines corresponding to piano keys / pitches
+  showKeyRegions: boolean;            // Key/pitch regions aligned with keyboard (subtle zebra tint)
+  showOctaveDividers: boolean;        // Stronger markings around important divisions (C1, C2...)
+  showHorizontalBeatLines: boolean;   // Horizontal divisions giving sense of distance/time
+  showSubtleGrid: boolean;            // Subtle intermediate grid lines
+  scrollGrid: boolean;                // Animated moving time grid
+}
+
 export interface PresetItem extends EffectConfig {
   id: string;
   name: string;
