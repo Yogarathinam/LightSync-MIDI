@@ -4,8 +4,10 @@ import logging
 from typing import List, Dict, Any
 from contextlib import asynccontextmanager
 
+from pathlib import Path
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from app.core.config import settings
@@ -228,3 +230,8 @@ async def websocket_endpoint(websocket: WebSocket):
         if websocket in active_websockets:
             active_websockets.remove(websocket)
         logger.info(f"WebSocket client disconnected. Total clients: {len(active_websockets)}")
+
+# Mount static frontend build files if present
+dist_dir = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
+if dist_dir.exists():
+    app.mount("/", StaticFiles(directory=str(dist_dir), html=True), name="static")

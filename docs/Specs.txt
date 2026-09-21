@@ -1,0 +1,1153 @@
+LightSync v2 — Technical Product Specification
+
+Project: LightSync v2
+Type: Standalone AI-powered music interaction and visualization application
+Primary Platform: Desktop
+Prototype Hardware: M5Stack Core + WS2812B LED strip + MIDI keyboard
+Development Target: RMK Innovate Hackathon 2026
+Document Status: Prototype / PoC Specification
+Version: 2.0
+
+1. Product Overview
+1.1 Vision
+
+LightSync is a unified music interaction platform that connects music input, visual feedback, physical LED lighting, learning, performance analysis, and AI assistance into a single application.
+
+The core concept is:
+
+One music event. Many experiences.
+
+A single musical event—such as a MIDI note being played—can simultaneously drive:
+
+Physical LED feedback
+On-screen visualization
+Learning guidance
+Performance tracking
+Game mechanics
+Music analysis
+AI coaching
+
+LightSync is designed to move beyond being a simple MIDI-to-LED controller and become a music interaction platform.
+
+2. Primary Objectives
+
+The prototype should demonstrate the following capabilities:
+
+Receive MIDI input.
+Interpret musical events in real time.
+Maintain a centralized music/keyboard state.
+Display responsive visual feedback.
+Control a physical WS2812B LED strip.
+Run LED effects locally on the M5Stack.
+Provide configurable visual effects.
+Provide a learning/practice experience.
+Record performance information.
+Generate performance analytics.
+Provide AI-assisted coaching.
+Present everything through a polished standalone desktop application.
+Maintain low-latency real-time interaction.
+Avoid unnecessary dependency on cloud services for core functionality.
+3. Product Architecture
+
+The system is divided into four primary layers:
+
+┌───────────────────────────────────────────────┐
+│              LIGHTSYNC DESKTOP                │
+│                                               │
+│  ┌──────────────────┐  ┌───────────────────┐ │
+│  │   Web UI Layer   │  │   Python Core     │ │
+│  │                  │  │                   │ │
+│  │ React            │  │ MIDI              │ │
+│  │ TypeScript       │  │ Music Engine      │ │
+│  │ Canvas / WebGL   │  │ Event Bus         │ │
+│  │ Three.js         │  │ Analytics         │ │
+│  │ Tailwind         │  │ AI                │ │
+│  └──────────────────┘  │ Device Manager    │ │
+│                        │ Learning Engine   │ │
+│                        └─────────┬─────────┘ │
+│                                  │           │
+└──────────────────────────────────┼───────────┘
+                                   │
+                              USB / Serial
+                                   │
+                                   ▼
+                         ┌──────────────────┐
+                         │     M5Stack      │
+                         │                  │
+                         │ Hardware Runtime │
+                         │ UI               │
+                         │ LED Engine       │
+                         │ Effect Engine    │
+                         └────────┬─────────┘
+                                  │
+                                  ▼
+                           WS2812B LED Strip
+4. Standalone Application Architecture
+
+LightSync should ultimately behave as a single desktop application.
+
+The user should not have to manually open a browser.
+
+The application consists of:
+
+Application Host
+
+Python-based desktop application responsible for:
+
+Application lifecycle
+Music processing
+MIDI communication
+AI communication
+Device communication
+Data storage
+Internal services
+Embedded Web Interface
+
+The application UI uses web technologies but is embedded inside the desktop application.
+
+The user experience should be:
+
+User
+ ↓
+LightSync.exe
+ ↓
+LightSync Desktop Window
+ ↓
+React-based interface
+
+The web technology is therefore an internal UI technology, not a separate website.
+
+5. Recommended Technology Stack
+5.1 Desktop/Application Core
+
+Python
+
+Responsibilities:
+
+MIDI processing
+Music event processing
+Music state
+Learning engine
+Performance analytics
+AI integration
+M5Stack communication
+Session management
+Database access
+5.2 Frontend
+React
+
+Used for:
+
+Application layout
+Navigation
+UI components
+Controls
+Dashboards
+Effect configuration
+Learning interface
+Analytics interface
+TypeScript
+
+Used as the primary frontend language for:
+
+UI logic
+Visualizer state
+Event handling
+Effect configuration
+WebSocket/bridge communication
+Tailwind CSS
+
+Used for rapid creation of:
+
+Dark/light themes
+Panels
+Cards
+Controls
+Sliders
+Buttons
+Status indicators
+Responsive layouts
+6. Visualization Technology
+
+Visual rendering should be separated from normal application UI.
+
+6.1 Canvas
+
+HTML Canvas should be the primary rendering system for:
+
+Falling notes
+Piano visualization
+Particles
+Ripples
+Waves
+Trails
+Reactive lighting
+Music-driven animations
+Learning visualizations
+
+The visualizer should target approximately:
+
+60 FPS
+
+where hardware and system performance permit.
+
+6.2 WebGL / Three.js
+
+Three.js/WebGL should be available for advanced visualization experiences.
+
+Potential uses:
+
+3D piano
+3D particles
+Spatial effects
+GPU-accelerated visual scenes
+Advanced lighting
+Shader-based effects
+Generative environments
+
+Three.js is optional for the core prototype.
+
+The application must remain functional without requiring a complex 3D scene.
+
+7. State Management
+
+A centralized frontend state system should maintain:
+
+Current mode
+Current song
+Current effect
+Current theme
+Connected devices
+MIDI status
+Keyboard state
+Visualization state
+Performance state
+User settings
+
+Zustand is the preferred lightweight frontend state solution.
+
+8. Core Music Engine
+
+The Music Engine is responsible for converting incoming music information into normalized LightSync events.
+
+Inputs
+Physical MIDI keyboard
+MIDI files
+Future audio input
+Future virtual keyboard
+Future DAW/virtual MIDI sources
+
+For the hackathon prototype, the primary input should be:
+
+Physical MIDI keyboard.
+
+9. LightSync Event System
+
+The most important architectural principle is the shared event system.
+
+Instead of every module independently interpreting MIDI input:
+
+MIDI → LED
+MIDI → Learning
+MIDI → Visualizer
+MIDI → Analytics
+
+LightSync uses:
+
+MIDI
+ ↓
+Music Engine
+ ↓
+Event Bus
+ ├── Visualizer
+ ├── LED Controller
+ ├── Learning Engine
+ ├── Analytics
+ ├── Game Engine
+ └── AI
+10. Event Types
+
+The system should support standardized events such as:
+
+Note Events
+NOTE_ON
+NOTE_OFF
+
+Properties may include:
+
+MIDI note
+Velocity
+Timestamp
+Channel
+Instrument
+Music Events
+CHORD_DETECTED
+BEAT_DETECTED
+TEMPO_CHANGED
+KEY_CHANGED
+Session Events
+SONG_STARTED
+SONG_PAUSED
+SONG_STOPPED
+SONG_SEEKED
+Learning Events
+PRACTICE_STARTED
+PRACTICE_ENDED
+NOTE_EXPECTED
+NOTE_CORRECT
+NOTE_INCORRECT
+Device Events
+DEVICE_CONNECTED
+DEVICE_DISCONNECTED
+Visualization Events
+EFFECT_CHANGED
+THEME_CHANGED
+SCENE_CHANGED
+11. Keyboard State Engine
+
+The Keyboard State Engine maintains the current state of the physical keyboard.
+
+It should track:
+
+Pressed keys
+Released keys
+Velocity
+Timing
+Active notes
+Left/right hand where applicable
+Expected notes during learning
+Played notes
+Important requirement
+
+Whenever a physical key is pressed:
+
+The corresponding visual/LED response must occur regardless of the currently selected application mode.
+
+The behavior should therefore originate from the core event/state system rather than being separately implemented inside every mode.
+
+12. Music Engine Features
+
+The architecture should support:
+
+Octave shifting
+Transposition
+Tempo control
+Tempo clock
+Beat detection
+Chord detection
+Melody information
+Key information
+Note density
+Velocity/dynamics
+Sections
+Rhythm information
+
+Only the features required for the prototype need to be implemented.
+
+13. Hardware Architecture
+13.1 Controller
+
+M5Stack Core
+
+The M5Stack acts as the single hardware controller for the prototype.
+
+It combines:
+
+ESP32 processing
+Display
+Buttons
+Communication
+LED rendering
+
+This eliminates the need for a separate ESP32 solely for LED control.
+
+14. M5Stack Responsibilities
+
+The M5Stack is the LightSync Hardware Runtime.
+
+Responsibilities:
+
+Communication
+Receive commands from PC
+Report hardware/device state
+Receive effect parameters
+LED Engine
+Render effects
+Manage LED state
+Handle brightness
+Handle transitions
+Execute local animations
+Device UI
+
+The built-in display provides a small configuration interface.
+
+15. M5Stack Mini UI
+
+The M5Stack interface should provide a simple product-like experience.
+
+Home
+LIGHTSYNC
+
+PLAY
+EFFECTS
+DEVICE
+SETTINGS
+Effects
+BOUNCE
+RIPPLE
+SPARK
+WAVE
+PULSE
+Device
+
+Display information such as:
+
+PC connection
+MIDI status
+LED count
+Brightness
+Current effect
+Settings
+
+Potential settings:
+
+Brightness
+Current effect
+Theme
+LED configuration
+Auto mode
+
+The M5Stack UI must not block or interfere with the LED rendering system.
+
+16. WS2812B LED System
+
+Prototype hardware:
+
+WS2812B LED strip
+
+Current available strip:
+
+144 LEDs/m
+
+The system should support:
+
+Per-note lighting
+Static colors
+Dynamic effects
+Brightness control
+Note-based colors
+Music-reactive effects
+17. LED Rendering Architecture
+
+The PC should not continuously transmit every LED's RGB value.
+
+Avoid:
+
+PC
+ ↓
+LED 1 RGB
+LED 2 RGB
+LED 3 RGB
+...
+LED 144 RGB
+ ↓
+M5Stack
+
+Instead:
+
+PC
+ ↓
+Semantic command
+ ↓
+M5Stack
+ ↓
+Local Effect Engine
+ ↓
+LEDs
+
+Example conceptual commands:
+
+NOTE_ON
+START_EFFECT
+SET_THEME
+SET_BRIGHTNESS
+SET_SCENE
+
+This reduces communication overhead and allows the M5Stack to independently animate the LEDs.
+
+18. LED Effects
+
+The prototype should contain approximately five or six polished effects.
+
+Recommended:
+
+Bounce
+Ripple
+Spark
+Wave
+Pulse
+Flow
+
+The effects should be parameterized.
+
+Possible parameters:
+
+Speed
+Decay
+Spread
+Brightness
+Color
+Intensity
+Direction
+Density
+19. Data-Driven Effects
+
+Effects should not require firmware modification for every parameter change.
+
+Conceptually:
+
+Effect
+ ├── Type
+ ├── Trigger
+ ├── Speed
+ ├── Decay
+ ├── Spread
+ ├── Brightness
+ └── Color
+
+For example:
+
+Effect: Ripple
+Trigger: NoteOn
+Speed: 1.2
+Decay: 0.8
+Spread: 4
+Brightness: 100%
+Color: Note-based
+
+The M5Stack contains generic effect renderers while the PC supplies configuration.
+
+20. Effect Studio
+
+The desktop application should provide an Effect Studio.
+
+Users can:
+
+Select an effect
+Change parameters
+Preview the effect
+Trigger it using MIDI
+Apply it to the physical LED device
+
+Example:
+
+Effect: Ripple
+
+Speed       ━━━━━━━━━●
+Decay       ━━━━━━━●━━
+Spread      ━━━━━━━━━━●
+Brightness  ━━━━━━━━●━
+
+[Preview]
+
+[Apply to Device]
+
+This demonstrates that LightSync effects are software-defined rather than hard-coded hardware behavior.
+
+21. Desktop Visualizer
+
+The visualizer is a major part of the application's presentation.
+
+It should respond immediately to music events.
+
+Possible visual elements:
+
+Piano
+Keyboard representation
+Active key highlighting
+Note labels
+Falling Notes
+Falling note blocks
+Timing indicators
+Expected note highlighting
+Particle System
+Note-triggered particles
+Velocity-controlled intensity
+Decay
+Music Reactive
+Beat pulses
+Tempo-driven animation
+Density-driven particle activity
+Velocity-driven brightness
+22. Performance Requirement
+
+The visualizer should be designed around:
+
+Real-time rendering
+
+Target:
+
+~60 FPS
+
+The system should avoid making Python responsible for frame-by-frame rendering.
+
+Architecture:
+
+Python
+ ↓
+NOTE_ON
+ ↓
+Frontend event/state
+ ↓
+requestAnimationFrame()
+ ↓
+Canvas/WebGL
+ ↓
+60 FPS animation
+23. Learning Mode
+
+Learning Mode should provide a lightweight proof-of-concept rather than attempting to reproduce a complete commercial piano-learning platform.
+
+Potential functionality:
+
+Song selection
+Next-note indication
+Falling notes
+Expected key
+Correct/incorrect feedback
+Progress
+Tempo control
+Practice section
+
+Example:
+
+NEXT NOTE
+
+       C4
+
+Press C4
+
+The corresponding physical LED can indicate the expected key.
+
+24. Practice Mode
+
+Practice Mode should allow users to focus on difficult parts.
+
+Potential controls:
+
+Section selection
+Tempo
+Loop
+Left hand
+Right hand
+Both hands
+Chord practice
+
+The prototype can initially support only a subset.
+
+25. Performance Analytics
+
+LightSync should record performance information.
+
+Metrics can include:
+
+Accuracy
+Correct notes
+Incorrect notes
+Timing deviation
+Velocity
+Consistency
+Tempo
+Section performance
+Practice duration
+
+Example:
+
+PERFORMANCE
+
+Accuracy        91%
+Timing          87%
+Correct Notes   46 / 50
+Avg Deviation   +21 ms
+26. AI Architecture
+
+AI should not be placed in the real-time music/LED path.
+
+Bad architecture:
+
+MIDI
+ ↓
+AI API
+ ↓
+Response
+ ↓
+LED
+
+This introduces latency and makes the system unreliable.
+
+Instead:
+
+MIDI
+ ↓
+Event Bus
+ ├── Visualizer
+ ├── LED
+ ├── Learning
+ └── Analytics
+          │
+          ▼
+      AI Layer
+
+The AI operates asynchronously.
+
+27. AI Components
+
+LightSync's AI layer should eventually contain three categories.
+
+27.1 Music Intelligence
+
+Primarily deterministic algorithms.
+
+Responsibilities:
+
+Timing analysis
+Accuracy calculation
+Note analysis
+Tempo analysis
+Chord analysis
+Performance pattern detection
+
+This does not necessarily require an LLM.
+
+27.2 LLM AI
+
+An external AI API can be used for:
+
+AI Coach
+
+Input:
+
+Song
+Accuracy
+Timing deviation
+Weak sections
+Frequent mistakes
+Tempo
+Velocity
+
+Output:
+
+Natural-language feedback.
+
+Example:
+
+"Your right hand is consistently late around the transition section. Try practicing that section at 70% tempo before returning to full speed."
+
+The AI should interpret LightSync-generated performance data, rather than inventing measurements.
+
+28. AI Visual Copilot
+
+A second AI capability can convert natural-language requests into structured visual configuration.
+
+Example user request:
+
+"Make the LEDs feel like a galaxy."
+
+AI produces a structured effect configuration conceptually containing:
+
+Effect type
+Color mode
+Speed
+Decay
+Spread
+Brightness
+
+The LightSync engine then validates and applies the configuration.
+
+The AI should never directly generate individual LED frames.
+
+29. AI Provider Abstraction
+
+The AI layer should be provider-independent.
+
+Conceptually:
+
+AI Manager
+    │
+    ├── AI Provider
+    │      ├── Gemini
+    │      ├── OpenAI
+    │      └── Future providers
+    │
+    └── Local AI / ML
+
+This allows the underlying AI service to be replaced without redesigning LightSync.
+
+30. Local ML Architecture
+
+Future versions may support:
+
+PyTorch models
+ONNX Runtime
+Local performance models
+Audio-to-MIDI
+Mistake classification
+Personalized difficulty
+Gesture recognition
+
+For the hackathon prototype, a trained local ML model is not required unless an existing model is readily available.
+
+31. AI + Rule-Based Hybrid
+
+The preferred architecture is:
+
+        LIGHTSYNC INTELLIGENCE
+                 │
+       ┌─────────┼─────────┐
+       │         │         │
+     Rules      ML        LLM
+       │         │         │
+       ▼         ▼         ▼
+ Music logic  Patterns   Coaching
+ Timing       Prediction Commands
+ Analytics    Future ML  Explanation
+
+This avoids using an LLM for tasks that should be deterministic.
+
+32. Communication Architecture
+
+There are two primary communication paths.
+
+PC ↔ Frontend
+
+Internal application bridge / communication layer.
+
+Used for:
+
+MIDI events
+UI commands
+Visualizer state
+Analytics
+Effect configuration
+AI responses
+PC ↔ M5Stack
+
+USB serial communication for the prototype.
+
+The protocol should be:
+
+Lightweight
+Human-readable during development
+Event/command based
+Independent of visual frame rendering
+
+Future versions may support Wi-Fi.
+
+33. Data Storage
+
+SQLite should be used for local persistence.
+
+Potential stored data:
+
+Songs
+Sessions
+Performance results
+Practice history
+Effect presets
+User settings
+Device configuration
+AI recommendations
+
+Cloud storage is not required for the prototype.
+
+34. Local-First Principle
+
+The core LightSync experience should work locally.
+
+Core functions should not depend on the internet:
+
+MIDI
+LED control
+Visualization
+Basic learning
+Performance analytics
+Effect engine
+M5Stack communication
+
+Internet access is only required for optional cloud AI functionality.
+
+35. Application Modes
+
+The overall product architecture should support:
+
+Play
+
+Real-time MIDI → visualization → LEDs.
+
+Learn
+
+Guided note-by-note learning.
+
+Practice
+
+Focused repetition and performance improvement.
+
+Visualize
+
+Music-reactive visual experiences.
+
+Perform
+
+Stage/performance-oriented visual effects.
+
+Analyze
+
+Performance metrics.
+
+Effects
+
+Effect configuration and preview.
+
+AI Coach
+
+Personalized feedback.
+
+For the hackathon, the primary implemented flow should be:
+
+Play → Learn → Analyze → AI Coach
+
+36. Recommended Hackathon Scope
+
+Because the prototype must be completed quickly, the following should be considered the MVP.
+
+Must Have
+Python core
+MIDI input
+Event system
+M5Stack communication
+WS2812B control
+4–6 LED effects
+React UI
+Canvas visualizer
+Standalone desktop window
+Effect Studio
+Basic learning mode
+Basic performance analytics
+Should Have
+AI Coach
+AI visual configuration
+M5Stack mini UI
+SQLite session storage
+Future
+Audio-to-MIDI
+Advanced ML
+3D generative environments
+AI accompaniment
+Multi-device synchronization
+Community/marketplace
+Plugin system
+Cloud synchronization
+37. Final Technology Stack
+Desktop
+
+Python
+
+Core application
+MIDI
+Music intelligence
+AI
+Analytics
+Device communication
+SQLite
+Desktop UI
+
+PyWebView
+
+Native desktop window
+Embedded web application
+Frontend
+
+React + TypeScript
+
+Application interface
+Navigation
+Controls
+Dashboards
+Styling
+
+Tailwind CSS
+
+State
+
+Zustand
+
+Visualization
+
+HTML Canvas
+
+Primary visualization engine.
+
+Advanced Graphics
+
+WebGL / Three.js
+
+Optional advanced visualization.
+
+MIDI
+
+mido + python-rtmidi
+
+Hardware
+
+M5Stack Core
+
+LED
+
+WS2812B + FastLED
+
+Database
+
+SQLite
+
+AI
+
+External LLM API through provider abstraction
+
+Potential providers:
+
+Gemini
+OpenAI
+Other compatible providers
+Future ML
+
+PyTorch → ONNX Runtime
+
+38. Core Design Principles
+Principle 1 — One Event, Many Experiences
+
+Every important musical event should flow through the common event system.
+
+Principle 2 — Real-Time Path Must Be Deterministic
+
+MIDI → visualization → LED should not depend on an LLM or cloud service.
+
+Principle 3 — Render Locally
+
+The browser renders its own animation.
+
+The M5Stack renders its own LED animation.
+
+Neither should receive unnecessary frame-by-frame data.
+
+Principle 4 — Semantic Communication
+
+Send:
+
+"Note C4"
+"Start Ripple"
+"Brightness 80%"
+
+rather than:
+
+144 RGB values × 60 frames/sec
+Principle 5 — AI Assists, It Doesn't Control the Core
+
+AI interprets music/performance data and generates recommendations/configurations.
+
+It should not sit inside the latency-sensitive music path.
+
+Principle 6 — Local First
+
+The application should remain useful without internet access.
+
+Principle 7 — Hardware Independence
+
+The PC should communicate with a device abstraction rather than directly coupling the entire application to one specific controller.
+
+Principle 8 — Effects Are Data-Driven
+
+Effect parameters should be configurable without firmware recompilation.
+
+39. Target User Experience
+
+The final application should feel like a single professional music product, not a collection of separate prototypes.
+
+The user launches:
+
+LightSync
+
+and sees:
+
+┌──────────────────────────────────────────────┐
+│ LIGHTSYNC                         ● ONLINE   │
+├───────────────┬──────────────────────────────┤
+│               │                              │
+│ PLAY          │                              │
+│ LEARN         │        VISUALIZER            │
+│ PRACTICE      │                              │
+│ VISUALIZE     │       ♪   ♪     ♪           │
+│ ANALYZE       │    ✦     ●  ✦       ●       │
+│ EFFECTS       │                              │
+│ AI COACH      │                              │
+│               │                              │
+│               ├──────────────────────────────┤
+│               │ Effect: RIPPLE               │
+│               │ Speed ━━━━━━━●               │
+│               │ Decay ━━━━━●                 │
+│               │ Brightness ━━━━━━━●          │
+└───────────────┴──────────────────────────────┘
+
+Meanwhile:
+
+MIDI Keyboard
+      │
+      ▼
+LightSync
+      │
+ ┌────┼─────────┐
+ ▼    ▼         ▼
+UI   Analytics  M5Stack
+                 │
+                 ▼
+             WS2812B
+40. Prototype Success Criteria
+
+The prototype can be considered successful when the following complete flow works:
+
+1. Launch LightSync
+        ↓
+2. M5Stack connects
+        ↓
+3. MIDI keyboard connects
+        ↓
+4. User presses a key
+        ↓
+5. LightSync generates NOTE_ON
+        ↓
+6. UI reacts immediately
+        ↓
+7. Canvas animation plays
+        ↓
+8. M5Stack receives semantic event
+        ↓
+9. LED effect plays
+        ↓
+10. User changes effect in Effect Studio
+        ↓
+11. Physical LED behavior changes
+        ↓
+12. User enters Learning Mode
+        ↓
+13. LightSync tracks performance
+        ↓
+14. Analytics are generated
+        ↓
+15. AI Coach interprets the results
+        ↓
+16. User receives personalized feedback
+
+That is the complete LightSync v2 PoC story.
+
+The architecture in one sentence
+
+LightSync is a standalone Python-powered desktop application with an embedded React/TypeScript interface, GPU-accelerated visualizer, centralized music event architecture, AI-assisted music intelligence, and an M5Stack-based physical lighting runtime controlling WS2812B LEDs.
