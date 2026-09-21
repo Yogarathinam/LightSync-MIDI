@@ -12,7 +12,6 @@ import {
   Activity, 
   BarChart2, 
   Sparkles, 
-  Radio, 
   Settings as SettingsIcon,
   SlidersHorizontal,
   Minus,
@@ -125,154 +124,153 @@ export const AppHeader: React.FC<{
         </nav>
 
         {/* Right Universal Actions Bar */}
-        <div className="flex items-center gap-2 shrink-0 select-none">
+        <div className="flex items-center gap-2 sm:gap-2.5 shrink-0 select-none">
           
-          {/* Live Chord Badge (Fixed width to prevent horizontal layout shift) */}
-          <div className="hidden xl:flex items-center justify-center w-24 h-8 px-2.5 rounded-xl bg-slate-100 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-xs font-mono select-none">
-            {currentChord ? (
-              <span className="font-bold text-indigo-600 dark:text-indigo-400 truncate">
-                {currentChord.chord}
+          {/* 1. Live Performance Output Capsule (Fixed width, zero layout shift) */}
+          <div className="hidden lg:flex items-center h-8.5 px-3 rounded-xl bg-slate-100 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 shadow-sm shrink-0 select-none">
+            {/* Live Chord / Pitch readout */}
+            <div className="w-14 text-center">
+              <span className="font-mono font-bold text-xs text-indigo-600 dark:text-indigo-400 truncate block">
+                {currentChord ? currentChord.chord : '--'}
               </span>
-            ) : (
-              <span className="text-slate-400 dark:text-zinc-600">--</span>
-            )}
-          </div>
-
-          {/* Active Note Key Count (Fixed width w-20 with tabular-nums so Idle vs Keys never shifts) */}
-          <div className="hidden lg:flex items-center justify-center gap-1.5 w-20 h-8 px-2 rounded-xl bg-slate-100 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-xs text-slate-600 dark:text-zinc-300 select-none">
-            <span className={`w-2 h-2 rounded-full shrink-0 transition-colors ${activeNotes.size > 0 ? 'bg-indigo-500 animate-ping' : 'bg-slate-400 dark:bg-zinc-600'}`} />
-            <span className="font-mono text-[11px] tabular-nums text-center whitespace-nowrap">
-              {activeNotes.size > 0 ? `${activeNotes.size} ${activeNotes.size === 1 ? 'Key' : 'Keys'}` : 'Idle'}
-            </span>
-          </div>
-
-          {/* Octave Switching: [-] [Oct 0] [+] with no hard limit */}
-          <div className="flex items-center bg-slate-100 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-0.5">
-            <button
-              onClick={decrementOctave}
-              className="w-6 h-6 rounded-lg flex items-center justify-center text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white hover:bg-white dark:hover:bg-zinc-800 active:scale-95 transition-all"
-              title="Shift Octave Down (-12 st)"
-            >
-              <Minus className="w-3.5 h-3.5" />
-            </button>
-            <div 
-              className="px-2 font-mono font-bold text-xs text-slate-800 dark:text-zinc-200 min-w-[50px] text-center"
-              title={`Current Octave: ${octaveShift > 0 ? `+${octaveShift}` : octaveShift}`}
-            >
-              {octaveShift === 0 ? 'Oct 0' : `Oct ${octaveShift > 0 ? `+${octaveShift}` : octaveShift}`}
             </div>
-            <button
-              onClick={incrementOctave}
-              className="w-6 h-6 rounded-lg flex items-center justify-center text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white hover:bg-white dark:hover:bg-zinc-800 active:scale-95 transition-all"
-              title="Shift Octave Up (+12 st)"
-            >
-              <Plus className="w-3.5 h-3.5" />
-            </button>
+            
+            {/* Subtle divider */}
+            <div className="h-3.5 w-px bg-slate-300 dark:bg-zinc-800 mx-2" />
+
+            {/* Active Keys indicator */}
+            <div className="flex items-center gap-1.5 w-16">
+              <span className="relative flex h-2 w-2 shrink-0">
+                {activeNotes.size > 0 && (
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75" />
+                )}
+                <span className={`relative inline-flex rounded-full h-2 w-2 transition-colors ${activeNotes.size > 0 ? 'bg-indigo-600 dark:bg-indigo-400' : 'bg-slate-400 dark:bg-zinc-600'}`} />
+              </span>
+              <span className="font-mono text-[11px] tabular-nums text-slate-700 dark:text-zinc-300 truncate">
+                {activeNotes.size > 0 ? `${activeNotes.size} ${activeNotes.size === 1 ? 'Key' : 'Keys'}` : 'Idle'}
+              </span>
+            </div>
           </div>
 
-          {/* Quick Settings Dropdown Trigger */}
-          <div 
-            onMouseLeave={handleMouseLeave}
-            className="relative"
-          >
+          {/* 2. Pitch Shift & Quick Settings Pod */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            {/* Octave Switching: [-] [Oct 0] [+] */}
+            <div className="flex items-center h-8.5 bg-slate-100 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-0.5 shadow-sm">
+              <button
+                onClick={decrementOctave}
+                className="w-6 h-7 rounded-lg flex items-center justify-center text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white hover:bg-white dark:hover:bg-zinc-800 active:scale-95 transition-all"
+                title="Shift Octave Down (-12 st)"
+              >
+                <Minus className="w-3.5 h-3.5" />
+              </button>
+              <div 
+                className="px-2 font-mono font-bold text-xs text-slate-800 dark:text-zinc-200 min-w-[50px] text-center select-none"
+                title={`Current Octave: ${octaveShift > 0 ? `+${octaveShift}` : octaveShift}`}
+              >
+                {octaveShift === 0 ? 'Oct 0' : `Oct ${octaveShift > 0 ? `+${octaveShift}` : octaveShift}`}
+              </div>
+              <button
+                onClick={incrementOctave}
+                className="w-6 h-7 rounded-lg flex items-center justify-center text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white hover:bg-white dark:hover:bg-zinc-800 active:scale-95 transition-all"
+                title="Shift Octave Up (+12 st)"
+              >
+                <Plus className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {/* Quick Settings Dropdown Trigger */}
+            <div 
+              onMouseLeave={handleMouseLeave}
+              className="relative"
+            >
+              <button
+                onMouseEnter={() => handleMouseEnter('quick_settings')}
+                onClick={() => {
+                  if (activeOverlay === 'quick_settings') closeOverlay();
+                  else openOverlay('quick_settings');
+                }}
+                className={`h-8.5 flex items-center gap-1.5 px-2.5 sm:px-3 rounded-xl border text-xs font-medium transition-all shadow-sm ${
+                  activeOverlay === 'quick_settings'
+                    ? 'bg-indigo-600 text-white border-indigo-600'
+                    : 'bg-slate-100 dark:bg-zinc-900 text-slate-700 dark:text-zinc-300 hover:bg-slate-200 dark:hover:bg-zinc-800 border-slate-200 dark:border-zinc-800'
+                }`}
+                title="Quick Settings (Keyboard, Transpose, Octave, Diffuser)"
+              >
+                <SlidersHorizontal className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline text-xs">Quick Settings</span>
+              </button>
+            </div>
+          </div>
+
+          {/* 3. Audio & System Toolbar Pod */}
+          <div className="flex items-center h-8.5 bg-slate-100 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-0.5 shadow-sm shrink-0">
+            {/* Metronome Quick Toggle */}
             <button
-              onMouseEnter={() => handleMouseEnter('quick_settings')}
-              onClick={() => {
-                if (activeOverlay === 'quick_settings') closeOverlay();
-                else openOverlay('quick_settings');
-              }}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-medium transition-all ${
-                activeOverlay === 'quick_settings'
-                  ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
-                  : 'bg-slate-100 dark:bg-zinc-900 text-slate-700 dark:text-zinc-300 hover:bg-slate-200 dark:hover:bg-zinc-800 border-slate-200 dark:border-zinc-800'
+              onClick={() => setMetronomeActive(!metronomeActive)}
+              title={`Metronome (${metronomeBpm} BPM)`}
+              className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all ${
+                metronomeActive
+                  ? 'bg-indigo-600 text-white shadow-sm'
+                  : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white hover:bg-white dark:hover:bg-zinc-800'
               }`}
-              title="Quick Settings (Keyboard, Transpose, Octave, Diffuser)"
             >
-              <SlidersHorizontal className="w-3.5 h-3.5" />
-              <span className="hidden xl:inline text-xs">Quick Settings</span>
+              <Clock className="w-3.5 h-3.5" />
             </button>
-          </div>
 
-          {/* M5Stack Hardware Badge */}
-          <button 
-            onMouseEnter={() => handleMouseEnter('device')}
-            onClick={() => handleTabClick('device')}
-            className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-medium border transition-all ${
-              deviceStatus.connected
-                ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/40'
-                : 'bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800/40'
-            }`}
-            title="Hardware Device Monitor"
-          >
-            <Radio className="w-3 h-3" />
-            <span className="font-mono text-[11px] hidden md:inline">
-              {deviceStatus.connected ? (deviceStatus.simulated ? 'M5 Sim' : `${deviceStatus.port}`) : 'No Device'}
-            </span>
-          </button>
+            {/* Volume / Mute Toggle with Mini Slider */}
+            <div className="hidden xl:flex items-center gap-1 px-1">
+              <button
+                onClick={toggleMute}
+                className="p-1 rounded text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white"
+                title={isMuted ? 'Unmute' : 'Mute'}
+              >
+                {isMuted ? <VolumeX className="w-3.5 h-3.5 text-rose-500" /> : <Volume2 className="w-3.5 h-3.5" />}
+              </button>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.05"
+                value={isMuted ? 0 : volume}
+                onChange={(e) => setVolume(parseFloat(e.target.value))}
+                className="w-14 h-1.5 accent-indigo-600 cursor-pointer"
+                title={`Volume: ${Math.round(volume * 100)}%`}
+              />
+            </div>
 
-          {/* Metronome Quick Toggle */}
-          <button
-            onClick={() => setMetronomeActive(!metronomeActive)}
-            title={`Metronome (${metronomeBpm} BPM)`}
-            className={`p-2 rounded-xl border text-xs font-medium transition-all ${
-              metronomeActive
-                ? 'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800'
-                : 'bg-slate-100 dark:bg-zinc-900 text-slate-600 dark:text-zinc-400 border-slate-200 dark:border-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-800'
-            }`}
-          >
-            <Clock className="w-3.5 h-3.5" />
-          </button>
+            {/* Divider */}
+            <div className="h-3.5 w-px bg-slate-300 dark:bg-zinc-800 mx-0.5" />
 
-          {/* Volume / Mute Toggle */}
-          <div className="hidden lg:flex items-center gap-1 bg-slate-100 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-1">
+            {/* Full Settings Modal Button */}
             <button
-              onClick={toggleMute}
-              className="p-1 rounded text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white"
-              title={isMuted ? 'Unmute' : 'Mute'}
+              onMouseEnter={() => handleMouseEnter('settings')}
+              onClick={() => {
+                if (activeOverlay === 'settings') closeOverlay();
+                else openOverlay('settings');
+              }}
+              className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all ${
+                activeOverlay === 'settings'
+                  ? 'bg-indigo-600 text-white'
+                  : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white hover:bg-white dark:hover:bg-zinc-800'
+              }`}
+              title="Studio Preferences & Configuration"
             >
-              {isMuted ? <VolumeX className="w-3.5 h-3.5 text-rose-500" /> : <Volume2 className="w-3.5 h-3.5" />}
+              <SettingsIcon className="w-3.5 h-3.5" />
             </button>
-            <input
-              type="range"
-              min="0"
-              max="1"
-              step="0.05"
-              value={isMuted ? 0 : volume}
-              onChange={(e) => setVolume(parseFloat(e.target.value))}
-              className="w-14 h-1.5 accent-indigo-600 cursor-pointer"
-              title={`Volume: ${Math.round(volume * 100)}%`}
-            />
+
+            {/* Application-Wide Light / Pure-Black Dark Toggle */}
+            <button
+              onClick={toggleTheme}
+              className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-700 dark:text-zinc-300 hover:text-slate-900 dark:hover:text-white hover:bg-white dark:hover:bg-zinc-800 transition-all"
+              title={`Switch whole application to ${theme === 'dark' ? 'Studio Daylight' : 'Pure Black OLED'} Theme`}
+            >
+              {theme === 'dark' ? (
+                <Sun className="w-3.5 h-3.5 text-amber-400 transition-transform hover:rotate-45" />
+              ) : (
+                <Moon className="w-3.5 h-3.5 text-indigo-600 transition-transform hover:-rotate-12" />
+              )}
+            </button>
           </div>
-
-          {/* Full Settings Modal Button */}
-          <button
-            onMouseEnter={() => handleMouseEnter('settings')}
-            onClick={() => {
-              if (activeOverlay === 'settings') closeOverlay();
-              else openOverlay('settings');
-            }}
-            className={`p-2 rounded-xl border transition-all ${
-              activeOverlay === 'settings'
-                ? 'bg-indigo-600 text-white border-indigo-600'
-                : 'bg-slate-100 dark:bg-zinc-900 text-slate-600 dark:text-zinc-300 hover:bg-slate-200 dark:hover:bg-zinc-800 border-slate-200 dark:border-zinc-800'
-            }`}
-            title="Studio Preferences & Configuration"
-          >
-            <SettingsIcon className="w-3.5 h-3.5" />
-          </button>
-
-          {/* Application-Wide Light / Pure-Black Dark Toggle */}
-          <button
-            onClick={toggleTheme}
-            className="p-2 rounded-xl bg-slate-100 dark:bg-zinc-900 text-slate-700 dark:text-zinc-200 hover:bg-slate-200 dark:hover:bg-zinc-800 border border-slate-200 dark:border-zinc-800 transition-all shadow-sm"
-            title={`Switch whole application to ${theme === 'dark' ? 'Studio Daylight' : 'Pure Black OLED'} Theme`}
-          >
-            {theme === 'dark' ? (
-              <Sun className="w-3.5 h-3.5 text-amber-400 transition-transform hover:rotate-45" />
-            ) : (
-              <Moon className="w-3.5 h-3.5 text-indigo-600 transition-transform hover:-rotate-12" />
-            )}
-          </button>
 
         </div>
       </div>

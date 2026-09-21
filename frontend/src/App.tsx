@@ -17,13 +17,13 @@ const MainApp: React.FC = () => {
   const [fps, setFps] = useState(60);
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-black text-slate-900 dark:text-zinc-100 antialiased transition-colors duration-200 selection:bg-indigo-500 selection:text-white">
+    <div className="h-screen w-screen max-h-screen max-w-screen overflow-hidden flex flex-col bg-slate-50 dark:bg-black text-slate-900 dark:text-zinc-100 antialiased transition-colors duration-200 selection:bg-indigo-500 selection:text-white select-none">
       
       {/* 1. Single Unified Top Navigation Bar */}
       <AppHeader />
 
-      {/* 2. Main Immersive Visualizer Engine (Single Viewport) */}
-      <main className="flex-1 max-w-[1850px] w-full mx-auto p-1 sm:p-2 flex flex-col min-h-0">
+      {/* 2. Main Immersive Visualizer Engine Stage with Responsive Letterboxing */}
+      <main className="flex-1 w-full min-h-0 flex flex-col items-center justify-center p-0.5 sm:px-3 sm:py-1.5 overflow-hidden bg-black relative">
         <StudioCanvas onFpsUpdate={setFps} />
       </main>
 
