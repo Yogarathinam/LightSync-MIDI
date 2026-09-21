@@ -325,11 +325,11 @@ let overlayTimer: number | null = null;
 
 export const useLightSyncStore = create<LightSyncState>((set, get) => ({
   // Navigation & Spatial Workspace / Overlay State
-  activeTab: 'visualize',
+  activeTab: 'play',
   setActiveTab: (tab) => set({ 
     activeTab: tab, 
-    activeOverlay: tab === 'visualize' ? null : (tab as WorkspaceId),
-    activeWorkspace: tab === 'visualize' ? null : (tab as WorkspaceId)
+    activeOverlay: (tab === 'play' || tab === 'visualize') ? null : (tab as WorkspaceId),
+    activeWorkspace: (tab === 'play' || tab === 'visualize') ? null : (tab as WorkspaceId)
   }),
   activeWorkspace: null,
   activeUtilityOverlay: null,
@@ -348,6 +348,7 @@ export const useLightSyncStore = create<LightSyncState>((set, get) => ({
     set({
       activeWorkspace: null,
       activeOverlay: get().activeUtilityOverlay,
+      activeTab: 'play',
     });
   },
 

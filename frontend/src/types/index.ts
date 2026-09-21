@@ -1,6 +1,6 @@
 export type ThemeMode = 'light' | 'dark';
 
-export type TopNavTab = 'songs' | 'learn' | 'visualize' | 'effects' | 'aicoach';
+export type TopNavTab = 'songs' | 'learn' | 'play' | 'visualize' | 'effects' | 'aicoach';
 
 export type WorkspaceId = 'songs' | 'learn' | 'effects' | 'aicoach' | 'play';
 export type UtilityOverlayId = 'quick_settings' | 'settings';

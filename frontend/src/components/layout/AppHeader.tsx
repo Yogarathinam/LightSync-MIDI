@@ -52,7 +52,7 @@ export const AppHeader: React.FC<{
   const tabs: { id: TopNavTab; label: string; icon: React.ReactNode }[] = [
     { id: 'songs', label: 'Songs', icon: <Music className="w-3.5 h-3.5 text-amber-500" /> },
     { id: 'learn', label: 'Learn', icon: <GraduationCap className="w-3.5 h-3.5 text-emerald-500" /> },
-    { id: 'visualize', label: 'Visualize', icon: <Play className="w-3.5 h-3.5 text-indigo-500" /> },
+    { id: 'play', label: 'Play', icon: <Play className="w-3.5 h-3.5 text-indigo-500" /> },
     { id: 'effects', label: 'Effect Studio', icon: <Sliders className="w-3.5 h-3.5 text-sky-500" /> },
     { id: 'aicoach', label: 'AI Coach', icon: <Sparkles className="w-3.5 h-3.5 text-purple-500" /> },
   ];
@@ -60,9 +60,17 @@ export const AppHeader: React.FC<{
   const handleTabClick = (tabId: TopNavTab) => {
     closeUtilityOverlay();
 
-    if (tabId === 'visualize') {
-      // "Visualize" is the home stage. Clicking it always closes workspaces and returns to the live visualizer!
-      closeWorkspace();
+    if (tabId === 'play' || tabId === 'visualize') {
+      if (activeWorkspace === null) {
+        // Already on default visualizer stage -> open PlayStudio!
+        openWorkspace('play');
+      } else if (activeWorkspace === 'play') {
+        // PlayStudio is already open -> close it back to default visualizer
+        closeWorkspace();
+      } else {
+        // In another workspace (songs, learn, effects, aicoach) -> return to default stage!
+        closeWorkspace();
+      }
     } else {
       // Workspace tabs ('songs', 'learn', 'effects', 'aicoach')
       if (activeWorkspace === tabId) {
@@ -101,7 +109,7 @@ export const AppHeader: React.FC<{
         <nav className="hidden md:flex items-center p-1 rounded-2xl bg-slate-100/90 dark:bg-zinc-900/80 border border-slate-200/80 dark:border-zinc-800">
           {tabs.map((tab) => {
             const isWorkspaceActive = activeWorkspace === tab.id;
-            const isDefaultVisualize = tab.id === 'visualize' && activeWorkspace === null;
+            const isDefaultPlay = (tab.id === 'play' || tab.id === 'visualize') && activeWorkspace === null;
             return (
               <button
                 key={tab.id}
@@ -109,19 +117,21 @@ export const AppHeader: React.FC<{
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all select-none cursor-pointer ${
                   isWorkspaceActive
                     ? 'bg-indigo-600 text-white shadow-sm font-semibold'
-                    : isDefaultVisualize
+                    : isDefaultPlay
                     ? 'bg-indigo-50/90 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border border-indigo-200/70 dark:border-indigo-800/60 font-semibold'
                     : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200 hover:bg-slate-200/60 dark:hover:bg-zinc-800/60'
                 }`}
                 title={
-                  tab.id === 'visualize' 
-                    ? 'Live Visualizer & Performance Stage'
+                  tab.id === 'play' || tab.id === 'visualize'
+                    ? activeWorkspace === null
+                      ? 'Live Visualizer & Play Stage (Click to open Play Studio)'
+                      : 'Return to live Play visualizer'
                     : `Open ${tab.label}`
                 }
               >
                 {tab.icon}
                 <span>{tab.label}</span>
-                {isDefaultVisualize && (
+                {isDefaultPlay && (
                   <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
                 )}
                 {tab.id === 'learn' && currentSong && (
@@ -285,7 +295,7 @@ export const AppHeader: React.FC<{
       <div className="md:hidden flex items-center justify-around px-2 py-1.5 bg-slate-50 dark:bg-black border-t border-slate-200 dark:border-zinc-800 overflow-x-auto">
         {tabs.map((tab) => {
           const isWorkspaceActive = activeWorkspace === tab.id;
-          const isDefaultVisualize = tab.id === 'visualize' && activeWorkspace === null;
+          const isDefaultPlay = (tab.id === 'play' || tab.id === 'visualize') && activeWorkspace === null;
           return (
             <button
               key={tab.id}
@@ -293,7 +303,7 @@ export const AppHeader: React.FC<{
               className={`p-1 rounded-lg text-xs flex flex-col items-center gap-0.5 shrink-0 cursor-pointer ${
                 isWorkspaceActive
                   ? 'text-indigo-600 dark:text-indigo-400 font-bold'
-                  : isDefaultVisualize
+                  : isDefaultPlay
                   ? 'text-indigo-500 font-semibold'
                   : 'text-slate-500 dark:text-zinc-500'
               }`}
