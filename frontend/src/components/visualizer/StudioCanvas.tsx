@@ -110,6 +110,11 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
     closeOverlay
   } = useLightSyncStore();
 
+  const isResizingRef = useRef(false);
+  const startYRef = useRef(0);
+  const startHeightRef = useRef(220);
+  const [canvasHeight, setCanvasHeight] = React.useState<number>(600);
+
   const ledCount = 144;
   const baseStartMidi = keyboardSize === 25 ? 48 : keyboardSize === 49 ? 36 : keyboardSize === 61 ? 36 : 21;
   const startMidi = baseStartMidi + octaveShift * 12 + transpose;
@@ -376,7 +381,7 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
       const isDark = theme === 'dark';
 
       // Dimensions: Dynamic resizable tall keyboard anchored directly at bottom
-      const keyAreaHeight = Math.max(90, Math.min(keyboardHeight, Math.floor(height * 0.52)));
+      const keyAreaHeight = Math.max(100, Math.min(keyboardHeight, Math.floor(height * 0.52)));
       const keyAreaTop = height - keyAreaHeight - 1;
       const ledBarHeight = 24;
       const ledBarTop = keyAreaTop - ledBarHeight - 1;
@@ -758,7 +763,7 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
     const x = (clientX - rect.left) * scaleX;
     const y = (clientY - rect.top) * scaleY;
 
-    const keyAreaHeight = Math.max(90, Math.min(keyboardHeight, Math.floor(canvas.height * 0.52)));
+    const keyAreaHeight = Math.max(100, Math.min(keyboardHeight, Math.floor(canvas.height * 0.52)));
     const keyAreaTop = canvas.height - keyAreaHeight - 1;
 
     // Only keys area triggers notes
@@ -851,6 +856,7 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
         canvas.width = targetW;
         canvas.height = targetH;
       }
+      setCanvasHeight(targetH);
     };
 
     updateSize();
@@ -868,6 +874,35 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
     };
   }, []);
 
+  // Seamless boundary drag resize handlers
+  const handleResizeStart = (e: React.PointerEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    isResizingRef.current = true;
+    startYRef.current = e.clientY;
+    startHeightRef.current = keyboardHeight;
+  };
+
+  const handleResizeMove = (e: React.PointerEvent) => {
+    if (!isResizingRef.current) return;
+    const deltaY = startYRef.current - e.clientY;
+    const maxAllowed = Math.floor(canvasHeight * 0.52);
+    const newHeight = Math.max(100, Math.min(Math.min(420, maxAllowed), startHeightRef.current + deltaY));
+    setKeyboardHeight(newHeight);
+  };
+
+  const handleResizeEnd = (e: React.PointerEvent) => {
+    if (isResizingRef.current) {
+      isResizingRef.current = false;
+      try {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      } catch (_) {}
+    }
+  };
+
+  const effectiveKeyHeight = Math.max(100, Math.min(keyboardHeight, Math.floor(canvasHeight * 0.52)));
+
   return (
     <div className="relative w-full h-full max-w-[1920px] max-h-[calc(100vw*0.62)] flex flex-col bg-slate-950 dark:bg-black rounded-xl sm:rounded-2xl border border-slate-800/80 dark:border-zinc-800/80 p-1 sm:p-1.5 overflow-hidden shadow-2xl transition-colors min-h-0">
       {/* Visualizer Top Info Bar */}
@@ -879,14 +914,32 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
         <span className="truncate ml-2">WS2812B (144 LEDS) • {keyboardSize} KEYS (MIDI {startMidi} - {startMidi + keyboardSize - 1}) • QWERTY [A-K]</span>
       </div>
 
-      <canvas
-        ref={canvasRef}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerCancel={handlePointerUp}
-        className="w-full flex-1 cursor-pointer touch-none block min-h-0"
-      />
+      {/* Visualizer Workspace with Seamless Pill-less Drag Boundary */}
+      <div className="relative w-full flex-1 min-h-0 overflow-hidden">
+        {/* Seamless Pill-less Resizing Boundary Edge (Zero obstruction, reveals sleek hairline on hover/drag) */}
+        <div
+          onPointerDown={handleResizeStart}
+          onPointerMove={handleResizeMove}
+          onPointerUp={handleResizeEnd}
+          onPointerCancel={handleResizeEnd}
+          onDoubleClick={() => setKeyboardHeight(220)}
+          style={{ bottom: `${effectiveKeyHeight + 25}px` }}
+          className="absolute left-0 right-0 h-4 -mb-2 z-20 cursor-row-resize select-none touch-none group flex items-center"
+          title="Drag boundary up or down to resize keyboard (Double-click to reset)"
+        >
+          {/* Subtle sleek hairline laser guide that only reveals upon hover/drag */}
+          <div className="w-full h-[2px] opacity-0 group-hover:opacity-100 group-active:opacity-100 transition-opacity duration-150 bg-indigo-500/80 shadow-[0_0_8px_rgba(99,102,241,0.7)]" />
+        </div>
+
+        <canvas
+          ref={canvasRef}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerUp}
+          className="w-full h-full cursor-pointer touch-none block"
+        />
+      </div>
     </div>
   );
 };

@@ -226,7 +226,7 @@ export const useLightSyncStore = create<LightSyncState>((set, get) => ({
   flowSpeed: 1.2,
   isAutoDemo: false,
   setKeyboardSize: (size) => set({ keyboardSize: size }),
-  setKeyboardHeight: (height) => set({ keyboardHeight: Math.max(130, Math.min(420, height)) }),
+  setKeyboardHeight: (height) => set({ keyboardHeight: Math.max(100, Math.min(420, height)) }),
   setOctaveShift: (shift) => set({ octaveShift: Math.max(-4, Math.min(4, shift)) }),
   incrementOctave: () => set((state) => ({ octaveShift: Math.max(-4, Math.min(4, state.octaveShift + 1)) })),
   decrementOctave: () => set((state) => ({ octaveShift: Math.max(-4, Math.min(4, state.octaveShift - 1)) })),
