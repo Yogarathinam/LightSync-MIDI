@@ -21,6 +21,9 @@ interface LightSyncState {
   setActiveTab: (tab: StudioTab) => void;
   activeOverlay: OverlayModalType;
   setActiveOverlay: (overlay: OverlayModalType) => void;
+  openOverlay: (overlay: OverlayModalType) => void;
+  cancelOverlayClose: () => void;
+  scheduleOverlayClose: (delayMs?: number) => void;
   closeOverlay: () => void;
 
   // Active Key States & Chord
@@ -110,13 +113,49 @@ interface LightSyncState {
   setWsSender: (sender: (msg: object) => void) => void;
 }
 
+let overlayTimer: number | null = null;
+
 export const useLightSyncStore = create<LightSyncState>((set, get) => ({
   // Navigation & Overlay
   activeTab: 'play',
   setActiveTab: (tab) => set({ activeTab: tab, activeOverlay: tab }),
   activeOverlay: null,
-  setActiveOverlay: (overlay) => set({ activeOverlay: overlay }),
-  closeOverlay: () => set({ activeOverlay: null }),
+  setActiveOverlay: (overlay) => {
+    if (overlayTimer) {
+      clearTimeout(overlayTimer);
+      overlayTimer = null;
+    }
+    set({ activeOverlay: overlay });
+  },
+  openOverlay: (overlay) => {
+    if (overlayTimer) {
+      clearTimeout(overlayTimer);
+      overlayTimer = null;
+    }
+    set({ activeOverlay: overlay });
+  },
+  cancelOverlayClose: () => {
+    if (overlayTimer) {
+      clearTimeout(overlayTimer);
+      overlayTimer = null;
+    }
+  },
+  scheduleOverlayClose: (delayMs = 320) => {
+    if (overlayTimer) {
+      clearTimeout(overlayTimer);
+    }
+    overlayTimer = window.setTimeout(() => {
+      set({ activeOverlay: null });
+      overlayTimer = null;
+    }, delayMs);
+  },
+  closeOverlay: () => {
+    if (overlayTimer) {
+      clearTimeout(overlayTimer);
+      overlayTimer = null;
+    }
+    set({ activeOverlay: null });
+  },
 
   // Notes & Chord
   activeNotes: new Map(),

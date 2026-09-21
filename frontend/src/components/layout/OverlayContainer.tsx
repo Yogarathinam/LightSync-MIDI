@@ -23,11 +23,14 @@ import { DeviceMonitor } from '../device/DeviceMonitor';
 import { QuickSettingsDropdown } from './QuickSettingsDropdown';
 import { SettingsModal } from './SettingsModal';
 
-export const OverlayContainer: React.FC<{
-  onMouseEnter?: () => void;
-  onMouseLeave?: () => void;
-}> = ({ onMouseEnter, onMouseLeave }) => {
-  const { activeOverlay, closeOverlay } = useLightSyncStore();
+export const OverlayContainer: React.FC = () => {
+  const { 
+    activeOverlay, 
+    closeOverlay, 
+    cancelOverlayClose, 
+    scheduleOverlayClose 
+  } = useLightSyncStore();
+  
   const cardRef = useRef<HTMLDivElement | null>(null);
 
   // Close on Escape key
@@ -113,37 +116,36 @@ export const OverlayContainer: React.FC<{
 
   return (
     <div 
-      className="fixed inset-0 z-50 pointer-events-none transition-colors duration-150"
+      className="fixed inset-0 z-50 pointer-events-none"
       onPointerDown={(e) => {
-        // Autohide if clicked outside the card
         if (e.target === e.currentTarget) {
           closeOverlay();
         }
       }}
     >
-      {/* Click-away transparent overlay */}
+      {/* Click-away backdrop: starts below header so it does not intercept hover trajectory */}
       <div 
         onClick={closeOverlay}
-        className="absolute inset-0 bg-black/25 dark:bg-black/50 pointer-events-auto transition-opacity"
+        className="absolute top-16 inset-x-0 bottom-0 bg-black/20 dark:bg-black/50 pointer-events-auto transition-opacity"
       />
 
-      {/* Floating Card positioned directly beneath the single top navbar */}
+      {/* Floating Card: high-performance solid surface without GPU-stalling blur shaders */}
       <div 
         ref={cardRef}
-        onMouseEnter={onMouseEnter}
-        onMouseLeave={onMouseLeave}
+        onMouseEnter={cancelOverlayClose}
+        onMouseLeave={() => scheduleOverlayClose(300)}
         onClick={(e) => e.stopPropagation()}
-        className={`pointer-events-auto absolute top-16 left-1/2 -translate-x-1/2 ${
+        className={`pointer-events-auto absolute top-[62px] left-1/2 -translate-x-1/2 ${
           isCompact ? 'max-w-md w-[92vw]' : 'max-w-4xl w-[94vw]'
-        } max-h-[82vh] flex flex-col rounded-2xl bg-white/95 dark:bg-zinc-950/95 backdrop-blur-xl border border-slate-200 dark:border-zinc-800 shadow-2xl overflow-hidden transition-all duration-150`}
+        } max-h-[82vh] flex flex-col rounded-2xl bg-white dark:bg-[#0c0c0e] border border-slate-300 dark:border-zinc-800 shadow-2xl overflow-hidden transition-opacity duration-150 ease-out`}
         style={{
-          boxShadow: '0 20px 50px -10px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(120, 120, 140, 0.15)'
+          boxShadow: '0 25px 60px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(120, 120, 140, 0.18)'
         }}
       >
         {/* Top Gesture Pill Handle */}
         <div 
           onClick={closeOverlay}
-          className="w-full pt-2.5 pb-1 flex flex-col items-center justify-center cursor-pointer group select-none shrink-0"
+          className="w-full pt-2 pb-1 flex flex-col items-center justify-center cursor-pointer group select-none shrink-0"
           title="Click to dismiss"
         >
           <div className="w-12 h-1 rounded-full bg-slate-300 dark:bg-zinc-700 group-hover:bg-indigo-500 transition-colors" />
@@ -151,7 +153,7 @@ export const OverlayContainer: React.FC<{
 
         {/* Card Header (unless compact) */}
         {!isCompact && (
-          <div className="px-5 py-2.5 border-b border-slate-100 dark:border-zinc-850 flex items-center justify-between shrink-0">
+          <div className="px-5 py-2.5 border-b border-slate-100 dark:border-zinc-850 flex items-center justify-between shrink-0 select-none">
             <div className="flex items-center gap-2.5">
               <div className="p-1.5 rounded-xl bg-slate-100 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800">
                 {meta.icon}
@@ -190,9 +192,9 @@ export const OverlayContainer: React.FC<{
         </div>
 
         {/* Footer info */}
-        <div className="px-5 py-2 bg-slate-50/80 dark:bg-zinc-950/80 border-t border-slate-100 dark:border-zinc-850 flex items-center justify-between text-[10px] text-slate-400 dark:text-zinc-500 font-mono shrink-0">
+        <div className="px-5 py-1.5 bg-slate-50 dark:bg-zinc-950 border-t border-slate-100 dark:border-zinc-850 flex items-center justify-between text-[10px] text-slate-400 dark:text-zinc-500 font-mono shrink-0 select-none">
           <span className="flex items-center gap-1">
-            <ChevronDown className="w-3 h-3" /> Move mouse away or click piano to play
+            <ChevronDown className="w-3 h-3" /> Move cursor off or click piano to play
           </span>
           <span>LightSync v2.0</span>
         </div>

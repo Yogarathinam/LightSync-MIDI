@@ -61,8 +61,13 @@ def main():
         from PyQt6.QtWidgets import QApplication, QMainWindow
         from PyQt6.QtWebEngineWidgets import QWebEngineView
 
-        # Enable GPU acceleration flags
-        os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = "--enable-gpu-rasterization --enable-zero-copy --ignore-gpu-blocklist"
+        # Stable hardware-accelerated GPU flags for PyQt6 WebEngine
+        os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = (
+            "--enable-gpu-rasterization "
+            "--enable-accelerated-2d-canvas "
+            "--disable-software-rasterizer "
+            "--disable-backgrounding-occluded-windows"
+        )
 
         app = QApplication(sys.argv)
         app.setApplicationName(settings.APP_NAME)

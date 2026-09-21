@@ -28,7 +28,9 @@ export const AppHeader: React.FC<{
   const { theme, toggleTheme } = useTheme();
   const { 
     activeOverlay,
-    setActiveOverlay,
+    openOverlay,
+    cancelOverlayClose,
+    scheduleOverlayClose,
     closeOverlay,
     deviceStatus, 
     volume, 
@@ -45,8 +47,6 @@ export const AppHeader: React.FC<{
     decrementOctave
   } = useLightSyncStore();
 
-  const hoverTimerRef = useRef<number | null>(null);
-
   const tabs: { id: StudioTab; label: string; icon: React.ReactNode }[] = [
     { id: 'play', label: 'Play', icon: <Music className="w-3.5 h-3.5" /> },
     { id: 'effects', label: 'Effect Studio', icon: <Sliders className="w-3.5 h-3.5 text-indigo-500" /> },
@@ -57,33 +57,26 @@ export const AppHeader: React.FC<{
     { id: 'device', label: 'Hardware', icon: <Cpu className="w-3.5 h-3.5 text-teal-500" /> },
   ];
 
-  // Hover triggers smooth overlay open
   const handleMouseEnter = (target: StudioTab | 'quick_settings' | 'settings') => {
-    if (hoverTimerRef.current) {
-      window.clearTimeout(hoverTimerRef.current);
-      hoverTimerRef.current = null;
-    }
-    setActiveOverlay(target);
+    openOverlay(target);
     if (onHoverMenu) onHoverMenu(target);
   };
 
   const handleMouseLeave = () => {
-    hoverTimerRef.current = window.setTimeout(() => {
-      closeOverlay();
-      if (onHoverMenu) onHoverMenu(null);
-    }, 240); // 240ms grace period so user can comfortably move mouse into the card
+    scheduleOverlayClose(300);
+    if (onHoverMenu) onHoverMenu(null);
   };
 
   const handleTabClick = (tabId: StudioTab) => {
     if (activeOverlay === tabId) {
       closeOverlay();
     } else {
-      setActiveOverlay(tabId);
+      openOverlay(tabId);
     }
   };
 
   return (
-    <header className="sticky top-0 z-40 bg-white/95 dark:bg-black/95 backdrop-blur-md border-b border-slate-200 dark:border-zinc-800 transition-colors shadow-sm">
+    <header className="sticky top-0 z-40 bg-white dark:bg-black border-b border-slate-200 dark:border-zinc-800 transition-colors shadow-sm">
       <div className="max-w-[1850px] mx-auto px-3 sm:px-4 h-16 flex items-center justify-between gap-2.5">
         
         {/* Left: Brand Identity */}
@@ -182,7 +175,7 @@ export const AppHeader: React.FC<{
               onMouseEnter={() => handleMouseEnter('quick_settings')}
               onClick={() => {
                 if (activeOverlay === 'quick_settings') closeOverlay();
-                else setActiveOverlay('quick_settings');
+                else openOverlay('quick_settings');
               }}
               className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-medium transition-all ${
                 activeOverlay === 'quick_settings'
@@ -252,7 +245,7 @@ export const AppHeader: React.FC<{
             onMouseEnter={() => handleMouseEnter('settings')}
             onClick={() => {
               if (activeOverlay === 'settings') closeOverlay();
-              else setActiveOverlay('settings');
+              else openOverlay('settings');
             }}
             className={`p-2 rounded-xl border transition-all ${
               activeOverlay === 'settings'

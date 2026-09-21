@@ -14,22 +14,7 @@ const MainApp: React.FC = () => {
   useWebSocketBridge();
   useKeyboardInput();
 
-  const { activeOverlay, setActiveOverlay, closeOverlay } = useLightSyncStore();
   const [fps, setFps] = useState(60);
-  const hoverGraceTimerRef = useRef<number | null>(null);
-
-  const handleOverlayMouseEnter = () => {
-    if (hoverGraceTimerRef.current) {
-      window.clearTimeout(hoverGraceTimerRef.current);
-      hoverGraceTimerRef.current = null;
-    }
-  };
-
-  const handleOverlayMouseLeave = () => {
-    hoverGraceTimerRef.current = window.setTimeout(() => {
-      closeOverlay();
-    }, 220);
-  };
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-black text-slate-900 dark:text-zinc-100 antialiased transition-colors duration-200 selection:bg-indigo-500 selection:text-white">
@@ -38,15 +23,12 @@ const MainApp: React.FC = () => {
       <AppHeader />
 
       {/* 2. Main Immersive Visualizer Engine (Single Viewport) */}
-      <main className="flex-1 max-w-[1850px] w-full mx-auto p-2 sm:p-3 flex flex-col">
+      <main className="flex-1 max-w-[1850px] w-full mx-auto p-1 sm:p-2 flex flex-col min-h-0">
         <StudioCanvas onFpsUpdate={setFps} />
       </main>
 
-      {/* 3. Floating Semi-Transparent Acrylic Hover Card Overlays with Autohide */}
-      <OverlayContainer 
-        onMouseEnter={handleOverlayMouseEnter}
-        onMouseLeave={handleOverlayMouseLeave}
-      />
+      {/* 3. Floating Elevated Hover Card Overlays with Autohide */}
+      <OverlayContainer />
 
       {/* 4. Bottom Real-time Engine Status Bar */}
       <StatusBar fps={fps} />

@@ -373,12 +373,12 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
       const height = canvas.height;
       const isDark = theme === 'dark';
 
-      // Dimensions: Keyboard at very bottom, LED strip right above keys
-      const keyAreaHeight = 125;
-      const keyAreaTop = height - keyAreaHeight - 4;
+      // Dimensions: Extended tall keyboard anchored directly at bottom
+      const keyAreaHeight = Math.max(190, Math.min(Math.floor(height * 0.36), 250));
+      const keyAreaTop = height - keyAreaHeight - 1;
       const ledBarHeight = 24;
-      const ledBarTop = keyAreaTop - ledBarHeight - 6;
-      const waterfallTop = 8;
+      const ledBarTop = keyAreaTop - ledBarHeight - 1;
+      const waterfallTop = 6;
       const waterfallHeight = ledBarTop - waterfallTop;
 
       ctx.clearRect(0, 0, width, height);
@@ -755,15 +755,15 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
     const x = (clientX - rect.left) * scaleX;
     const y = (clientY - rect.top) * scaleY;
 
-    const keyAreaHeight = 125;
-    const keyAreaTop = canvas.height - keyAreaHeight - 4;
+    const keyAreaHeight = Math.max(190, Math.min(Math.floor(canvas.height * 0.36), 250));
+    const keyAreaTop = canvas.height - keyAreaHeight - 1;
 
     // Only keys area triggers notes
     if (y < keyAreaTop) return null;
 
     const whiteKeys = keys.filter(k => !k.isBlack);
     const whiteKeyWidth = (canvas.width - 32) / whiteKeys.length;
-    const blackKeyHeight = keyAreaHeight * 0.62;
+    const blackKeyHeight = keyAreaHeight * 0.64;
 
     // Check black keys first
     if (y < keyAreaTop + blackKeyHeight) {
@@ -841,8 +841,9 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
       const parent = canvas.parentElement;
       if (parent) {
         canvas.width = parent.clientWidth;
-        // Immersive waterfall canvas height
-        canvas.height = Math.max(480, Math.min(window.innerHeight - 200, 640));
+        // Extend full height between header (64px) and status bar (36px)
+        const totalHeight = window.innerHeight - 116;
+        canvas.height = Math.max(540, totalHeight);
       }
     };
 
@@ -852,14 +853,14 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
   }, []);
 
   return (
-    <div className="relative w-full bg-slate-900 dark:bg-black rounded-3xl border border-slate-700/50 dark:border-zinc-800 p-2 overflow-hidden shadow-xl transition-colors">
+    <div className="relative w-full flex-1 flex flex-col bg-slate-900 dark:bg-black rounded-2xl border border-slate-700/50 dark:border-zinc-800 p-1.5 overflow-hidden shadow-xl transition-colors min-h-0">
       {/* Visualizer Top Info Bar */}
-      <div className="w-full flex justify-between items-center px-3 py-1.5 text-[11px] text-slate-400 dark:text-zinc-500 font-mono">
+      <div className="w-full flex justify-between items-center px-3 py-1 text-[11px] text-slate-400 dark:text-zinc-500 font-mono shrink-0 select-none">
         <span className="flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
           WATERFALL FLOW KEYS RUNWAY
         </span>
-        <span>WS2812B STRIP MOUNT (144 LEDS) • {keyboardSize} KEYS (MIDI {startMidi} - {startMidi + keyboardSize - 1})</span>
+        <span>WS2812B STRIP (144 LEDS) • {keyboardSize} KEYS (MIDI {startMidi} - {startMidi + keyboardSize - 1}) • QWERTY [A-K]</span>
       </div>
 
       <canvas
@@ -868,14 +869,8 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
-        className="w-full h-[480px] sm:h-[540px] cursor-pointer rounded-2xl touch-none"
+        className="w-full flex-1 cursor-pointer touch-none block"
       />
-
-      {/* Visualizer Bottom Info */}
-      <div className="mt-1 flex items-center justify-between text-[11px] text-slate-400 dark:text-zinc-500 px-3 py-1 font-mono">
-        <span>Play keys via MIDI, touch/mouse, or QWERTY [A-K] • Space = Sustain</span>
-        <span>Pure Black OLED 60 FPS Engine</span>
-      </div>
     </div>
   );
 };
