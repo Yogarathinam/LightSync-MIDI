@@ -1,9 +1,13 @@
 export type ThemeMode = 'light' | 'dark';
 
-export type WorkspaceId = 'play' | 'effects' | 'learn' | 'practice' | 'analyze' | 'aicoach' | 'device';
+export type TopNavTab = 'songs' | 'learn' | 'visualize' | 'effects' | 'aicoach';
+
+export type WorkspaceId = 'songs' | 'learn' | 'effects' | 'aicoach' | 'play';
 export type UtilityOverlayId = 'quick_settings' | 'settings';
 
-export type StudioTab = 'play' | 'effects' | 'learn' | 'practice' | 'analyze' | 'aicoach' | 'device';
+export type LearnSubView = 'follow' | 'practice' | 'analyze' | 'progress';
+
+export type StudioTab = TopNavTab | 'play' | 'practice' | 'analyze' | 'device';
 
 export type OverlayModalType = WorkspaceId | UtilityOverlayId | null;
 

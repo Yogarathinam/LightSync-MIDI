@@ -1,8 +1,10 @@
 import { create } from 'zustand';
 import { 
   StudioTab, 
+  TopNavTab,
   WorkspaceId,
   UtilityOverlayId,
+  LearnSubView,
   OverlayModalType,
   InstrumentType, 
   EffectType, 
@@ -85,6 +87,114 @@ export const COLOR_SYNC_PRESETS: Record<ColorSyncPresetId, {
     effect: 'rain'
   }
 };
+
+export const DEFAULT_SONGS: SongItem[] = [
+  {
+    id: 'ode_to_joy',
+    title: 'Ode to Joy',
+    composer: 'L. v. Beethoven',
+    difficulty: 'Beginner',
+    bpm: 100,
+    time_signature: '4/4',
+    key: 'C Major',
+    notes: [
+      { pitch: 64, name: 'E4', time: 0.0, duration: 1.0, hand: 'right' },
+      { pitch: 64, name: 'E4', time: 1.0, duration: 1.0, hand: 'right' },
+      { pitch: 65, name: 'F4', time: 2.0, duration: 1.0, hand: 'right' },
+      { pitch: 67, name: 'G4', time: 3.0, duration: 1.0, hand: 'right' },
+      { pitch: 67, name: 'G4', time: 4.0, duration: 1.0, hand: 'right' },
+      { pitch: 65, name: 'F4', time: 5.0, duration: 1.0, hand: 'right' },
+      { pitch: 64, name: 'E4', time: 6.0, duration: 1.0, hand: 'right' },
+      { pitch: 62, name: 'D4', time: 7.0, duration: 1.0, hand: 'right' },
+      { pitch: 60, name: 'C4', time: 8.0, duration: 1.0, hand: 'right' },
+      { pitch: 60, name: 'C4', time: 9.0, duration: 1.0, hand: 'right' },
+      { pitch: 62, name: 'D4', time: 10.0, duration: 1.0, hand: 'right' },
+      { pitch: 64, name: 'E4', time: 11.0, duration: 1.0, hand: 'right' },
+      { pitch: 64, name: 'E4', time: 12.0, duration: 1.5, hand: 'right' },
+      { pitch: 62, name: 'D4', time: 13.5, duration: 0.5, hand: 'right' },
+      { pitch: 62, name: 'D4', time: 14.0, duration: 2.0, hand: 'right' },
+    ]
+  },
+  {
+    id: 'fur_elise',
+    title: 'Für Elise (Theme)',
+    composer: 'L. v. Beethoven',
+    difficulty: 'Intermediate',
+    bpm: 120,
+    time_signature: '3/8',
+    key: 'A Minor',
+    notes: [
+      { pitch: 76, name: 'E5', time: 0.0, duration: 0.5, hand: 'right' },
+      { pitch: 75, name: 'D#5', time: 0.5, duration: 0.5, hand: 'right' },
+      { pitch: 76, name: 'E5', time: 1.0, duration: 0.5, hand: 'right' },
+      { pitch: 75, name: 'D#5', time: 1.5, duration: 0.5, hand: 'right' },
+      { pitch: 76, name: 'E5', time: 2.0, duration: 0.5, hand: 'right' },
+      { pitch: 71, name: 'B4', time: 2.5, duration: 0.5, hand: 'right' },
+      { pitch: 74, name: 'D5', time: 3.0, duration: 0.5, hand: 'right' },
+      { pitch: 72, name: 'C5', time: 3.5, duration: 0.5, hand: 'right' },
+      { pitch: 69, name: 'A4', time: 4.0, duration: 1.5, hand: 'right' },
+    ]
+  },
+  {
+    id: 'river_flows_in_you',
+    title: 'River Flows in You',
+    composer: 'Yiruma',
+    difficulty: 'Intermediate',
+    bpm: 75,
+    time_signature: '4/4',
+    key: 'A Major',
+    notes: [
+      { pitch: 69, name: 'A4', time: 0.0, duration: 0.5, hand: 'right' },
+      { pitch: 73, name: 'C#5', time: 0.5, duration: 0.5, hand: 'right' },
+      { pitch: 76, name: 'E5', time: 1.0, duration: 1.0, hand: 'right' },
+      { pitch: 74, name: 'D5', time: 2.0, duration: 0.5, hand: 'right' },
+      { pitch: 73, name: 'C#5', time: 2.5, duration: 0.5, hand: 'right' },
+      { pitch: 71, name: 'B4', time: 3.0, duration: 1.0, hand: 'right' },
+      { pitch: 69, name: 'A4', time: 4.0, duration: 0.5, hand: 'right' },
+      { pitch: 71, name: 'B4', time: 4.5, duration: 0.5, hand: 'right' },
+      { pitch: 73, name: 'C#5', time: 5.0, duration: 1.0, hand: 'right' },
+      { pitch: 71, name: 'B4', time: 6.0, duration: 2.0, hand: 'right' },
+    ]
+  },
+  {
+    id: 'c_major_scale',
+    title: 'C Major Scale Drill',
+    composer: 'Technique Drill',
+    difficulty: 'Beginner',
+    bpm: 90,
+    time_signature: '4/4',
+    key: 'C Major',
+    notes: [
+      { pitch: 60, name: 'C4', time: 0.0, duration: 1.0, hand: 'right' },
+      { pitch: 62, name: 'D4', time: 1.0, duration: 1.0, hand: 'right' },
+      { pitch: 64, name: 'E4', time: 2.0, duration: 1.0, hand: 'right' },
+      { pitch: 65, name: 'F4', time: 3.0, duration: 1.0, hand: 'right' },
+      { pitch: 67, name: 'G4', time: 4.0, duration: 1.0, hand: 'right' },
+      { pitch: 69, name: 'A4', time: 5.0, duration: 1.0, hand: 'right' },
+      { pitch: 71, name: 'B4', time: 6.0, duration: 1.0, hand: 'right' },
+      { pitch: 72, name: 'C5', time: 7.0, duration: 1.0, hand: 'right' },
+    ]
+  },
+  {
+    id: 'minuet_in_g',
+    title: 'Minuet in G Major',
+    composer: 'J. S. Bach',
+    difficulty: 'Beginner',
+    bpm: 110,
+    time_signature: '3/4',
+    key: 'G Major',
+    notes: [
+      { pitch: 67, name: 'G4', time: 0.0, duration: 1.0, hand: 'right' },
+      { pitch: 72, name: 'C5', time: 1.0, duration: 0.5, hand: 'right' },
+      { pitch: 74, name: 'D5', time: 1.5, duration: 0.5, hand: 'right' },
+      { pitch: 76, name: 'E5', time: 2.0, duration: 0.5, hand: 'right' },
+      { pitch: 77, name: 'F#5', time: 2.5, duration: 0.5, hand: 'right' },
+      { pitch: 79, name: 'G5', time: 3.0, duration: 1.0, hand: 'right' },
+      { pitch: 67, name: 'G4', time: 4.0, duration: 1.0, hand: 'right' },
+      { pitch: 67, name: 'G4', time: 5.0, duration: 1.0, hand: 'right' },
+    ]
+  }
+];
 
 interface LightSyncState {
   // Navigation & Spatial Workspace / Overlay Modal
@@ -169,9 +279,15 @@ interface LightSyncState {
   setBgConfigParam: <K extends keyof VisualizerBackgroundConfig>(param: K, value: VisualizerBackgroundConfig[K]) => void;
   applyColorPreset: (presetId: ColorSyncPresetId) => void;
 
-  // Learning & Practice Mode State
+  // Songs Catalog & Unified Learning Workspace State
+  songsList: SongItem[];
+  setSongsList: (songs: SongItem[]) => void;
+  addSong: (song: SongItem) => void;
   currentSong: SongItem | null;
   setCurrentSong: (song: SongItem | null) => void;
+  learnSubView: LearnSubView;
+  setLearnSubView: (view: LearnSubView) => void;
+  selectSongAndLearn: (song: SongItem, subView?: LearnSubView) => void;
   isSongPlaying: boolean;
   setIsSongPlaying: (playing: boolean) => void;
   practiceMode: 'wait_for_key' | 'flow';
@@ -203,8 +319,12 @@ let overlayTimer: number | null = null;
 
 export const useLightSyncStore = create<LightSyncState>((set, get) => ({
   // Navigation & Spatial Workspace / Overlay State
-  activeTab: 'play',
-  setActiveTab: (tab) => set({ activeTab: tab, activeOverlay: tab }),
+  activeTab: 'visualize',
+  setActiveTab: (tab) => set({ 
+    activeTab: tab, 
+    activeOverlay: tab === 'visualize' ? null : (tab as WorkspaceId),
+    activeWorkspace: tab === 'visualize' ? null : (tab as WorkspaceId)
+  }),
   activeWorkspace: null,
   activeUtilityOverlay: null,
   activeOverlay: null,
@@ -488,9 +608,23 @@ export const useLightSyncStore = create<LightSyncState>((set, get) => ({
     get().addConsoleLog(`Applied Visual Sync Preset: ${preset.name}`);
   },
 
-  // Learning & Practice
-  currentSong: null,
+  // Songs Catalog & Unified Learning Workspace
+  songsList: DEFAULT_SONGS,
+  setSongsList: (songs) => set({ songsList: songs }),
+  addSong: (song) => set((state) => ({ songsList: [song, ...state.songsList] })),
+  currentSong: DEFAULT_SONGS[0],
   setCurrentSong: (song) => set({ currentSong: song }),
+  learnSubView: 'follow',
+  setLearnSubView: (view) => set({ learnSubView: view }),
+  selectSongAndLearn: (song, subView = 'follow') => {
+    set({
+      currentSong: song,
+      learnSubView: subView,
+      activeWorkspace: 'learn',
+      activeOverlay: 'learn',
+      activeTab: 'learn'
+    });
+  },
   isSongPlaying: false,
   setIsSongPlaying: (playing) => set({ isSongPlaying: playing }),
   practiceMode: 'wait_for_key',

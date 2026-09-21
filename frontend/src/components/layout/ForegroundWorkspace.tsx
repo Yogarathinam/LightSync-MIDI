@@ -13,12 +13,11 @@ import {
 import { useLightSyncStore } from '../../store/useLightSyncStore';
 import { WorkspaceId } from '../../types';
 
-import { PlayStudio } from '../play/PlayStudio';
+import { SongsWorkspace } from '../songs/SongsWorkspace';
+import { LearnWorkspace } from '../learn/LearnWorkspace';
 import { EffectStudio } from '../effects/EffectStudio';
-import { LearnStudio } from '../learn/LearnStudio';
-import { PracticeStudio } from '../practice/PracticeStudio';
-import { AnalyzeStudio } from '../analyze/AnalyzeStudio';
 import { AICoachStudio } from '../aicoach/AICoachStudio';
+import { PlayStudio } from '../play/PlayStudio';
 import { DeviceMonitor } from '../device/DeviceMonitor';
 
 export const ForegroundWorkspace: React.FC = () => {
@@ -74,35 +73,23 @@ export const ForegroundWorkspace: React.FC = () => {
 
   const getWorkspaceMeta = (ws: WorkspaceId | null) => {
     switch (ws) {
-      case 'play':
+      case 'songs':
         return {
-          title: 'Play Studio',
-          badge: 'Live Harmonics & Synth',
-          icon: <Music className="w-4 h-4 text-indigo-500" />
+          title: 'Song Library & MIDI Import',
+          badge: 'Pieces & Catalog',
+          icon: <Music className="w-4 h-4 text-amber-500" />
+        };
+      case 'learn':
+        return {
+          title: 'Interactive Learning Studio',
+          badge: 'Follow, Practice, Analyze',
+          icon: <GraduationCap className="w-4 h-4 text-emerald-500" />
         };
       case 'effects':
         return {
           title: 'WS2812B Effect Studio',
           badge: 'Optical Simulation Engine',
-          icon: <Sliders className="w-4 h-4 text-indigo-500" />
-        };
-      case 'learn':
-        return {
-          title: 'Learn Studio',
-          badge: 'Interactive Score Curriculum',
-          icon: <GraduationCap className="w-4 h-4 text-emerald-500" />
-        };
-      case 'practice':
-        return {
-          title: 'Practice Studio & Drills',
-          badge: 'Sub-tempo & A-B Looper',
-          icon: <Activity className="w-4 h-4 text-sky-500" />
-        };
-      case 'analyze':
-        return {
-          title: 'Performance Analysis',
-          badge: 'Micro-timing & Chords',
-          icon: <BarChart2 className="w-4 h-4 text-amber-500" />
+          icon: <Sliders className="w-4 h-4 text-sky-500" />
         };
       case 'aicoach':
         return {
@@ -110,11 +97,11 @@ export const ForegroundWorkspace: React.FC = () => {
           badge: 'Offline Heuristic Copilot',
           icon: <Sparkles className="w-4 h-4 text-purple-500" />
         };
-      case 'device':
+      case 'play':
         return {
-          title: 'Hardware Controller Bridge',
-          badge: 'M5Stack Serial Protocol',
-          icon: <Cpu className="w-4 h-4 text-teal-500" />
+          title: 'Play Studio',
+          badge: 'Live Harmonics & Synth',
+          icon: <Music className="w-4 h-4 text-indigo-500" />
         };
       default:
         return {
@@ -153,7 +140,7 @@ export const ForegroundWorkspace: React.FC = () => {
         </div>
 
         {/* Workspace Header */}
-        <div className="px-5 py-2.5 border-b border-slate-100 dark:border-zinc-800 flex items-center justify-between shrink-0 select-none">
+        <div className="px-5 py-2.5 border-b border-slate-100 dark:border-zinc-850 flex items-center justify-between shrink-0 select-none">
           <div className="flex items-center gap-2.5">
             <div className="p-1.5 rounded-xl bg-slate-100 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800">
               {meta.icon}
@@ -179,13 +166,11 @@ export const ForegroundWorkspace: React.FC = () => {
 
         {/* Workspace Scrollable Body */}
         <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4">
-          {displayedWorkspace === 'play' && <PlayStudio />}
+          {displayedWorkspace === 'songs' && <SongsWorkspace />}
+          {displayedWorkspace === 'learn' && <LearnWorkspace />}
           {displayedWorkspace === 'effects' && <EffectStudio />}
-          {displayedWorkspace === 'learn' && <LearnStudio />}
-          {displayedWorkspace === 'practice' && <PracticeStudio />}
-          {displayedWorkspace === 'analyze' && <AnalyzeStudio />}
           {displayedWorkspace === 'aicoach' && <AICoachStudio />}
-          {displayedWorkspace === 'device' && <DeviceMonitor />}
+          {displayedWorkspace === 'play' && <PlayStudio />}
         </div>
 
         {/* Workspace Footer */}

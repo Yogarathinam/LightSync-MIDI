@@ -12,6 +12,7 @@ import {
   Activity, 
   BarChart2, 
   Sparkles, 
+  Play,
   Settings as SettingsIcon,
   SlidersHorizontal,
   Minus,
@@ -19,7 +20,7 @@ import {
 } from 'lucide-react';
 import { useLightSyncStore } from '../../store/useLightSyncStore';
 import { useTheme } from '../../context/ThemeContext';
-import { StudioTab } from '../../types';
+import { StudioTab, TopNavTab } from '../../types';
 
 export const AppHeader: React.FC<{
   onHoverMenu?: (tab: StudioTab | 'quick_settings' | 'settings' | null) => void;
@@ -32,6 +33,7 @@ export const AppHeader: React.FC<{
     activeUtilityOverlay,
     openUtilityOverlay,
     closeUtilityOverlay,
+    currentSong,
     deviceStatus, 
     volume, 
     setVolume, 
@@ -47,34 +49,24 @@ export const AppHeader: React.FC<{
     decrementOctave
   } = useLightSyncStore();
 
-  const tabs: { id: StudioTab; label: string; icon: React.ReactNode }[] = [
-    { id: 'play', label: 'Play', icon: <Music className="w-3.5 h-3.5" /> },
-    { id: 'effects', label: 'Effect Studio', icon: <Sliders className="w-3.5 h-3.5 text-indigo-500" /> },
+  const tabs: { id: TopNavTab; label: string; icon: React.ReactNode }[] = [
+    { id: 'songs', label: 'Songs', icon: <Music className="w-3.5 h-3.5 text-amber-500" /> },
     { id: 'learn', label: 'Learn', icon: <GraduationCap className="w-3.5 h-3.5 text-emerald-500" /> },
-    { id: 'practice', label: 'Practice', icon: <Activity className="w-3.5 h-3.5 text-sky-500" /> },
-    { id: 'analyze', label: 'Analyze', icon: <BarChart2 className="w-3.5 h-3.5 text-amber-500" /> },
+    { id: 'visualize', label: 'Visualize', icon: <Play className="w-3.5 h-3.5 text-indigo-500" /> },
+    { id: 'effects', label: 'Effect Studio', icon: <Sliders className="w-3.5 h-3.5 text-sky-500" /> },
     { id: 'aicoach', label: 'AI Coach', icon: <Sparkles className="w-3.5 h-3.5 text-purple-500" /> },
-    { id: 'device', label: 'Hardware', icon: <Cpu className="w-3.5 h-3.5 text-teal-500" /> },
   ];
 
-  const handleTabClick = (tabId: StudioTab) => {
+  const handleTabClick = (tabId: TopNavTab) => {
     closeUtilityOverlay();
 
-    if (tabId === 'play') {
-      if (activeWorkspace !== null && activeWorkspace !== 'play') {
-        // Any other workspace is open -> return to normal default mode
-        closeWorkspace();
-      } else if (activeWorkspace === 'play') {
-        // PlayStudio is open -> return to normal default mode
-        closeWorkspace();
-      } else {
-        // Already in normal default mode -> open PlayStudio
-        openWorkspace('play');
-      }
+    if (tabId === 'visualize') {
+      // "Visualize" is the home stage. Clicking it always closes workspaces and returns to the live visualizer!
+      closeWorkspace();
     } else {
-      // Non-play workspace tabs
+      // Workspace tabs ('songs', 'learn', 'effects', 'aicoach')
       if (activeWorkspace === tabId) {
-        closeWorkspace();
+        closeWorkspace(); // toggle closed -> returns to live visualizer
       } else {
         openWorkspace(tabId);
       }
@@ -109,7 +101,7 @@ export const AppHeader: React.FC<{
         <nav className="hidden md:flex items-center p-1 rounded-2xl bg-slate-100/90 dark:bg-zinc-900/80 border border-slate-200/80 dark:border-zinc-800">
           {tabs.map((tab) => {
             const isWorkspaceActive = activeWorkspace === tab.id;
-            const isDefaultPlay = tab.id === 'play' && activeWorkspace === null;
+            const isDefaultVisualize = tab.id === 'visualize' && activeWorkspace === null;
             return (
               <button
                 key={tab.id}
@@ -117,20 +109,25 @@ export const AppHeader: React.FC<{
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all select-none cursor-pointer ${
                   isWorkspaceActive
                     ? 'bg-indigo-600 text-white shadow-sm font-semibold'
-                    : isDefaultPlay
+                    : isDefaultVisualize
                     ? 'bg-indigo-50/90 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border border-indigo-200/70 dark:border-indigo-800/60 font-semibold'
                     : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200 hover:bg-slate-200/60 dark:hover:bg-zinc-800/60'
                 }`}
                 title={
-                  tab.id === 'play' 
-                    ? (activeWorkspace !== null ? 'Return to Live Visualizer' : 'Open Play Studio Controls')
+                  tab.id === 'visualize' 
+                    ? 'Live Visualizer & Performance Stage'
                     : `Open ${tab.label}`
                 }
               >
                 {tab.icon}
                 <span>{tab.label}</span>
-                {isDefaultPlay && (
+                {isDefaultVisualize && (
                   <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
+                )}
+                {tab.id === 'learn' && currentSong && (
+                  <span className="hidden xl:inline text-[10px] font-mono px-1.5 py-0.2 rounded bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 truncate max-w-[90px]">
+                    {currentSong.title}
+                  </span>
                 )}
               </button>
             );
@@ -288,7 +285,7 @@ export const AppHeader: React.FC<{
       <div className="md:hidden flex items-center justify-around px-2 py-1.5 bg-slate-50 dark:bg-black border-t border-slate-200 dark:border-zinc-800 overflow-x-auto">
         {tabs.map((tab) => {
           const isWorkspaceActive = activeWorkspace === tab.id;
-          const isDefaultPlay = tab.id === 'play' && activeWorkspace === null;
+          const isDefaultVisualize = tab.id === 'visualize' && activeWorkspace === null;
           return (
             <button
               key={tab.id}
@@ -296,7 +293,7 @@ export const AppHeader: React.FC<{
               className={`p-1 rounded-lg text-xs flex flex-col items-center gap-0.5 shrink-0 cursor-pointer ${
                 isWorkspaceActive
                   ? 'text-indigo-600 dark:text-indigo-400 font-bold'
-                  : isDefaultPlay
+                  : isDefaultVisualize
                   ? 'text-indigo-500 font-semibold'
                   : 'text-slate-500 dark:text-zinc-500'
               }`}

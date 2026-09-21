@@ -11,7 +11,7 @@ import {
   Zap
 } from 'lucide-react';
 import { useLightSyncStore } from '../../store/useLightSyncStore';
-import { StudioTab } from '../../types';
+import { StudioTab, WorkspaceId } from '../../types';
 
 export const VisualizerToolbar: React.FC = () => {
   const {
@@ -26,18 +26,15 @@ export const VisualizerToolbar: React.FC = () => {
     isAutoDemo
   } = useLightSyncStore();
 
-  const studioShortcuts: { id: StudioTab | 'settings'; label: string; icon: React.ReactNode }[] = [
-    { id: 'play', label: 'Play', icon: <Music className="w-3.5 h-3.5" /> },
-    { id: 'effects', label: 'Effect Studio', icon: <Sliders className="w-3.5 h-3.5 text-indigo-500" /> },
+  const studioShortcuts: { id: WorkspaceId | 'settings'; label: string; icon: React.ReactNode }[] = [
+    { id: 'songs', label: 'Songs', icon: <Music className="w-3.5 h-3.5 text-amber-500" /> },
     { id: 'learn', label: 'Learn', icon: <GraduationCap className="w-3.5 h-3.5 text-emerald-500" /> },
-    { id: 'practice', label: 'Practice', icon: <Activity className="w-3.5 h-3.5 text-sky-500" /> },
-    { id: 'analyze', label: 'Analyze', icon: <BarChart2 className="w-3.5 h-3.5 text-amber-500" /> },
+    { id: 'effects', label: 'Effect Studio', icon: <Sliders className="w-3.5 h-3.5 text-sky-500" /> },
     { id: 'aicoach', label: 'AI Coach', icon: <Sparkles className="w-3.5 h-3.5 text-purple-500" /> },
-    { id: 'device', label: 'Hardware', icon: <Cpu className="w-3.5 h-3.5 text-teal-500" /> },
     { id: 'settings', label: 'Settings', icon: <SettingsIcon className="w-3.5 h-3.5 text-slate-500 dark:text-zinc-400" /> },
   ];
 
-  const handleToggleOverlay = (id: StudioTab | 'settings') => {
+  const handleToggleOverlay = (id: WorkspaceId | 'settings') => {
     if (activeOverlay === id) {
       setActiveOverlay(null);
     } else {
