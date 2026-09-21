@@ -1,5 +1,4 @@
 import React, { useRef, useEffect, useCallback } from 'react';
-import { ChevronsUpDown, Minus, Plus } from 'lucide-react';
 import { useLightSyncStore } from '../../store/useLightSyncStore';
 import { useTheme } from '../../context/ThemeContext';
 import { EffectType } from '../../types';
@@ -110,10 +109,6 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
     activeOverlay,
     closeOverlay
   } = useLightSyncStore();
-
-  const isResizingRef = useRef(false);
-  const startYRef = useRef(0);
-  const startHeightRef = useRef(220);
 
   const ledCount = 144;
   const baseStartMidi = keyboardSize === 25 ? 48 : keyboardSize === 49 ? 36 : keyboardSize === 61 ? 36 : 21;
@@ -873,32 +868,6 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
     };
   }, []);
 
-  // Resize keyboard drag handlers
-  const handleResizeStart = (e: React.PointerEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    e.currentTarget.setPointerCapture(e.pointerId);
-    isResizingRef.current = true;
-    startYRef.current = e.clientY;
-    startHeightRef.current = keyboardHeight;
-  };
-
-  const handleResizeMove = (e: React.PointerEvent) => {
-    if (!isResizingRef.current) return;
-    const deltaY = startYRef.current - e.clientY;
-    const newHeight = Math.max(110, Math.min(420, startHeightRef.current + deltaY));
-    setKeyboardHeight(newHeight);
-  };
-
-  const handleResizeEnd = (e: React.PointerEvent) => {
-    if (isResizingRef.current) {
-      isResizingRef.current = false;
-      try {
-        e.currentTarget.releasePointerCapture(e.pointerId);
-      } catch (_) {}
-    }
-  };
-
   return (
     <div className="relative w-full h-full max-w-[1920px] max-h-[calc(100vw*0.62)] flex flex-col bg-slate-950 dark:bg-black rounded-xl sm:rounded-2xl border border-slate-800/80 dark:border-zinc-800/80 p-1 sm:p-1.5 overflow-hidden shadow-2xl transition-colors min-h-0">
       {/* Visualizer Top Info Bar */}
@@ -908,44 +877,6 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
           WATERFALL FLOW KEYS RUNWAY
         </span>
         <span className="truncate ml-2">WS2812B (144 LEDS) • {keyboardSize} KEYS (MIDI {startMidi} - {startMidi + keyboardSize - 1}) • QWERTY [A-K]</span>
-      </div>
-
-      {/* Unobtrusive Corner Keyboard Resizer (Non-obstructing, positioned in corner) */}
-      <div
-        onPointerDown={handleResizeStart}
-        onPointerMove={handleResizeMove}
-        onPointerUp={handleResizeEnd}
-        onPointerCancel={handleResizeEnd}
-        style={{ bottom: `${Math.max(90, Math.min(keyboardHeight, 380)) + 30}px` }}
-        className="absolute right-3.5 z-30 cursor-row-resize select-none touch-none flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-900/90 dark:bg-zinc-900/90 hover:bg-slate-800 dark:hover:bg-zinc-800 border border-slate-700/70 dark:border-zinc-700/80 hover:border-indigo-500 shadow-xl backdrop-blur-sm text-slate-300 dark:text-zinc-300 hover:text-white transition-all group"
-        title="Drag up or down to resize keyboard height"
-      >
-        <ChevronsUpDown className="w-3.5 h-3.5 text-indigo-400 group-hover:scale-110 transition-transform" />
-        <span className="text-[10px] font-mono font-medium hidden sm:inline select-none">
-          {Math.round(keyboardHeight)}px
-        </span>
-        <div className="flex items-center border-l border-slate-700 dark:border-zinc-800 pl-1 ml-0.5">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setKeyboardHeight(Math.max(110, keyboardHeight - 25));
-            }}
-            className="p-0.5 rounded hover:bg-slate-700/60 dark:hover:bg-zinc-700/60 text-slate-400 hover:text-white"
-            title="Shrink keyboard (-25px)"
-          >
-            <Minus className="w-2.5 h-2.5" />
-          </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setKeyboardHeight(Math.min(420, keyboardHeight + 25));
-            }}
-            className="p-0.5 rounded hover:bg-slate-700/60 dark:hover:bg-zinc-700/60 text-slate-400 hover:text-white"
-            title="Expand keyboard (+25px)"
-          >
-            <Plus className="w-2.5 h-2.5" />
-          </button>
-        </div>
       </div>
 
       <canvas

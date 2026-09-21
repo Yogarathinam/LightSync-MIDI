@@ -13,6 +13,8 @@ export const QuickSettingsDropdown: React.FC = () => {
   const {
     keyboardSize,
     setKeyboardSize,
+    keyboardHeight,
+    setKeyboardHeight,
     octaveShift,
     incrementOctave,
     decrementOctave,
@@ -65,7 +67,33 @@ export const QuickSettingsDropdown: React.FC = () => {
         </div>
       </div>
 
-      {/* 2. Octave Shift with [-] [Oct 0] [+] */}
+      {/* 2. Piano Key Height / Scale */}
+      <div className="space-y-1.5">
+        <label className="text-slate-500 dark:text-zinc-400 font-medium">
+          Piano Key Height:
+        </label>
+        <div className="grid grid-cols-3 gap-1.5 bg-slate-100 dark:bg-zinc-900 p-1 rounded-xl border border-slate-200 dark:border-zinc-800">
+          {[
+            { label: 'Compact', h: 170 },
+            { label: 'Standard', h: 220 },
+            { label: 'Grand', h: 280 }
+          ].map((preset) => (
+            <button
+              key={preset.label}
+              onClick={() => setKeyboardHeight(preset.h)}
+              className={`py-1 rounded-lg text-xs font-medium transition-all ${
+                keyboardHeight === preset.h
+                  ? 'bg-indigo-600 text-white font-bold shadow-sm'
+                  : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              {preset.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* 3. Octave Shift with [-] [Oct 0] [+] */}
       <div className="space-y-1.5">
         <label className="text-slate-500 dark:text-zinc-400 font-medium">
           Octave Shift:
