@@ -1,89 +1,107 @@
-# LightSync v2 — M5Stack Core Firmware (Arduino IDE)
+# LightSync v2 — M5Stack Core Firmware (Arduino IDE & M5Unified)
+### Built for Team XLR8 | RMK Innovate Hackathon 2026
 
-This directory contains the ready-to-upload Arduino sketch for the **M5Stack Core (ESP32)** hardware runtime driving the **WS2812B addressable LED strip** (144 LEDs/m).
+This directory contains the complete, ready-to-upload Arduino sketch for the **M5Stack Core (ESP32)** hardware runtime driving the **WS2812B addressable LED strip** (144 LEDs/m), powered by the modern **M5Unified** library.
 
 ---
 
-## 1. Hardware Pinout & Wiring
+## 1. Features & Capabilities
 
-| Component | Pin / Signal | M5Stack Core Connection | Notes |
+- **M5Unified Library**: Compatible with M5Stack Basic, Gray, Core, Core2, Fire, and CoreS3!
+- **On-Screen Live Optical Simulation**: A real-time 288-pixel virtual LED strip rendered directly on the 320x240 LCD at 30+ FPS, showing the exact optical effects even without physical LEDs connected.
+- **Harmonic Chord Readout**: Real-time detected chord display (`C Major`, `A Minor`, `F#7`, etc.) synchronized directly from the Python AI/Chord Engine.
+- **Team XLR8 Branding**: High-tech cyber aesthetic with Team XLR8 hackathon badge and LightSync v2 logo.
+- **All 9 Software Effects**:
+  1. `BOUNCE`: Ballistic particle mass with damping rebound.
+  2. `RIPPLE`: Expanding circular wave crest with thickness.
+  3. `PULSE`: Radial breathing envelope expanding and contracting.
+  4. `HOLD AURA`: Sustained luminous radiance from held keys.
+  5. `CYBER GLITCH`: High-energy stochastic digital noise and scanlines.
+  6. `SPARK BURST`: Explosive kinetic scatter.
+  7. `SPRINKLE`: Twinkling starlight / fairy dust fade.
+  8. `NEON RAIN`: Directional comet streaks with trailing tails.
+  9. `HARMONIC WAVE`: Continuous spatial sine wave ripple.
+- **7 Visual Sync Color Presets**:
+  - *Cyberpunk Neon* (Cyan & Hot Magenta)
+  - *Synthwave Sunset* (Golden Amber & Deep Violet)
+  - *Emerald Matrix* (Mint & Luminous Teal)
+  - *Sunset Horizon* (Rose Red & Warm Peach)
+  - *Electric Indigo* (Indigo & Cobalt Sky)
+  - *Crimson Nova* (Flame Red & Blaze Orange)
+  - *Pitch Spectrum* (Dynamic Chromatic Frequency)
+- **Interactive On-Device Controls**:
+  - **Button [A] (Left)**: Single click cycles Effects; **Hold >500ms** cycles Color Sync Presets!
+  - **Button [B] (Center)**: Steps brightness (50 $\rightarrow$ 100 $\rightarrow$ 160 $\rightarrow$ 220 $\rightarrow$ 255).
+  - **Button [C] (Right)**: Plays a live musical Arpeggio Demo (C-E-G-C) with speaker audio chime!
+
+---
+
+## 2. Hardware Pinout & Wiring
+
+| Component | Pin / Signal | M5Stack Connection | Notes |
 | :--- | :--- | :--- | :--- |
-| **WS2812B Data (DIN)** | Data In | **GPIO 21** (Pin G21 on bottom header) | 330Ω - 470Ω resistor recommended in series |
+| **WS2812B Data (DIN)** | Data In | **GPIO 21** (Pin G21 on bottom header / Grove Port) | 330Ω–470Ω resistor recommended in series |
 | **WS2812B Ground (GND)** | Ground | **GND** | Must share common ground with M5Stack & power supply |
 | **WS2812B Power (+5V)** | +5V | **External 5V Power Supply** (5V 4A+) | **Do NOT power 144 LEDs directly from M5Stack 5V pin!** |
 
 > [!CAUTION]
-> **Power Injection Warning**: A 144-LED strip draws up to ~8.6 Amps at full white (60mA per pixel). Even with software brightness capping (max 200/255), provide an external 5V 4A+ DC supply and inject 5V/GND at both ends of the strip to prevent voltage drop and brownouts.
+> **Power Supply Requirement**: A 144-LED strip draws up to ~8.6 Amps at full white (60mA per pixel). Even with software brightness capping, use an external 5V 4A+ DC power brick and connect GND together with M5Stack.
 
 ---
 
-## 2. Arduino Sketch Structure
+## 3. Sketch Folder Structure
 
-In Arduino IDE, the sketch folder name **must match** the main `.ino` file. Everything is structured for direct loading:
+In Arduino IDE, the sketch folder name must match the main `.ino` file:
 
 ```
 firmware/
 └── LightSync_M5Core/
     ├── LightSync_M5Core.ino     # Main Arduino sketch (setup, loop, serial handler)
-    ├── config.h                 # Pin definitions (Pin 21), defaults, runtime state
+    ├── config.h                 # Pin definitions (Pin 21), presets, runtime state
     ├── protocol.h               # High-speed serial CLI & JSON command parser
-    ├── effects.h                # FastLED effect engine (Bounce, Ripple, Pulse, Hold, etc.)
-    └── ui.h                     # M5Stack LCD Mini UI & physical button handlers (A, B, C)
+    ├── effects.h                # FastLED effect engine (Bounce, Ripple, Pulse, etc.)
+    └── ui.h                     # M5Unified LCD UI, live visualizer & button handlers
 ```
 
 ---
 
-## 3. How to Open and Upload in Arduino IDE
+## 4. How to Open and Upload in Arduino IDE
 
-### Step 1: Open Sketch
-1. Launch **Arduino IDE** (v1.8.x or v2.x).
-2. Click **File $\rightarrow$ Open...**
-3. Navigate to:
-   ```
-   firmware/LightSync_M5Core/LightSync_M5Core.ino
-   ```
-4. All tabs (`config.h`, `protocol.h`, `effects.h`, `ui.h`) will automatically appear as top tabs in Arduino IDE.
+### Step 1: Install Arduino IDE
+Ensure you have **Arduino IDE 2.x** (or 1.8.19+).
 
-### Step 2: Install Board Package
-If not already installed:
-1. Open **File $\rightarrow$ Preferences**.
-2. In **Additional Boards Manager URLs**, add:
+### Step 2: Install ESP32 Board Package
+1. In Arduino IDE, go to **File $\rightarrow$ Preferences**.
+2. In **Additional Boards Manager URLs**, paste:
    ```
    https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
    ```
-3. Go to **Tools $\rightarrow$ Board $\rightarrow$ Boards Manager...**, search for `esp32` by Espressif, and install it.
-4. Select **Tools $\rightarrow$ Board $\rightarrow$ ESP32 Arduino $\rightarrow$ M5Stack-Core-ESP32**.
+3. Go to **Tools $\rightarrow$ Board $\rightarrow$ Boards Manager...**, search for `esp32` by **Espressif**, and install version **2.0.x or 3.x**.
+4. Select **Tools $\rightarrow$ Board $\rightarrow$ ESP32 Arduino $\rightarrow$ M5Stack-Core-ESP32** (or `M5Stack Core2` if using Core2).
 
 ### Step 3: Install Required Libraries
-Open **Tools $\rightarrow$ Manage Libraries...** and install:
-1. **M5Stack** (by M5Stack)
-2. **FastLED** (by Daniel Garcia)
-3. **ArduinoJson** (by Benoit Blanchon, v7.x or v6.x)
+Open **Tools $\rightarrow$ Manage Libraries...** (Ctrl+Shift+I) and install:
+1. **M5Unified** (by M5Stack) — *Latest version*
+2. **FastLED** (by Daniel Garcia) — *v3.6.0 or higher*
+3. **ArduinoJson** (by Benoît Blanchon) — *v6.x or v7.x*
 
-### Step 4: Upload
-1. Connect your M5Stack Core via USB-C.
-2. Select your device port under **Tools $\rightarrow$ Port** (e.g. `COM3` on Windows).
-3. Set **Upload Speed** to `921600` (or `115200` if upload fails).
-4. Click the **Upload** button ($\rightarrow$).
-5. Once uploaded, open **Tools $\rightarrow$ Serial Monitor** set to **115200 baud**. You will see:
+### Step 4: Open the Sketch
+1. Click **File $\rightarrow$ Open...**
+2. Browse to:
    ```
-   LIGHTSYNC_M5_READY version=2.0 board=M5Stack_Core
+   firmware/LightSync_M5Core/LightSync_M5Core.ino
    ```
+3. All 4 accompanying header files (`config.h`, `protocol.h`, `effects.h`, `ui.h`) will automatically open in separate tabs.
 
----
-
-## 4. Supported Effects Engine
-
-The local effect engine runs at 60+ FPS independently of the serial connection:
-1. **Bounce**: Ballistic particle mass with damping bounce off strip boundaries.
-2. **Ripple**: Expanding sinusoidal ring crest wave.
-3. **Pulse**: Radial breathing envelope expanding and contracting.
-4. **Hold Aura (`hold_beam`)**: Sustained illumination with reactive spark emitters while keys remain pressed.
-5. **Cyber Glitch**: Stochastic digital bit noise.
-6. **Spark Burst**: Explosive velocity scatter.
-7. **Sprinkle Glow**: Twinkling star / glitter fade.
-8. **Neon Rain**: Directional comet particles with trailing tails.
-9. **Harmonic Wave**: Continuous spatial sine wave ripple.
+### Step 5: Select Port & Upload
+1. Connect your M5Stack Core to your computer with the USB-C cable.
+2. Select your device port under **Tools $\rightarrow$ Port** (e.g. `COM3` on Windows, `/dev/ttyUSB0` on Linux/macOS).
+3. Set **Upload Speed** to `921600` (or `115200` if connection is noisy).
+4. Click **Upload** ($\rightarrow$).
+5. After upload finishes, the screen will light up with the **LIGHTSYNC v2.0 | Team XLR8** dashboard, and the Serial Monitor at **115200 baud** will print:
+   ```
+   LIGHTSYNC_M5_READY version=2.0 board=M5Stack_Core team=XLR8 lib=M5Unified
+   ```
 
 ---
 
@@ -92,24 +110,29 @@ The local effect engine runs at 60+ FPS independently of the serial connection:
 ### Real-Time Music Events
 - `NOTE_ON <midi_pitch> <velocity>` (e.g. `NOTE_ON 60 100`)
 - `NOTE_OFF <midi_pitch>` (e.g. `NOTE_OFF 60`)
+- `CHORD <name>` (e.g. `CHORD C Major`, `CHORD Am`, `CHORD Ready`)
 
-### Effect & Parameter Sync (CLI Format)
-- `EFFECT <name>` (e.g. `EFFECT ripple`)
-- `speed=<float>` (e.g. `speed=1.20`)
+### Effect & Parameter Controls
+- `EFFECT <name>` (e.g. `EFFECT glitch`, `EFFECT ripple`, `EFFECT wave`)
+- `PRESET <name>` (e.g. `PRESET cyberpunk`, `PRESET synthwave`, `PRESET emerald`)
+- `speed=<float>` (e.g. `speed=1.50`)
 - `decay=<float>` (e.g. `decay=0.85`)
-- `spread=<float>` (e.g. `spread=3.5`)
-- `brightness=<0-255>` (e.g. `brightness=180`)
-- `color=<r>,<g>,<b>` (e.g. `color=0,240,255`)
+- `spread=<float>` (e.g. `spread=3.0`)
+- `brightness=<0-255>` (e.g. `brightness=200`)
+- `color=<r>,<g>,<b>` (Primary RGB, e.g. `color=0,240,255`)
+- `color2=<r>,<g>,<b>` (Secondary RGB, e.g. `color2=236,72,153`)
 - `rainbow=<0|1>`
 - `leds=<count>` (e.g. `leds=144`)
 
 ### Diagnostic Commands
-- `PING` $\rightarrow$ Responds with `PONG LIGHTSYNC_M5 CORE FPS=<fps>`
-- `STATUS` $\rightarrow$ Responds with full parameter dump
+- `PING` $\rightarrow$ Responds with `PONG LIGHTSYNC_M5 CORE FPS=<fps> TEAM=XLR8`
+- `STATUS` $\rightarrow$ Responds with full parameter telemetry
+- JSON Payloads: Supports `{ "effect": "spark", "speed": 1.4, "brightness": 200, "chord": "C Major", "color": [0, 240, 255] }`
 
 ---
 
-## 6. M5Stack Physical Controls
-- **Button A (Left)**: Cycle active effect locally.
-- **Button B (Center)**: Cycle brightness presets (50, 100, 150, 200, 250).
-- **Button C (Right)**: Trigger local test note (Middle C) without PC connected.
+## 6. On-Device Button Commands
+- **[A] Click**: Next Visual Effect (sends `EVENT EFFECT_CHANGED` to PC)
+- **[A] Hold (>500ms)**: Next Color Sync Preset (sends `EVENT PRESET_CHANGED` to PC)
+- **[B] Click**: Cycle Brightness levels (50 $\rightarrow$ 100 $\rightarrow$ 160 $\rightarrow$ 220 $\rightarrow$ 255)
+- **[C] Click**: Trigger Test Arpeggio (C-E-G-C chord) with audio chime

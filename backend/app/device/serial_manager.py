@@ -120,10 +120,18 @@ class SerialDeviceManager:
         pitch = data.get("pitch", 60)
         vel = data.get("velocity", 100)
         self.send_raw(ProtocolBuilder.note_on(pitch, vel))
+        chord = data.get("chord")
+        if chord and isinstance(chord, dict) and "chord" in chord:
+            self.send_raw(ProtocolBuilder.chord(chord["chord"]))
 
     def _on_note_off(self, data: Dict[str, Any]):
         pitch = data.get("pitch", 60)
         self.send_raw(ProtocolBuilder.note_off(pitch))
+        chord = data.get("chord")
+        if chord and isinstance(chord, dict) and "chord" in chord:
+            self.send_raw(ProtocolBuilder.chord(chord["chord"]))
+        elif data.get("active_count", 0) == 0:
+            self.send_raw(ProtocolBuilder.chord("Ready"))
 
     def _on_effect_changed(self, data: Dict[str, Any]):
         eff = data.get("effect", "bounce")

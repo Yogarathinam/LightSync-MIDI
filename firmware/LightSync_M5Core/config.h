@@ -2,12 +2,16 @@
 
 #include <Arduino.h>
 
-// ==========================================
-// LightSync M5Stack Core Hardware Configuration
-// ==========================================
+// =========================================================================
+// LightSync v2 — M5Stack Core Firmware Configuration
+// Designed for Team XLR8 | RMK Innovate Hackathon 2026
+// Hardware: M5Stack Core / Core2 / Fire / CoreS3 (ESP32) + WS2812B LED Strip
+// =========================================================================
 
-// WS2812B Data Pin (Pin 21 on M5Stack Core bottom header)
+// WS2812B Data Output Pin (Pin 21 on M5Stack Core bottom header / Grove port)
+#ifndef LED_DATA_PIN
 #define LED_DATA_PIN 21
+#endif
 
 // Default LED strip configuration
 #define DEFAULT_LED_COUNT 144
@@ -15,7 +19,7 @@
 
 // Serial Communication
 #define SERIAL_BAUD_RATE 115200
-#define SERIAL_RX_BUFFER_SIZE 256
+#define SERIAL_RX_BUFFER_SIZE 512
 
 // Default Effect Parameters
 #define DEFAULT_BRIGHTNESS 180
@@ -23,12 +27,16 @@
 #define DEFAULT_DECAY 0.85f
 #define DEFAULT_SPREAD 3.0f
 
-// Color Defaults (Cyan)
+// Color Defaults (Electric Cyan & Hot Magenta - Cyberpunk Neon)
 #define DEFAULT_COLOR_R 0
 #define DEFAULT_COLOR_G 240
 #define DEFAULT_COLOR_B 255
 
-// Effect Types Enum
+#define DEFAULT_SEC_R 236
+#define DEFAULT_SEC_G 72
+#define DEFAULT_SEC_B 153
+
+// 9 Visual Effects matching Web Studio
 enum EffectType {
     EFFECT_BOUNCE = 0,
     EFFECT_RIPPLE,
@@ -42,22 +50,48 @@ enum EffectType {
     EFFECT_COUNT
 };
 
+// 7 Preset Color Schemes matching Web Studio
+enum ColorPresetId {
+    PRESET_CYBERPUNK = 0,
+    PRESET_SYNTHWAVE,
+    PRESET_EMERALD,
+    PRESET_SUNSET,
+    PRESET_INDIGO,
+    PRESET_CRIMSON,
+    PRESET_SPECTRUM,
+    PRESET_COUNT
+};
+
 // Runtime configuration state
 struct DeviceConfig {
     EffectType currentEffect = EFFECT_BOUNCE;
+    ColorPresetId currentPreset = PRESET_CYBERPUNK;
     float speed = DEFAULT_SPEED;
     float decay = DEFAULT_DECAY;
     float spread = DEFAULT_SPREAD;
     uint8_t brightness = DEFAULT_BRIGHTNESS;
     bool rainbow = false;
+    
+    // Primary Color (RGB)
     uint8_t primaryR = DEFAULT_COLOR_R;
     uint8_t primaryG = DEFAULT_COLOR_G;
     uint8_t primaryB = DEFAULT_COLOR_B;
-    uint8_t secondaryR = 255;
-    uint8_t secondaryG = 0;
-    uint8_t secondaryB = 127;
+
+    // Secondary Color (RGB)
+    uint8_t secondaryR = DEFAULT_SEC_R;
+    uint8_t secondaryG = DEFAULT_SEC_G;
+    uint8_t secondaryB = DEFAULT_SEC_B;
+
     uint16_t ledCount = DEFAULT_LED_COUNT;
-    uint8_t keyCount = 61;
+    uint8_t keyCount = 61;       // 25, 49, 61, or 88 keys
+    
+    // Live Performance Readouts
+    char currentChord[24] = "Ready";
+    uint8_t lastPitch = 60;
+    uint8_t lastVelocity = 0;
+    uint32_t lastNoteTime = 0;
+
+    // Connectivity Status
     bool pcConnected = false;
     bool midiConnected = false;
     char activeMidiPort[32] = "Virtual / None";

@@ -19,6 +19,14 @@ class ProtocolBuilder:
         return f"EFFECT {effect_name}\n"
 
     @staticmethod
+    def chord(chord_name: str) -> str:
+        return f"CHORD {chord_name}\n"
+
+    @staticmethod
+    def preset(preset_name: str) -> str:
+        return f"PRESET {preset_name}\n"
+
+    @staticmethod
     def set_param(param_name: str, value: Union[int, float, bool, str]) -> str:
         if isinstance(value, bool):
             val_str = "1" if value else "0"
