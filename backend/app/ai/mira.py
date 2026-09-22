@@ -204,6 +204,16 @@ class MiraAssistant:
         late_count = ratings.get("LATE", 0)
         miss_count = ratings.get("MISS", 0)
 
+        recorded_notes = session_data.get("recorded_notes") or session_data.get("notes_detail") or []
+        notes_log_str = ""
+        if recorded_notes:
+            notes_log_str = "- Recorded Note Attempts: " + "; ".join(
+                f"#{i+1} {n.get('note_name', 'Note')} m.{n.get('measure', 1)}: " +
+                (f"HIT [{n.get('rating', 'PERFECT')}, offset: {n.get('deviation_ms', 0)}ms, vel: {n.get('velocity', 90)}]" if n.get("is_correct")
+                 else f"WRONG (struck {n.get('note_name', n.get('played_pitch'))}, expected {n.get('expected_name', n.get('expected_pitch'))})")
+                for i, n in enumerate(recorded_notes[:35])
+            ) + "\n"
+
         # Build prompt for Gemini Relay
         prompt = (
             f"You are MIRA — Musical Intelligence & Rhythm Assistant, an expert classical and jazz piano tutor. "
@@ -212,7 +222,8 @@ class MiraAssistant:
             f"- Average Timing Deviation: {avg_dev:+.1f} ms\n"
             f"- Timing Counts: Perfect: {perfect_count}, Good: {good_count}, Early: {early_count}, Late: {late_count}, Misses: {miss_count}\n"
             f"- Average Key Velocity: {avg_vel}/127\n"
-            f"- Problematic Measures: {problem_measures}\n\n"
+            f"- Problematic Measures: {problem_measures}\n"
+            f"{notes_log_str}\n"
             f"Respond in concise JSON with fields: headline (string), tone (string), summary (string), timing_diagnosis (string), drills (array of {{title, action}})."
         )
 
@@ -298,11 +309,19 @@ class MiraAssistant:
         accuracy = telemetry.get("accuracyPct", 85)
         problem_measures = telemetry.get("problemMeasures", [1, 2])
         avg_dev = telemetry.get("avgDeviationMs", 14)
+        recorded_notes = telemetry.get("recordedNotes", [])
+        notes_str = ""
+        if recorded_notes:
+            notes_str = f"Recorded note attempts: " + "; ".join(
+                f"#{i+1} {n.get('note_name', 'Note')} ({'HIT ' + str(n.get('deviation_ms', 0)) + 'ms' if n.get('is_correct') else 'WRONG exp ' + str(n.get('expected_name', ''))})"
+                for i, n in enumerate(recorded_notes[:25])
+            ) + ".\n"
 
         relay_prompt = (
             f"You are MIRA — Musical Intelligence & Rhythm Assistant. "
             f"Generate a personalized 4-phase piano learning curriculum for '{song_title}' (BPM: {bpm}, Key: {key}).\n"
             f"Student Telemetry: Accuracy: {accuracy}%, Timing offset: {avg_dev}ms, Problem measures: {problem_measures}.\n"
+            f"{notes_str}"
             f"Custom goal: {prompt or 'Master smooth transitions and steady tempo'}.\n\n"
             f"Return JSON with: songTitle (string), headline (string), summary (string), "
             f"steps: array of 4 objects with: step (1-4), title (string), description (string), tempoScale (int 50-120), hand ('both'|'left'|'right'), loopSection ('all'|'m1_4'|'m5_8'), targetGoal (string)."
@@ -383,6 +402,13 @@ class MiraAssistant:
         hits = telemetry.get("hits", 0)
         misses = telemetry.get("misses", 0)
         problems = telemetry.get("problemMeasures", [])
+        recorded_notes = telemetry.get("recordedNotes", [])
+        notes_log = ""
+        if recorded_notes:
+            notes_log = f"- Recent Note Attempts ({len(recorded_notes)} notes): " + "; ".join(
+                f"#{i+1} {n.get('note_name', 'Note')} ({'HIT ' + str(n.get('deviation_ms', 0)) + 'ms' if n.get('is_correct') else 'WRONG exp ' + str(n.get('expected_name', ''))})"
+                for i, n in enumerate(recorded_notes[:25])
+            ) + "\n"
 
         user_query = messages[-1].get("text", "") if messages else "How can I improve my timing?"
 
@@ -392,7 +418,8 @@ class MiraAssistant:
             f"- Current Song: {song_title}\n"
             f"- Note Accuracy: {accuracy}% ({hits} hits, {misses} misses)\n"
             f"- Timing Tendency: {avg_dev:+.1f} ms deviation\n"
-            f"- Problematic Measures: {problems}\n\n"
+            f"- Problematic Measures: {problems}\n"
+            f"{notes_log}\n"
             f"Student Query: \"{user_query}\"\n\n"
             f"Give a direct, encouraging, and musically expert answer with practical technique tips (finger posture, metronome, breath, touch)."
         )

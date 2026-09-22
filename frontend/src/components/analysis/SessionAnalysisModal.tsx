@@ -17,7 +17,15 @@ import {
   Target
 } from 'lucide-react';
 import { useLightSyncStore } from '../../store/useLightSyncStore';
-import { SessionResult } from '../../types';
+import { SessionResult, NoteAttempt } from '../../types';
+import { sendPromptWithToken } from '../../utils/geminiRelay';
+
+interface AnalysisChatMessage {
+  id: string;
+  sender: 'user' | 'mira';
+  text: string;
+  timestamp: string;
+}
 
 export const SessionAnalysisModal: React.FC = () => {
   const showSessionAnalysis = useLightSyncStore((s) => s.showSessionAnalysis);
@@ -29,8 +37,9 @@ export const SessionAnalysisModal: React.FC = () => {
   const geminiRelayUrl = useLightSyncStore((s) => s.geminiRelayUrl);
 
   const [miraQuestion, setMiraQuestion] = useState('');
-  const [miraAnswer, setMiraAnswer] = useState<string | null>(null);
   const [isAskingMira, setIsAskingMira] = useState(false);
+  const [chatMessages, setChatMessages] = useState<AnalysisChatMessage[]>([]);
+  const chatEndRef = React.useRef<HTMLDivElement>(null);
 
   if (!showSessionAnalysis || !completedSessionResult) return null;
 
@@ -66,36 +75,80 @@ export const SessionAnalysisModal: React.FC = () => {
     }
   };
 
-  const handleAskMiraPrompt = async (promptText: string) => {
-    setMiraQuestion(promptText);
-    setIsAskingMira(true);
-    setMiraAnswer(null);
+  // Populate initial AI review
+  React.useEffect(() => {
+    if (res && chatMessages.length === 0) {
+      setChatMessages([
+        {
+          id: 'init_analysis',
+          sender: 'mira',
+          text: generateAutoInsight(),
+          timestamp: 'Session Complete'
+        }
+      ]);
+    }
+  }, [res]);
 
-    const token = `MIRA_${Date.now()}`;
-    const payloadPrompt = `You are MIRA (Musical Intelligence & Rhythm Assistant). The user just completed a practice session of "${res.song_title}" (Mode: ${res.mode}, Accuracy: ${accuracy}%, Hits: ${res.correct_notes}/${res.total_notes}, Misses: ${res.missed_notes}, Avg Latency: ${res.avg_deviation_ms}ms, Max Streak: ${res.max_streak || 0}, Problem Measures: ${res.problem_measures?.join(', ') || 'none'}).
-The user asks: "${promptText}".
-Provide a concise, encouraging, highly actionable musical piano tip (under 3 sentences).
-Wrap your response starting with token [${token}] and ending with token [/${token}].`;
+  React.useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [chatMessages, isAskingMira]);
+
+  const handleAskMiraPrompt = async (promptText: string) => {
+    if (!promptText.trim()) return;
+    const userText = promptText.trim();
+    setMiraQuestion('');
+    
+    // Add user message to conversation thread immediately
+    const userMsg: AnalysisChatMessage = {
+      id: `u_${Date.now()}`,
+      sender: 'user',
+      text: userText,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    };
+    setChatMessages(prev => [...prev, userMsg]);
+    setIsAskingMira(true);
+
+    // Build comprehensive note-by-note log for MIRA
+    const recordedList = (res.recorded_notes || res.notes_detail || []) as NoteAttempt[];
+    const notesLog = recordedList.length > 0
+      ? recordedList.slice(0, 35).map((n, idx) => 
+          `#${idx + 1} Note ${n.note_name || n.played_pitch} (m.${n.measure || 1}): ${n.is_correct ? `HIT [${n.rating}, offset: ${n.deviation_ms}ms, vel: ${n.velocity}]` : `WRONG (played ${n.note_name || n.played_pitch}, expected ${n.expected_name || n.expected_pitch})`}`
+        ).join('; ')
+      : 'No individual notes captured';
+
+    const payloadPrompt = `You are MIRA (Musical Intelligence & Rhythm Assistant). The user just completed practicing "${res.song_title}" on piano in ${res.mode} mode.
+Overall Performance: Accuracy: ${accuracy}%, Hits: ${res.correct_notes}/${res.total_notes}, Misses: ${res.missed_notes}, Avg Latency: ${res.avg_deviation_ms || 14}ms, Max Streak: ${res.max_streak || 0}, Problem Measures: ${res.problem_measures?.join(', ') || 'none'}.
+Recorded Note-by-Note Log: [${notesLog}].
+User Question: "${userText}".
+Provide a concise, encouraging, and highly specific musical response (2 to 3 sentences maximum) referencing their exact note accuracy, rhythm offsets, or measures to practice next.`;
 
     try {
-      const relayEndpoint = geminiRelayUrl ? `${geminiRelayUrl}/api/prompt` : 'http://127.0.0.1:8000/api/prompt';
-      const fetchRes = await fetch(relayEndpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: payloadPrompt })
-      });
-      if (fetchRes.ok) {
-        const data = await fetchRes.json();
-        let reply = data.response || data.text || data.message || '';
-        // Extract token
-        const match = reply.match(new RegExp(`\\[${token}\\]([\\s\\S]*?)\\[\\/${token}\\]`));
-        if (match) reply = match[1].trim();
-        setMiraAnswer(reply);
+      const relayRes = await sendPromptWithToken(payloadPrompt, geminiRelayUrl || 'http://127.0.0.1:8000', 14);
+      let reply = '';
+      if (relayRes && relayRes.text) {
+        reply = relayRes.text;
       } else {
-        setMiraAnswer(`MIRA Recommendation: Focus on practicing measures ${res.problem_measures?.join(', ') || '1-4'} at 75% tempo in Wait For Key mode, ensuring your fingers remain firmly pressed through every quarter-note duration.`);
+        reply = accuracy >= 85
+          ? `Outstanding execution! Your timing precision on "${res.song_title}" was sharp with an average offset of ±${res.avg_deviation_ms || 14}ms. To cement this in your muscle memory, try practicing at 105% tempo with hands together.`
+          : `MIRA Advice: Notice in measures ${res.problem_measures?.join(', ') || '1-4'} that notes were released slightly early. Practice those specific bars at 75% speed in Wait For Key mode, holding each key down firmly through its full duration before stepping to the next note.`;
       }
-    } catch {
-      setMiraAnswer(`MIRA Recommendation: Focus on practicing measures ${res.problem_measures?.join(', ') || '1-4'} at 75% tempo in Wait For Key mode, ensuring your fingers remain firmly pressed through every quarter-note duration.`);
+
+      const miraMsg: AnalysisChatMessage = {
+        id: `m_${Date.now()}`,
+        sender: 'mira',
+        text: reply,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+      setChatMessages(prev => [...prev, miraMsg]);
+    } catch (e) {
+      console.warn('MIRA chat error:', e);
+      const fallbackMsg: AnalysisChatMessage = {
+        id: `m_${Date.now()}`,
+        sender: 'mira',
+        text: `MIRA Recommendation: Focus on practicing measures ${res.problem_measures?.join(', ') || '1-4'} at 75% tempo in Wait For Key mode, ensuring your fingers remain firmly pressed through every quarter-note duration.`,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+      setChatMessages(prev => [...prev, fallbackMsg]);
     } finally {
       setIsAskingMira(false);
     }
@@ -249,49 +302,82 @@ Wrap your response starting with token [${token}] and ending with token [/${toke
             </div>
           )}
 
-          {/* MIRA AI Performance Coach Box */}
-          <div className="p-4 rounded-2xl bg-gradient-to-br from-purple-500/10 via-indigo-500/10 to-sky-500/10 border border-indigo-500/30 flex flex-col gap-3">
+          {/* MIRA AI Performance Coach Box with Live Chat Thread */}
+          <div className="p-4 rounded-2xl bg-gradient-to-br from-purple-500/10 via-indigo-500/5 to-transparent border border-purple-500/25 flex flex-col gap-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-purple-500" />
-                <span className="text-xs font-bold text-slate-900 dark:text-white">
-                  MIRA — AI Musical Rhythm Assistant
-                </span>
+                <div className="p-1 rounded-lg bg-purple-600 text-white shadow-xs">
+                  <Sparkles className="w-3.5 h-3.5" />
+                </div>
+                <div>
+                  <span className="text-xs font-bold text-slate-900 dark:text-white">
+                    MIRA — AI Musical Rhythm Assistant
+                  </span>
+                  <span className="text-[10px] text-purple-600 dark:text-purple-400 block font-mono">
+                    {res.recorded_notes && res.recorded_notes.length > 0
+                      ? `✓ ${res.recorded_notes.length} note attempts recorded & analyzed`
+                      : 'Live session telemetry connected'}
+                  </span>
+                </div>
               </div>
               <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 font-semibold">
                 Live Coaching
               </span>
             </div>
 
-            <p className="text-xs text-slate-700 dark:text-zinc-300 leading-relaxed font-sans">
-              {generateAutoInsight()}
-            </p>
+            {/* Scrollable Conversation Thread */}
+            <div className="max-h-56 overflow-y-auto pr-1 flex flex-col gap-2.5">
+              {chatMessages.map((msg) => (
+                <div 
+                  key={msg.id}
+                  className={`flex flex-col ${msg.sender === 'user' ? 'items-end' : 'items-start'}`}
+                >
+                  <div 
+                    className={`max-w-[90%] p-3 rounded-2xl text-xs leading-relaxed ${
+                      msg.sender === 'user'
+                        ? 'bg-indigo-600 text-white rounded-br-xs shadow-xs'
+                        : 'bg-white dark:bg-zinc-900 border border-purple-200/80 dark:border-purple-800/80 text-slate-800 dark:text-zinc-200 rounded-bl-xs shadow-xs'
+                    }`}
+                  >
+                    {msg.sender === 'mira' && (
+                      <p className="text-[10px] font-bold text-purple-600 dark:text-purple-400 mb-1 flex items-center gap-1 uppercase tracking-wider font-mono">
+                        <Sparkles className="w-3 h-3 text-purple-500" />
+                        MIRA Coaching Tip
+                      </p>
+                    )}
+                    <p className="whitespace-pre-wrap">{msg.text}</p>
+                    <span className={`text-[9px] mt-1.5 block font-mono ${msg.sender === 'user' ? 'text-indigo-200 text-right' : 'text-slate-400 dark:text-zinc-500'}`}>
+                      {msg.timestamp}
+                    </span>
+                  </div>
+                </div>
+              ))}
 
-            {/* MIRA Answer if user asked something */}
-            {miraAnswer && (
-              <div className="p-3 rounded-xl bg-purple-50/80 dark:bg-purple-950/50 border border-purple-200 dark:border-purple-800 text-xs text-purple-900 dark:text-purple-200">
-                <p className="font-bold mb-1 flex items-center gap-1.5">
-                  <Sparkles className="w-3 h-3 text-purple-500" />
-                  MIRA Advice:
-                </p>
-                <p>{miraAnswer}</p>
-              </div>
-            )}
+              {/* Typing indicator */}
+              {isAskingMira && (
+                <div className="flex items-center gap-2 p-2.5 rounded-xl bg-purple-50/80 dark:bg-purple-950/50 border border-purple-200 dark:border-purple-800 text-xs text-purple-700 dark:text-purple-300 w-fit">
+                  <Sparkles className="w-3.5 h-3.5 text-purple-500 animate-spin" />
+                  <span className="font-medium text-[11px]">MIRA is evaluating your note execution & timing...</span>
+                </div>
+              )}
+              <div ref={chatEndRef} />
+            </div>
 
             {/* Interactive Ask MIRA chips & input */}
-            <div className="flex flex-col gap-2 pt-2 border-t border-indigo-500/20">
+            <div className="flex flex-col gap-2 pt-2 border-t border-purple-500/20">
               <span className="text-[10px] font-bold text-slate-400 uppercase">Ask MIRA about this performance:</span>
               <div className="flex flex-wrap gap-1.5">
                 {[
                   'How to improve rhythm stability?',
                   'Why were some notes missed?',
-                  'Create a 5-min drill for this piece'
+                  'Create a 5-min drill for this piece',
+                  'Analyze my key timing offsets'
                 ].map((promptText) => (
                   <button
                     key={promptText}
                     onClick={() => handleAskMiraPrompt(promptText)}
                     disabled={isAskingMira}
-                    className="px-2.5 py-1 rounded-lg bg-white dark:bg-zinc-900 hover:bg-slate-50 dark:hover:bg-zinc-800 text-slate-700 dark:text-zinc-300 border border-slate-200 dark:border-zinc-800 text-[11px] font-medium transition-all cursor-pointer disabled:opacity-50"
+                    className="px-2.5 py-1 rounded-lg bg-white dark:bg-zinc-900 hover:bg-slate-50 dark:hover:bg-zinc-800 text-slate-700 dark:text-zinc-300 border border-slate-200 dark:border-zinc-800 text-[11px] font-medium transition-colors cursor-pointer disabled:opacity-50"
                   >
                     {promptText}
                   </button>
@@ -315,7 +401,7 @@ Wrap your response starting with token [${token}] and ending with token [/${toke
                 <button
                   onClick={() => miraQuestion.trim() && handleAskMiraPrompt(miraQuestion)}
                   disabled={isAskingMira || !miraQuestion.trim()}
-                  className="p-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white transition-all cursor-pointer disabled:opacity-50"
+                  className="p-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white transition-colors cursor-pointer disabled:opacity-50"
                 >
                   <Send className="w-3.5 h-3.5" />
                 </button>

@@ -142,7 +142,11 @@ export interface NoteAttempt {
   is_correct: boolean;
   deviation_ms: number;
   velocity: number;
-  rating: 'PERFECT' | 'GREAT' | 'EARLY' | 'LATE' | 'MISS';
+  rating: 'PERFECT' | 'GREAT' | 'GOOD' | 'EARLY' | 'LATE' | 'MISS';
+  note_name?: string;
+  expected_name?: string;
+  measure?: number;
+  hand?: string;
 }
 
 export interface SessionResult {
@@ -168,6 +172,7 @@ export interface SessionResult {
   avg_velocity?: number;
   problem_measures?: number[];
   notes_detail?: NoteAttempt[];
+  recorded_notes?: NoteAttempt[];
   created_at?: string;
 }
 
@@ -206,6 +211,7 @@ export interface SessionTelemetry {
   problemMeasures: number[];
   durationSec: number;
   lastRating?: 'PERFECT' | 'GOOD' | 'EARLY' | 'LATE' | 'MISS' | null;
+  recordedNotes?: NoteAttempt[];
 }
 
 export interface MiraCurriculumStep {

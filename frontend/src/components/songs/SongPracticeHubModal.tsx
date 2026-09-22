@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { useLightSyncStore } from '../../store/useLightSyncStore';
 import { SongItem, SessionResult } from '../../types';
+import { sendPromptWithToken } from '../../utils/geminiRelay';
 
 interface SongPracticeHubModalProps {
   song: SongItem | null;
@@ -123,25 +124,14 @@ export const SongPracticeHubModal: React.FC<SongPracticeHubModalProps> = ({ song
     setIsAskingMira(true);
     setMiraAnswer(null);
 
-    const token = `MIRA_${Date.now()}`;
     const payloadPrompt = `You are MIRA (Musical Intelligence & Rhythm Assistant). The user is preparing to practice the song "${song.title}" by ${song.composer} (Difficulty: ${song.difficulty}, Key: ${song.key}, BPM: ${song.bpm}, ${song.notes.length} notes).
 The user asks: "${promptText}".
-Provide a concise, encouraging, highly practical piano learning tip (under 3 sentences).
-Wrap your response starting with token [${token}] and ending with token [/${token}].`;
+Provide a concise, encouraging, highly practical piano learning tip (under 3 sentences).`;
 
     try {
-      const relayEndpoint = geminiRelayUrl ? `${geminiRelayUrl}/api/prompt` : 'http://127.0.0.1:8000/api/prompt';
-      const res = await fetch(relayEndpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: payloadPrompt })
-      });
-      if (res.ok) {
-        const data = await res.json();
-        let reply = data.response || data.text || data.message || '';
-        const match = reply.match(new RegExp(`\\[${token}\\]([\\s\\S]*?)\\[\\/${token}\\]`));
-        if (match) reply = match[1].trim();
-        setMiraAnswer(reply);
+      const relayRes = await sendPromptWithToken(payloadPrompt, geminiRelayUrl || 'http://127.0.0.1:8000', 14);
+      if (relayRes && relayRes.text) {
+        setMiraAnswer(relayRes.text);
       } else {
         setMiraAnswer(`MIRA Recommendation for ${song.title}: Start with 75% tempo in Wait For Key mode. Keep your fingers curved and maintain gentle arm weight across the key transitions.`);
       }

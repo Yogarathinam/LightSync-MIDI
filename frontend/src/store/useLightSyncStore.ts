@@ -1243,6 +1243,8 @@ export const useLightSyncStore = create<LightSyncState>((set, get) => ({
       max_streak: currentTelemetry.streak,
       avg_velocity: currentTelemetry.avgVelocity,
       problem_measures: currentTelemetry.problemMeasures,
+      notes_detail: currentTelemetry.recordedNotes || [],
+      recorded_notes: currentTelemetry.recordedNotes || [],
       created_at: new Date().toISOString()
     };
 
@@ -1453,7 +1455,8 @@ export const useLightSyncStore = create<LightSyncState>((set, get) => ({
     handAccuracy: { left: 100, right: 100 },
     avgVelocity: 85,
     problemMeasures: [],
-    durationSec: 0
+    durationSec: 0,
+    recordedNotes: []
   },
 
   updateTelemetry: (partial) =>
@@ -1474,11 +1477,12 @@ export const useLightSyncStore = create<LightSyncState>((set, get) => ({
         handAccuracy: { left: 100, right: 100 },
         avgVelocity: 85,
         problemMeasures: [],
-        durationSec: 0
+        durationSec: 0,
+        recordedNotes: []
       }
     }),
 
-  recordNoteAttempt: ({ pitch: _pitch, expectedPitch: _expectedPitch, timeOffsetMs, velocity, hand: _hand, measure, hit }) =>
+  recordNoteAttempt: ({ pitch, expectedPitch, timeOffsetMs, velocity, hand, measure, hit }) =>
     set((state) => {
       const prev = state.currentTelemetry;
       const totalNotes = prev.totalNotes + 1;
@@ -1517,6 +1521,20 @@ export const useLightSyncStore = create<LightSyncState>((set, get) => ({
 
       const avgVelocity = Math.round((prev.avgVelocity * (totalNotes - 1) + velocity) / totalNotes);
 
+      const noteAttempt = {
+        timestamp: Date.now(),
+        expected_pitch: expectedPitch || pitch,
+        played_pitch: pitch,
+        is_correct: hit,
+        deviation_ms: timeOffsetMs,
+        velocity,
+        rating: lastRating,
+        note_name: getMidiNoteName(pitch),
+        expected_name: expectedPitch ? getMidiNoteName(expectedPitch) : getMidiNoteName(pitch),
+        measure,
+        hand
+      };
+
       return {
         currentTelemetry: {
           ...prev,
@@ -1529,7 +1547,8 @@ export const useLightSyncStore = create<LightSyncState>((set, get) => ({
           timingRatings: ratings,
           problemMeasures,
           avgVelocity,
-          lastRating
+          lastRating,
+          recordedNotes: [...(prev.recordedNotes || []), noteAttempt]
         }
       };
     }),

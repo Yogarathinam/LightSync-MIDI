@@ -526,11 +526,13 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
   const showSessionAnalysisRef = useRef(showSessionAnalysis);
   showSessionAnalysisRef.current = showSessionAnalysis;
   const hasCompletedPieceRef = useRef<boolean>(false);
+  const wrongNotesStruckRef = useRef<Set<number>>(new Set());
   const playbackPublishTimerRef = useRef<number>(0);
 
   // Cleanly synchronize song playback: whenever songPlaybackId or currentSong changes, reset notes
   useEffect(() => {
     hasCompletedPieceRef.current = false;
+    wrongNotesStruckRef.current.clear();
     songBeatRef.current = 0;
     soundingSongNotesRef.current.forEach((pitch) => triggerNoteOff(pitch));
     soundingSongNotesRef.current.clear();
@@ -947,16 +949,39 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
 
                   // Record performance telemetry
                   const timeOffsetMs = Math.round((n.time - currentBeat) * (60 / curSong.bpm) * 1000);
+                  const activeState = curActiveNotes.get(n.pitch);
                   recordNoteAttempt({
                     pitch: n.pitch,
                     expectedPitch: n.pitch,
                     timeOffsetMs,
-                    velocity: 100,
+                    velocity: activeState?.velocity || 100,
                     hand: (n.hand === 'left' ? 'left' : 'right'),
                     measure: Math.floor(n.time / 4) + 1,
                     hit: true
                   });
                 }
+              });
+
+              // Record any wrong notes pressed while waiting for target key
+              curActiveNotes.forEach((noteState, pressedPitch) => {
+                const isExpected = pendingAtHitline.some(n => n.pitch === pressedPitch);
+                if (!isExpected && !wrongNotesStruckRef.current.has(pressedPitch)) {
+                  wrongNotesStruckRef.current.add(pressedPitch);
+                  const targetNote = pendingAtHitline[0];
+                  recordNoteAttempt({
+                    pitch: pressedPitch,
+                    expectedPitch: targetNote.pitch,
+                    timeOffsetMs: 0,
+                    velocity: noteState?.velocity || 90,
+                    hand: (targetNote.hand === 'left' ? 'left' : 'right'),
+                    measure: Math.floor(targetNote.time / 4) + 1,
+                    hit: false
+                  });
+                }
+              });
+              // Release tracked wrong notes when unpressed
+              wrongNotesStruckRef.current.forEach((p) => {
+                if (!curActiveNotes.has(p)) wrongNotesStruckRef.current.delete(p);
               });
 
               // Check remaining pending notes after strike
@@ -1015,6 +1040,16 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
                       canAdvance = true;
                       setWaitingState(false, null);
                       setExpectedPitch(null);
+                      const activeState = curActiveNotes.get(nextUpcoming.pitch);
+                      recordNoteAttempt({
+                        pitch: nextUpcoming.pitch,
+                        expectedPitch: nextUpcoming.pitch,
+                        timeOffsetMs: 0,
+                        velocity: activeState?.velocity || 100,
+                        hand: (nextUpcoming.hand === 'left' ? 'left' : 'right'),
+                        measure: Math.floor(nextUpcoming.time / 4) + 1,
+                        hit: true
+                      });
                     } else {
                       // Clamp to start of next note and wait
                       songBeatRef.current = nextUpcoming.time;
