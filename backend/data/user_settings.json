@@ -1,6 +1,6 @@
 {
   "effectConfig": {
-    "effect": "blink",
+    "effect": "static",
     "speed": 1.2,
     "decay": 0.85,
     "spread": 1.0,

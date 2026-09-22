@@ -661,7 +661,7 @@ export const useLightSyncStore = create<LightSyncState>((set, get) => ({
 
   // Effect Studio
   effectConfig: {
-    effect: (savedSettings?.effectConfig?.effect as EffectType) || 'blink',
+    effect: ((savedSettings?.effectConfig?.effect === 'blink' ? 'static' : savedSettings?.effectConfig?.effect) as EffectType) || 'static',
     speed: savedSettings?.effectConfig?.speed ?? 1.2,
     decay: savedSettings?.effectConfig?.decay ?? 0.85,
     spread: savedSettings?.effectConfig?.spread ?? 3.0,

@@ -20,7 +20,7 @@ import { useLightSyncStore, COLOR_SYNC_PRESETS } from '../../store/useLightSyncS
 import { EffectType, ColorSyncPresetId, FlowKeyTrailStyle } from '../../types';
 
 const EFFECTS_CATALOG: { id: EffectType; name: string; desc: string }[] = [
-  { id: 'blink', name: 'Blink & Fade', desc: 'Instantaneous key flash with smooth subtle decay' },
+  { id: 'static', name: 'Static Key Light', desc: 'Solid single-LED light held continuously until key release' },
   { id: 'bounce', name: 'Bounce', desc: 'Damped ballistic particle motion' },
   { id: 'ripple', name: 'Ripple', desc: 'Expanding sinusoidal ring crest' },
   { id: 'pulse', name: 'Pulse', desc: 'Radial breathing heart rhythm' },

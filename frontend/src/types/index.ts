@@ -35,6 +35,7 @@ export type EffectType =
   | 'sprinkle' 
   | 'rain' 
   | 'wave'
+  | 'static'
   | 'blink';
 
 export interface EffectConfig {

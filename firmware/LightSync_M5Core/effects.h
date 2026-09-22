@@ -137,15 +137,14 @@ public:
     void triggerEffectPreview(EffectType eff) {
         // Generates an automated musical demo trigger for live previewing
         previewStep = (previewStep + 1) % 4;
-        int16_t positions[] = {
-            (int16_t)(config.ledCount * 0.25f),
-            (int16_t)(config.ledCount * 0.50f),
-            (int16_t)(config.ledCount * 0.75f),
-            (int16_t)(config.ledCount * 0.40f)
-        };
-        int16_t centerLed = positions[previewStep];
-        CRGB col = getNoteColor(60 + previewStep * 4, centerLed);
-        spawnEffect(eff, centerLed, col, 100);
+        uint8_t previewPitch = 60 + previewStep * 4;
+        int16_t centerLed = mapPitchToLed(previewPitch);
+        CRGB col = getNoteColor(previewPitch, centerLed);
+        if (eff == EFFECT_STATIC) {
+            onNoteOn(previewPitch, 100, 360);
+        } else {
+            spawnEffect(eff, centerLed, col, 100);
+        }
     }
 
     uint16_t pitchToFreq(uint8_t pitch) {
@@ -358,11 +357,11 @@ public:
                 break;
             }
 
-            case EFFECT_BLINK: {
+            case EFFECT_STATIC: {
                 int pIdx = allocateParticle();
                 if (pIdx >= 0) {
                     particles[pIdx].active = true;
-                    particles[pIdx].type = EFFECT_BLINK;
+                    particles[pIdx].type = EFFECT_STATIC;
                     particles[pIdx].pos = centerLed;
                     particles[pIdx].color = col;
                     particles[pIdx].life = 1.0f;
@@ -432,10 +431,18 @@ public:
                     continue;
                 }
 
-                // ONLY draw sustain spread luminance if the effect is EFFECT_HOLD_BEAM!
-                // For all other effects (especially EFFECT_BLINK single-LED flash & fade),
-                // the particle system handles illumination.
-                if (config.currentEffect == EFFECT_HOLD_BEAM) {
+                // STATIC KEY LIGHT: Solid single-LED illumination held continuously until key release!
+                if (config.currentEffect == EFFECT_STATIC) {
+                    CRGB col = getNoteColor(activeNotes[i].pitch, activeNotes[i].centerLed);
+                    float brtFactor = (config.brightness / 255.0f);
+                    int16_t ledIdx = activeNotes[i].centerLed;
+                    if (ledIdx >= 0 && ledIdx < (int16_t)config.ledCount) {
+                        leds[ledIdx].r = (uint8_t)(col.r * brtFactor);
+                        leds[ledIdx].g = (uint8_t)(col.g * brtFactor);
+                        leds[ledIdx].b = (uint8_t)(col.b * brtFactor);
+                    }
+                }
+                else if (config.currentEffect == EFFECT_HOLD_BEAM) {
                     CRGB col = getNoteColor(activeNotes[i].pitch, activeNotes[i].centerLed);
                     addSpreadLuminance(activeNotes[i].centerLed, config.spread * 1.2f, col, 1.0f);
                     CRGB secCol = CRGB(config.secondaryR, config.secondaryG, config.secondaryB);
@@ -549,9 +556,9 @@ public:
                     break;
                 }
 
-                case EFFECT_BLINK: {
-                    // Instantaneous flash with smooth, snappy quadratic decay on ONLY THE ONE LED
-                    p.life -= dt * (2.8f * config.speed);
+                case EFFECT_STATIC: {
+                    // Subtle quadratic fade on release for ONLY THE ONE LED
+                    p.life -= dt * (2.2f * config.speed);
                     if (p.life > 0.0f) {
                         float fadeCurve = p.life * p.life;
                         float brtFactor = (config.brightness / 255.0f) * fadeCurve;

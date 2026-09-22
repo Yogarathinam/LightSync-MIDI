@@ -24,7 +24,7 @@ public:
         if (lower == "sprinkle") return EFFECT_SPRINKLE;
         if (lower == "rain") return EFFECT_RAIN;
         if (lower == "wave") return EFFECT_WAVE;
-        if (lower == "blink" || lower == "blink & fade" || lower == "fade") return EFFECT_BLINK;
+        if (lower == "static" || lower == "static key" || lower == "key light" || lower == "blink" || lower == "blink & fade" || lower == "fade") return EFFECT_STATIC;
 
         return EFFECT_BOUNCE;
     }
@@ -40,7 +40,7 @@ public:
             case EFFECT_SPRINKLE:  return "SPRINKLE";
             case EFFECT_RAIN:      return "NEON RAIN";
             case EFFECT_WAVE:      return "HARMONIC WAVE";
-            case EFFECT_BLINK:     return "BLINK & FADE";
+            case EFFECT_STATIC:    return "STATIC KEY";
             default:               return "BOUNCE";
         }
     }
@@ -56,7 +56,7 @@ public:
             case EFFECT_SPRINKLE:  return "Gentle falling fairy dust sparkles";
             case EFFECT_RAIN:      return "Flowing neon comet trails along strip";
             case EFFECT_WAVE:      return "Interfering sinusoidal harmonic wave";
-            case EFFECT_BLINK:     return "Crisp key blink flash with subtle quadratic fade";
+            case EFFECT_STATIC:    return "Solid key light held continuously until key release";
             default:               return "Dynamic visual LED effect";
         }
     }

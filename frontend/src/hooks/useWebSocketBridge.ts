@@ -79,7 +79,18 @@ export const useWebSocketBridge = () => {
 
             if (ev === 'EFFECT_CHANGED' && val) {
               const effLower = val.toLowerCase().trim();
-              useLightSyncStore.getState().setEffectParam('effect', effLower as any);
+              let matchedEff: any = 'static';
+              if (effLower.includes('static') || effLower.includes('blink')) matchedEff = 'static';
+              else if (effLower.includes('bounce')) matchedEff = 'bounce';
+              else if (effLower.includes('ripple')) matchedEff = 'ripple';
+              else if (effLower.includes('pulse')) matchedEff = 'pulse';
+              else if (effLower.includes('hold')) matchedEff = 'hold_beam';
+              else if (effLower.includes('glitch')) matchedEff = 'glitch';
+              else if (effLower.includes('spark')) matchedEff = 'spark';
+              else if (effLower.includes('sprinkle')) matchedEff = 'sprinkle';
+              else if (effLower.includes('rain')) matchedEff = 'rain';
+              else if (effLower.includes('wave')) matchedEff = 'wave';
+              useLightSyncStore.getState().setEffectParam('effect', matchedEff);
             } else if (ev === 'BRIGHTNESS_CHANGED' && val) {
               const b = parseInt(val, 10);
               if (!isNaN(b)) {

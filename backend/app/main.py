@@ -140,8 +140,8 @@ def disconnect_device():
     serial_manager.disconnect()
     return {"success": True, "port": None, "simulated": True}
 
-# User Settings Persistence File
-SETTINGS_FILE = Path("data/user_settings.json")
+# User Settings Persistence File (Resolved relative to backend data folder)
+SETTINGS_FILE = Path(__file__).resolve().parent.parent / "data" / "user_settings.json"
 
 @app.get("/api/settings")
 def get_user_settings():

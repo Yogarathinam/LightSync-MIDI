@@ -340,6 +340,7 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
         p.speed = effectConfig.speed * 0.2;
         p.spread = effectConfig.spread * 4.0;
         break;
+      case 'static':
       case 'blink':
         p.pos = centerLed;
         p.spread = 0; // strictly one LED only!
@@ -816,14 +817,18 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
 
             const keyIdx = Math.max(0, Math.min(keyboardSize - 1, bar.pitch - startMidi));
             const centerLed = Math.floor((keyIdx / (keyboardSize - 1)) * 143);
-            for (let s = 0; s < 4; s++) {
-              spawnParticle('spark', centerLed, bar.color);
-            }
-            const keyCenterX = bar.x + bar.width / 2;
-            spawnRunwayBursts(keyCenterX, ledBarTop, bar.color, 12, true);
-            spawnShockwaveRipple(keyCenterX, ledBarTop, bar.color, bar.width * 2.5 + 40);
-            if (Math.random() < 0.3) {
-              spawnLensFlare(keyCenterX, ledBarTop, bar.color, 260);
+            if (curEff.effect !== 'static' && curEff.effect !== 'blink') {
+              for (let s = 0; s < 4; s++) {
+                spawnParticle('spark', centerLed, bar.color);
+              }
+              const keyCenterX = bar.x + bar.width / 2;
+              spawnRunwayBursts(keyCenterX, ledBarTop, bar.color, 12, true);
+              spawnShockwaveRipple(keyCenterX, ledBarTop, bar.color, bar.width * 2.5 + 40);
+              if (Math.random() < 0.3) {
+                spawnLensFlare(keyCenterX, ledBarTop, bar.color, 260);
+              }
+            } else {
+              spawnParticle('static', centerLed, bar.color);
             }
           }
 
@@ -1172,8 +1177,21 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
         leds[i].b *= decay;
       }
 
-      // Sustain aura on held keys (only for effects supporting sustain aura; single-LED blink stays clean with zero neighbor bleed)
-      if (curEff.effect !== 'blink') {
+      // Sustain aura on held keys
+      if (curEff.effect === 'static' || curEff.effect === 'blink') {
+        // STATIC KEY LIGHT: Solid illumination on ONLY the key's target LED while held!
+        curActiveNotes.forEach((noteData) => {
+          const cols = getNoteColors(noteData.pitch, curEff, curFlow);
+          const targetLed = Math.round(noteData.centerLed);
+          if (targetLed >= 0 && targetLed < ledCount) {
+            const brt = (curEff.brightness / 255) * 1.5;
+            const cur = leds[targetLed];
+            cur.r = Math.min(255, cols.primary.r * brt);
+            cur.g = Math.min(255, cols.primary.g * brt);
+            cur.b = Math.min(255, cols.primary.b * brt);
+          }
+        });
+      } else {
         curActiveNotes.forEach((noteData) => {
           const cols = getNoteColors(noteData.pitch, curEff, curFlow);
           addSpreadLuminance(noteData.centerLed, curEff.spread * 1.2, cols.primary, 1.0);
@@ -1236,9 +1254,10 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
             const wavePos = p.pos + Math.sin(p.phase) * (p.spread * 3);
             if (wavePos >= 0 && wavePos < ledCount) addSpreadLuminance(wavePos, 2.5, p.color, p.life);
             break;
+          case 'static':
           case 'blink':
-            // Instantaneous flash with smooth, snappy quadratic decay on ONLY THE ONE LED
-            p.life -= dt * (2.8 * p.speed);
+            // Subtle release quadratic decay on ONLY THE ONE LED for staccato key releases
+            p.life -= dt * (2.2 * p.speed);
             if (p.life > 0) {
               const fadeCurve = p.life * p.life;
               const targetLed = Math.round(p.pos);

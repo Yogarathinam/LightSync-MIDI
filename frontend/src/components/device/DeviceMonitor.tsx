@@ -85,7 +85,7 @@ export const DeviceMonitor: React.FC = () => {
   // M5Stack Simulated Button Handlers
   const handleBtnA = () => {
     // Cycle effect across all 10 effects
-    const effects: EffectType[] = ['blink', 'bounce', 'ripple', 'pulse', 'hold_beam', 'glitch', 'spark', 'sprinkle', 'rain', 'wave'];
+    const effects: EffectType[] = ['static', 'bounce', 'ripple', 'pulse', 'hold_beam', 'glitch', 'spark', 'sprinkle', 'rain', 'wave'];
     const currIdx = effects.indexOf(effectConfig.effect);
     const nextEff = effects[(currIdx + 1) % effects.length];
     setEffectParam('effect', nextEff);
