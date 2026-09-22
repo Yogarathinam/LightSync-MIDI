@@ -510,7 +510,7 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
   const activeWorkspaceRef = useRef(activeWorkspace);
   activeWorkspaceRef.current = activeWorkspace;
   const songBeatRef = useRef<number>(0);
-  const spawnedSongNoteIdsRef = useRef<Set<number>>(new Set());
+  const soundingSongNotesRef = useRef<Map<number, number>>(new Map());
   const learnModeRef = useRef(learnMode);
   learnModeRef.current = learnMode;
   const playbackPublishTimerRef = useRef<number>(0);
@@ -518,18 +518,20 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
   // Cleanly synchronize song playback: whenever songPlaybackId or currentSong changes, reset notes
   useEffect(() => {
     songBeatRef.current = 0;
-    spawnedSongNoteIdsRef.current.clear();
+    soundingSongNotesRef.current.forEach((pitch) => triggerNoteOff(pitch));
+    soundingSongNotesRef.current.clear();
     fallingBarsRef.current = [];
-  }, [songPlaybackId, currentSong?.id]);
+  }, [songPlaybackId, currentSong?.id, triggerNoteOff]);
 
   // Handle interactive timeline seeking (scrub forward / reverse)
   useEffect(() => {
     if (seekEpoch > 0) {
       songBeatRef.current = targetSeekBeat;
-      spawnedSongNoteIdsRef.current.clear();
+      soundingSongNotesRef.current.forEach((pitch) => triggerNoteOff(pitch));
+      soundingSongNotesRef.current.clear();
       fallingBarsRef.current = [];
     }
-  }, [seekEpoch, targetSeekBeat]);
+  }, [seekEpoch, targetSeekBeat, triggerNoteOff]);
 
   // Listen for newly pressed keys to trigger LED strip effects & 2D Runway VFX
   const prevPitchesRef = useRef<Set<number>>(new Set());
@@ -757,8 +759,19 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
       if (curBg.showHorizontalBeatLines) {
         const beatSpacing = 44;
         const isSongActive = isSongPlayingRef.current;
-        const scrollDir = isSongActive ? -1 : 1;
-        const scrollDistance = curBg.scrollGrid ? (now * 0.001 * 50 * curFlow.flowSpeed * scrollDir) : 0;
+        const isSongMode = isSongActive || activeWorkspaceRef.current === 'songs' || activeWorkspaceRef.current === 'learn';
+        let scrollDistance = 0;
+        if (curBg.scrollGrid) {
+          if (isSongMode && currentSongRef.current) {
+            const speed = 170 * curFlow.flowSpeed;
+            const bpm = currentSongRef.current.bpm || 120;
+            const pxPerBeat = (speed * 60) / bpm;
+            scrollDistance = -(songBeatRef.current * pxPerBeat);
+          } else {
+            const scrollDir = isSongActive ? -1 : 1;
+            scrollDistance = (now * 0.001 * 50 * curFlow.flowSpeed * scrollDir);
+          }
+        }
 
         ctx.save();
         ctx.beginPath();
@@ -839,118 +852,184 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
       ctx.fillRect(16, waterfallTop, width - 32, 35);
 
       // ==========================================
-      // 2. SONG PLAYBACK & AUTO-DEMO WATERFALL FALLING BARS
+      // 2. SONG PLAYBACK & AUTO-DEMO WATERFALL FALLING BARS (Synthesia Style)
       // ==========================================
       const curSong = currentSongRef.current;
       const isSongOn = isSongPlayingRef.current;
+      const isSongMode = isSongOn || activeWorkspaceRef.current === 'songs' || activeWorkspaceRef.current === 'learn';
+      const curLearnMode = learnModeRef.current;
+      const hFilter = handFilterRef.current;
 
-      if (isSongOn && curSong && curSong.notes && curSong.notes.length > 0) {
-        const curLearnMode = learnModeRef.current;
-        const hFilter = handFilterRef.current;
+      const isMatchingHand = (hand?: string) => {
+        if (hFilter === 'right' && hand === 'left') return false;
+        if (hFilter === 'left' && hand === 'right') return false;
+        return true;
+      };
 
-        const isMatchingHand = (hand?: string) => {
-          if (hFilter === 'right' && hand === 'left') return false;
-          if (hFilter === 'left' && hand === 'right') return false;
-          return true;
-        };
+      if (curSong && curSong.notes && curSong.notes.length > 0 && isSongMode) {
+        const speed = 170 * curFlow.flowSpeed;
+        const maxNoteEnd = Math.max(...curSong.notes.map(n => n.time + n.duration));
 
-        let canAdvance = true;
-        if (curLearnMode === 'wait_for_key') {
-          // Find next target note that matches hand filter and has not finished its duration
-          const targetNote = curSong.notes.find(
-            n => isMatchingHand(n.hand) && songBeatRef.current < (n.time + n.duration)
-          );
+        let canAdvance = isSongOn;
 
-          if (targetNote) {
-            // Check if note has arrived at hitline (ledBarTop)
-            if (songBeatRef.current >= targetNote.time) {
-              const isKeyHeld = curActiveNotes.has(targetNote.pitch);
-              if (!isKeyHeld) {
-                // Freeze right at hitline until user strikes key!
-                songBeatRef.current = targetNote.time;
-                canAdvance = false;
-                setWaitingState(true, targetNote.pitch);
-                setExpectedPitch(targetNote.pitch);
+        if (isSongOn) {
+          if (curLearnMode === 'wait_for_key') {
+            // Find next target note that matches hand filter and has not finished its duration
+            const targetNote = curSong.notes.find(
+              n => isMatchingHand(n.hand) && songBeatRef.current < (n.time + n.duration)
+            );
+
+            if (targetNote) {
+              // Check if note has arrived at hitline (ledBarTop)
+              if (songBeatRef.current >= targetNote.time) {
+                // Find all notes in this chord (within 0.05 beats of targetNote.time)
+                const chordNotes = curSong.notes.filter(
+                  n => isMatchingHand(n.hand) && Math.abs(n.time - targetNote.time) < 0.05 && songBeatRef.current < (n.time + n.duration)
+                );
+                const allHeld = chordNotes.every(n => curActiveNotes.has(n.pitch));
+
+                if (!allHeld) {
+                  // Freeze right at targetNote.time until user strikes key!
+                  songBeatRef.current = Math.max(targetNote.time, songBeatRef.current);
+                  canAdvance = false;
+                  setWaitingState(true, targetNote.pitch);
+                  setExpectedPitch(targetNote.pitch);
+                } else {
+                  // Key is actively held: let timeline progress through its duration!
+                  canAdvance = true;
+                  setWaitingState(false, null);
+                  setExpectedPitch(null);
+                }
               } else {
-                // Key is actively held: let timeline progress through its duration!
-                canAdvance = true;
                 setWaitingState(false, null);
                 setExpectedPitch(null);
               }
             } else {
               setWaitingState(false, null);
+              setExpectedPitch(null);
             }
-          } else {
-            setWaitingState(false, null);
           }
-        }
 
-        if (canAdvance) {
-          songBeatRef.current += dt * (curSong.bpm / 60);
-        }
+          if (canAdvance) {
+            const prevBeat = songBeatRef.current;
+            songBeatRef.current += dt * (curSong.bpm / 60);
+            const currentBeat = songBeatRef.current;
 
-        const currentBeat = songBeatRef.current;
-        const speed = 170 * curFlow.flowSpeed;
-        const travelDistance = Math.max(100, ledBarTop - waterfallTop);
-        const travelBeats = (travelDistance / speed) * (curSong.bpm / 60);
+            // In Watch & Listen: trigger notes and explosive impact visuals
+            if (curLearnMode !== 'wait_for_key') {
+              curSong.notes.forEach((note, idx) => {
+                if (!isMatchingHand(note.hand)) return;
 
-        // Periodically sync playback position to store (for timeline scrubber)
-        playbackPublishTimerRef.current += dt;
-        if (playbackPublishTimerRef.current >= 0.04) {
-          playbackPublishTimerRef.current = 0;
-          const maxNoteEnd = Math.max(...curSong.notes.map(n => n.time + n.duration));
-          setPlaybackBeat(currentBeat, maxNoteEnd);
-        }
+                // Note On
+                if (prevBeat < note.time && currentBeat >= note.time) {
+                  triggerNoteOn(note.pitch, 100);
+                  soundingSongNotesRef.current.set(idx, note.pitch);
 
-        curSong.notes.forEach((note, idx) => {
-          if (spawnedSongNoteIdsRef.current.has(idx)) return;
-          if (note.time + note.duration < currentBeat) return; // Skip passed notes after seeking
+                  const geom = getKeyGeometry(note.pitch, width, keyAreaTop, keyAreaHeight);
+                  if (geom) {
+                    const noteColorHex = note.hand === 'left'
+                      ? (leftHandColorRef.current || '#38bdf8')
+                      : (rightHandColorRef.current || '#10b981');
+                    const col = hexToRgb(noteColorHex);
+                    const keyIdx = Math.max(0, Math.min(keyboardSize - 1, note.pitch - startMidi));
+                    const centerLed = Math.floor((keyIdx / (keyboardSize - 1)) * 143);
 
-          if (note.time <= currentBeat + travelBeats) {
-            spawnedSongNoteIdsRef.current.add(idx);
+                    if (curEff.effect !== 'static' && curEff.effect !== 'blink') {
+                      for (let s = 0; s < 4; s++) spawnParticle('spark', centerLed, col);
+                      const keyCenterX = geom.x + geom.width / 2;
+                      spawnRunwayBursts(keyCenterX, ledBarTop, col, 12, true);
+                      spawnShockwaveRipple(keyCenterX, ledBarTop, col, geom.width * 2.5 + 40);
+                      if (Math.random() < 0.3) spawnLensFlare(keyCenterX, ledBarTop, col, 260);
+                    } else {
+                      spawnParticle('static', centerLed, col);
+                    }
+                  }
+                }
 
-            if (hFilter === 'right' && note.hand === 'left') return;
-            if (hFilter === 'left' && note.hand === 'right') return;
-
-            const geom = getKeyGeometry(note.pitch, width, keyAreaTop, keyAreaHeight);
-            if (geom) {
-              const noteColorHex = note.hand === 'left'
-                ? (leftHandColorRef.current || '#38bdf8')
-                : (rightHandColorRef.current || '#10b981');
-              const col = hexToRgb(noteColorHex);
-
-              const timeToHitSec = (note.time - currentBeat) / (curSong.bpm / 60);
-              const noteLengthPx = Math.max(28, (note.duration * (60 / curSong.bpm)) * speed);
-              const noteY = ledBarTop - (timeToHitSec * speed) - noteLengthPx;
-
-              fallingBarsRef.current.push({
-                id: Math.random(),
-                pitch: note.pitch,
-                x: geom.x + 2,
-                width: geom.width - 4,
-                y: noteY,
-                length: noteLengthPx,
-                speed: speed,
-                color: col,
-                triggered: false,
-                active: true
+                // Note Off
+                const noteEnd = note.time + note.duration;
+                if (prevBeat < noteEnd && currentBeat >= noteEnd) {
+                  if (soundingSongNotesRef.current.has(idx)) {
+                    triggerNoteOff(note.pitch);
+                    soundingSongNotesRef.current.delete(idx);
+                  }
+                }
               });
             }
+
+            // Piece completion
+            if (currentBeat > maxNoteEnd + 2) {
+              stopSongPlayback();
+            }
+          }
+
+          // Periodically sync playback position to store (for timeline scrubber)
+          playbackPublishTimerRef.current += dt;
+          if (playbackPublishTimerRef.current >= 0.04) {
+            playbackPublishTimerRef.current = 0;
+            setPlaybackBeat(songBeatRef.current, maxNoteEnd);
+          }
+        } else {
+          // Paused: release sounding notes so audio stops immediately
+          if (soundingSongNotesRef.current.size > 0) {
+            soundingSongNotesRef.current.forEach((pitch) => triggerNoteOff(pitch));
+            soundingSongNotesRef.current.clear();
+          }
+        }
+
+        // Render all visible waterfall bars (freeze solidly when paused, scrub dynamically!)
+        const currentBeat = songBeatRef.current;
+        curSong.notes.forEach((note) => {
+          if (!isMatchingHand(note.hand)) return;
+
+          const timeToHitSec = (note.time - currentBeat) / (curSong.bpm / 60);
+          const noteLengthPx = Math.max(28, (note.duration * (60 / curSong.bpm)) * speed);
+          const noteY = ledBarTop - (timeToHitSec * speed) - noteLengthPx;
+
+          // Skip notes outside visible canvas vertical range
+          if (noteY + noteLengthPx < waterfallTop - 10 || noteY > height + 20) return;
+
+          const geom = getKeyGeometry(note.pitch, width, keyAreaTop, keyAreaHeight);
+          if (!geom) return;
+
+          const noteColorHex = note.hand === 'left'
+            ? (leftHandColorRef.current || '#38bdf8')
+            : (rightHandColorRef.current || '#10b981');
+          const col = hexToRgb(noteColorHex);
+
+          const barX = geom.x + 2;
+          const barW = Math.max(4, geom.width - 4);
+          const barH = noteLengthPx;
+
+          // Render falling bar with rich neon gradient
+          const barGrad = ctx.createLinearGradient(0, noteY, 0, noteY + barH);
+          barGrad.addColorStop(0, `rgba(${col.r}, ${col.g}, ${col.b}, 0.35)`);
+          barGrad.addColorStop(0.85, `rgba(${col.r}, ${col.g}, ${col.b}, 0.95)`);
+          barGrad.addColorStop(1, '#ffffff');
+
+          ctx.fillStyle = barGrad;
+          ctx.beginPath();
+          ctx.roundRect(barX, noteY, barW, barH, [6, 6, 4, 4]);
+          ctx.fill();
+
+          ctx.strokeStyle = `rgba(${col.r}, ${col.g}, ${col.b}, 0.9)`;
+          ctx.lineWidth = 1.2;
+          ctx.stroke();
+
+          // Impact / Active Glow at LED strip line
+          const noteBottom = noteY + barH;
+          if (noteBottom >= ledBarTop - 2 && noteY <= ledBarTop + 10) {
+            ctx.fillStyle = '#ffffff';
+            ctx.shadowColor = `rgb(${col.r}, ${col.g}, ${col.b})`;
+            ctx.shadowBlur = 14;
+            ctx.fillRect(barX - 2, ledBarTop - 2, barW + 4, 4);
+            ctx.shadowBlur = 0;
           }
         });
-
-        // Automatically detect song completion and stop
-        const maxNoteEnd = Math.max(...curSong.notes.map(n => n.time + n.duration));
-        if (currentBeat > maxNoteEnd + travelBeats + 1 && fallingBarsRef.current.length === 0) {
-          stopSongPlayback();
-        }
-      } else if (!isSongOn && (spawnedSongNoteIdsRef.current.size > 0 || songBeatRef.current > 0)) {
-        spawnedSongNoteIdsRef.current.clear();
-        songBeatRef.current = 0;
-        fallingBarsRef.current = [];
       }
 
-      if (isAutoDemoRef.current && !isSongOn) {
+      // Auto Demo Chords (only when in main Play tab with no song active)
+      if (isAutoDemoRef.current && !isSongMode) {
         demoTimerRef.current += dt;
         if (demoTimerRef.current > 0.38 / curFlow.flowSpeed) {
           demoTimerRef.current = 0;
@@ -976,71 +1055,66 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
             }
           });
         }
-      }
 
-      // Draw Falling Waterfall Bars (Auto Demo / Practice)
-      if (fallingNotesRef.current) {
-        const bars = fallingBarsRef.current;
-        for (let i = bars.length - 1; i >= 0; i--) {
-          const bar = bars[i];
-          bar.y += bar.speed * dt;
+        if (fallingNotesRef.current) {
+          const bars = fallingBarsRef.current;
+          for (let i = bars.length - 1; i >= 0; i--) {
+            const bar = bars[i];
+            bar.y += bar.speed * dt;
 
-          // Impact at LED strip line: trigger note and explosive burst effects
-          if (!bar.triggered && (bar.y + bar.length) >= ledBarTop) {
-            bar.triggered = true;
-            triggerNoteOn(bar.pitch, 100);
+            // Impact at LED strip line
+            if (!bar.triggered && (bar.y + bar.length) >= ledBarTop) {
+              bar.triggered = true;
+              triggerNoteOn(bar.pitch, 100);
 
-            const keyIdx = Math.max(0, Math.min(keyboardSize - 1, bar.pitch - startMidi));
-            const centerLed = Math.floor((keyIdx / (keyboardSize - 1)) * 143);
-            if (curEff.effect !== 'static' && curEff.effect !== 'blink') {
-              for (let s = 0; s < 4; s++) {
-                spawnParticle('spark', centerLed, bar.color);
+              const keyIdx = Math.max(0, Math.min(keyboardSize - 1, bar.pitch - startMidi));
+              const centerLed = Math.floor((keyIdx / (keyboardSize - 1)) * 143);
+              if (curEff.effect !== 'static' && curEff.effect !== 'blink') {
+                for (let s = 0; s < 4; s++) spawnParticle('spark', centerLed, bar.color);
+                const keyCenterX = bar.x + bar.width / 2;
+                spawnRunwayBursts(keyCenterX, ledBarTop, bar.color, 12, true);
+                spawnShockwaveRipple(keyCenterX, ledBarTop, bar.color, bar.width * 2.5 + 40);
+                if (Math.random() < 0.3) spawnLensFlare(keyCenterX, ledBarTop, bar.color, 260);
+              } else {
+                spawnParticle('static', centerLed, bar.color);
               }
-              const keyCenterX = bar.x + bar.width / 2;
-              spawnRunwayBursts(keyCenterX, ledBarTop, bar.color, 12, true);
-              spawnShockwaveRipple(keyCenterX, ledBarTop, bar.color, bar.width * 2.5 + 40);
-              if (Math.random() < 0.3) {
-                spawnLensFlare(keyCenterX, ledBarTop, bar.color, 260);
+            }
+
+            if (bar.y >= ledBarTop) {
+              if (bar.triggered && bar.active) {
+                triggerNoteOff(bar.pitch);
+                bar.active = false;
               }
-            } else {
-              spawnParticle('static', centerLed, bar.color);
             }
-          }
 
-          if (bar.y >= ledBarTop) {
-            if (bar.triggered && bar.active) {
-              triggerNoteOff(bar.pitch);
-              bar.active = false;
+            if (bar.y > height) {
+              bars.splice(i, 1);
+              continue;
             }
-          }
 
-          if (bar.y > height) {
-            bars.splice(i, 1);
-            continue;
-          }
+            // Render Falling Bar
+            const barGrad = ctx.createLinearGradient(0, bar.y, 0, bar.y + bar.length);
+            barGrad.addColorStop(0, `rgba(${bar.color.r}, ${bar.color.g}, ${bar.color.b}, 0.35)`);
+            barGrad.addColorStop(0.8, `rgba(${bar.color.r}, ${bar.color.g}, ${bar.color.b}, 0.95)`);
+            barGrad.addColorStop(1, '#ffffff');
 
-          // Render Falling Bar
-          const barGrad = ctx.createLinearGradient(0, bar.y, 0, bar.y + bar.length);
-          barGrad.addColorStop(0, `rgba(${bar.color.r}, ${bar.color.g}, ${bar.color.b}, 0.35)`);
-          barGrad.addColorStop(0.8, `rgba(${bar.color.r}, ${bar.color.g}, ${bar.color.b}, 0.95)`);
-          barGrad.addColorStop(1, '#ffffff');
+            ctx.fillStyle = barGrad;
+            ctx.beginPath();
+            ctx.roundRect(bar.x, bar.y, bar.width, bar.length, [6, 6, 4, 4]);
+            ctx.fill();
 
-          ctx.fillStyle = barGrad;
-          ctx.beginPath();
-          ctx.roundRect(bar.x, bar.y, bar.width, bar.length, [6, 6, 4, 4]);
-          ctx.fill();
+            ctx.strokeStyle = `rgba(${bar.color.r}, ${bar.color.g}, ${bar.color.b}, 0.85)`;
+            ctx.lineWidth = 1.2;
+            ctx.stroke();
 
-          ctx.strokeStyle = `rgba(${bar.color.r}, ${bar.color.g}, ${bar.color.b}, 0.85)`;
-          ctx.lineWidth = 1.2;
-          ctx.stroke();
-
-          // Impact Glow
-          if (bar.y + bar.length >= ledBarTop && bar.y < ledBarTop + 10) {
-            ctx.fillStyle = '#ffffff';
-            ctx.shadowColor = `rgb(${bar.color.r}, ${bar.color.g}, ${bar.color.b})`;
-            ctx.shadowBlur = 14;
-            ctx.fillRect(bar.x - 2, ledBarTop - 2, bar.width + 4, 4);
-            ctx.shadowBlur = 0;
+            // Impact Glow
+            if (bar.y + bar.length >= ledBarTop && bar.y < ledBarTop + 10) {
+              ctx.fillStyle = '#ffffff';
+              ctx.shadowColor = `rgb(${bar.color.r}, ${bar.color.g}, ${bar.color.b})`;
+              ctx.shadowBlur = 14;
+              ctx.fillRect(bar.x - 2, ledBarTop - 2, bar.width + 4, 4);
+              ctx.shadowBlur = 0;
+            }
           }
         }
       }

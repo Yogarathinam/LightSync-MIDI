@@ -174,7 +174,7 @@ export const LearnWorkspace: React.FC = () => {
     setLastFeedback(null);
     sessionStartTimeRef.current = Date.now();
 
-    if (mode === 'watch_listen' && song) {
+    if ((mode === 'watch_listen' || mode === 'wait_for_key') && song) {
       startSongPlayback(song);
     } else {
       stopSongPlayback();

@@ -319,7 +319,8 @@ interface LightSyncState {
   isSongPlaying: boolean;
   setIsSongPlaying: (playing: boolean) => void;
   songPlaybackId: number;
-  startSongPlayback: (song?: SongItem) => void;
+  startSongPlayback: (song?: SongItem, forceRestart?: boolean) => void;
+  restartSongPlayback: (song?: SongItem) => void;
   stopSongPlayback: () => void;
   playbackBeat: number;
   playbackTotalBeats: number;
@@ -930,22 +931,36 @@ export const useLightSyncStore = create<LightSyncState>((set, get) => ({
   isSongPlaying: false,
   setIsSongPlaying: (playing) => set({ isSongPlaying: playing }),
   songPlaybackId: 0,
-  startSongPlayback: (song) => {
+  startSongPlayback: (song, forceRestart = false) => {
     try {
       synthEngine.initContext();
     } catch (_) {}
     const current = song || get().currentSong;
     if (!current) return;
     // Release any previous active notes
-    const { activeNotes, triggerNoteOff } = get();
+    const { activeNotes, triggerNoteOff, currentSong, playbackBeat, playbackTotalBeats } = get();
     for (const pitch of activeNotes.keys()) {
       triggerNoteOff(pitch);
     }
+    const isNewSong = !currentSong || currentSong.id !== current.id;
+    const maxBeats = (current.notes && current.notes.length > 0)
+      ? Math.max(...current.notes.map(n => n.time + n.duration))
+      : (playbackTotalBeats || 100);
+    const hasEnded = playbackBeat >= maxBeats;
+    const shouldRestart = forceRestart || isNewSong || hasEnded;
+
     set((state) => ({
       currentSong: current,
       isSongPlaying: true,
-      songPlaybackId: (state.songPlaybackId || 0) + 1
+      playbackBeat: shouldRestart ? 0 : state.playbackBeat,
+      targetSeekBeat: shouldRestart ? 0 : state.targetSeekBeat,
+      playbackTotalBeats: maxBeats,
+      songPlaybackId: shouldRestart ? (state.songPlaybackId || 0) + 1 : state.songPlaybackId
     }));
+  },
+  restartSongPlayback: (song) => {
+    get().seekToBeat(0);
+    get().startSongPlayback(song, true);
   },
   stopSongPlayback: () => {
     const { activeNotes, triggerNoteOff } = get();

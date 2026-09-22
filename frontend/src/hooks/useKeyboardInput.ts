@@ -22,10 +22,22 @@ const QWERTY_MAP: Record<string, number> = {
 };
 
 export const useKeyboardInput = () => {
-  const { triggerNoteOn, triggerNoteOff, octaveShift, toggleSustain } = useLightSyncStore();
+  const { 
+    triggerNoteOn, 
+    triggerNoteOff, 
+    octaveShift, 
+    toggleSustain,
+    currentSong,
+    isSongPlaying,
+    startSongPlayback,
+    stopSongPlayback,
+    playbackBeat,
+    playbackTotalBeats,
+    seekToBeat
+  } = useLightSyncStore();
+
   const octaveShiftRef = useRef(octaveShift);
   octaveShiftRef.current = octaveShift;
-
   const triggerNoteOnRef = useRef(triggerNoteOn);
   triggerNoteOnRef.current = triggerNoteOn;
   const triggerNoteOffRef = useRef(triggerNoteOff);
@@ -33,22 +45,73 @@ export const useKeyboardInput = () => {
   const toggleSustainRef = useRef(toggleSustain);
   toggleSustainRef.current = toggleSustain;
 
+  const currentSongRef = useRef(currentSong);
+  currentSongRef.current = currentSong;
+  const isSongPlayingRef = useRef(isSongPlaying);
+  isSongPlayingRef.current = isSongPlaying;
+  const playbackBeatRef = useRef(playbackBeat);
+  playbackBeatRef.current = playbackBeat;
+  const playbackTotalBeatsRef = useRef(playbackTotalBeats);
+  playbackTotalBeatsRef.current = playbackTotalBeats;
+
   useEffect(() => {
     // Map key string -> actual played pitch (so pitch changes don't orphan held keys)
     const activeKeysPitchMap = new Map<string, number>();
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.repeat) return;
       const target = e.target as HTMLElement;
       if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
         return;
       }
 
-      if (e.code === 'Space') {
+      // Spacebar: Play / Pause toggle when song is loaded
+      if (e.code === 'Space' || e.key === ' ') {
         e.preventDefault();
-        toggleSustainRef.current();
+        if (target && target.tagName === 'BUTTON') {
+          target.blur();
+        }
+        if (currentSongRef.current) {
+          if (isSongPlayingRef.current) {
+            stopSongPlayback();
+          } else {
+            startSongPlayback(currentSongRef.current);
+          }
+        } else {
+          toggleSustainRef.current();
+        }
         return;
       }
+
+      // ArrowLeft: Step backward (4 beats / measure, or 1 beat with Shift)
+      if (e.code === 'ArrowLeft' || e.key === 'ArrowLeft') {
+        e.preventDefault();
+        if (target && target.tagName === 'BUTTON') {
+          target.blur();
+        }
+        if (currentSongRef.current) {
+          const step = e.shiftKey ? 1 : 4;
+          const newBeat = Math.max(0, playbackBeatRef.current - step);
+          seekToBeat(newBeat);
+        }
+        return;
+      }
+
+      // ArrowRight: Step forward (4 beats / measure, or 1 beat with Shift)
+      if (e.code === 'ArrowRight' || e.key === 'ArrowRight') {
+        e.preventDefault();
+        if (target && target.tagName === 'BUTTON') {
+          target.blur();
+        }
+        if (currentSongRef.current) {
+          const maxBeats = playbackTotalBeatsRef.current || 100;
+          const step = e.shiftKey ? 1 : 4;
+          const newBeat = Math.min(maxBeats, playbackBeatRef.current + step);
+          seekToBeat(newBeat);
+        }
+        return;
+      }
+
+      if (e.repeat) return;
 
       const key = e.key.toLowerCase();
       if (key in QWERTY_MAP && !activeKeysPitchMap.has(key)) {

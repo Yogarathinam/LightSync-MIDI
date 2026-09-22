@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { 
   Play, 
+  Pause,
   Square, 
   RotateCcw, 
   SkipBack, 
@@ -124,10 +125,10 @@ export const SongTimelineScrubber: React.FC<SongTimelineScrubberProps> = ({
                 ? 'bg-rose-600 hover:bg-rose-500 text-white shadow-rose-500/20'
                 : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-500/20'
             }`}
-            title={isSongPlaying ? 'Pause Song Playback' : 'Play Song'}
+            title={isSongPlaying ? 'Pause Playback (Space)' : 'Play Song (Space)'}
           >
             {isSongPlaying ? (
-              <Square className="w-3.5 h-3.5 fill-current" />
+              <Pause className="w-3.5 h-3.5 fill-current" />
             ) : (
               <Play className="w-3.5 h-3.5 fill-current" />
             )}
@@ -144,7 +145,7 @@ export const SongTimelineScrubber: React.FC<SongTimelineScrubberProps> = ({
           <button
             onClick={() => handleSkip(-4)}
             className="p-1.5 rounded-xl bg-slate-100 dark:bg-zinc-900 hover:bg-slate-200 dark:hover:bg-zinc-800 text-slate-600 dark:text-zinc-400 border border-slate-200 dark:border-zinc-800 transition-all cursor-pointer"
-            title="Rewind 1 measure (-4 beats)"
+            title="Rewind 1 measure / -4 beats (Left Arrow)"
           >
             <SkipBack className="w-3 h-3" />
           </button>
@@ -152,7 +153,7 @@ export const SongTimelineScrubber: React.FC<SongTimelineScrubberProps> = ({
           <button
             onClick={() => handleSkip(4)}
             className="p-1.5 rounded-xl bg-slate-100 dark:bg-zinc-900 hover:bg-slate-200 dark:hover:bg-zinc-800 text-slate-600 dark:text-zinc-400 border border-slate-200 dark:border-zinc-800 transition-all cursor-pointer"
-            title="Forward 1 measure (+4 beats)"
+            title="Forward 1 measure / +4 beats (Right Arrow)"
           >
             <SkipForward className="w-3 h-3" />
           </button>
