@@ -129,11 +129,13 @@ public:
                 break;
 
             case SCREEN_EFFECTS_MENU:
-                // Next Effect in Browser
+                // Next Effect in Browser (cycles 0 to EFFECT_COUNT-1)
                 config.menuEffectIndex = (config.menuEffectIndex + 1) % EFFECT_COUNT;
+                config.currentEffect = (EffectType)config.menuEffectIndex; // Apply immediately
                 engine.clearAll();
-                engine.triggerEffectPreview((EffectType)config.menuEffectIndex);
+                engine.triggerEffectPreview(config.currentEffect);
                 needsFullRedraw = true;
+                Serial.printf("EVENT EFFECT_CHANGED %s\n", CommandProtocol::getEffectName(config.currentEffect));
                 break;
 
             case SCREEN_PRESETS_MENU:
@@ -186,8 +188,8 @@ public:
                 break;
 
             case SCREEN_PRESETS_MENU:
-                // Apply Selected Color Preset and return to Dashboard
-                CommandProtocol::applyPreset((ColorPresetId)config.menuPresetIndex, config);
+                // Apply Selected Color Preset and return to Dashboard (preserve selected effect)
+                CommandProtocol::applyPreset((ColorPresetId)config.menuPresetIndex, config, false);
                 engine.clearAll();
                 config.currentScreen = SCREEN_DASHBOARD;
                 needsFullRedraw = true;
@@ -228,10 +230,12 @@ public:
                 break;
 
             case SCREEN_EFFECTS_MENU:
-                // Next Menu: Color Presets
+                // Preserve current effect and navigate to Color Presets
+                config.currentEffect = (EffectType)config.menuEffectIndex;
                 config.currentScreen = SCREEN_PRESETS_MENU;
                 config.menuPresetIndex = (uint8_t)config.currentPreset;
                 needsFullRedraw = true;
+                Serial.printf("EVENT EFFECT_CHANGED %s\n", CommandProtocol::getEffectName(config.currentEffect));
                 break;
 
             case SCREEN_PRESETS_MENU:
@@ -312,7 +316,7 @@ public:
     // --- Screen 1: Effects Browser with Live Preview ---
     void drawEffectsMenu() {
         char counterBuf[16];
-        snprintf(counterBuf, sizeof(counterBuf), "FX [%d/9]", config.menuEffectIndex + 1);
+        snprintf(counterBuf, sizeof(counterBuf), "FX [%d/%d]", config.menuEffectIndex + 1, EFFECT_COUNT);
         drawHeader("EFFECTS BROWSER", counterBuf, 0x07FF);
 
         // Preview Optical Strip Container (Y: 34 to 64)
@@ -345,7 +349,7 @@ public:
         } else {
             M5.Display.fillRoundRect(18, 140, 110, 20, 4, 0x2945);
             M5.Display.setTextColor(0xD69A, 0x2945);
-            M5.Display.drawString("Click [B] to Apply", 22, 146);
+            M5.Display.drawString("Click [B] for Home", 20, 146);
         }
 
         // Color Swatches on right
@@ -356,8 +360,8 @@ public:
         M5.Display.drawRoundRect(220, 140, 78, 20, 4, TFT_WHITE);
 
         // Bottom Button Legend
-        drawButtonLegend("[A] NEXT FX", "Browse 1-9", 0x07FF,
-                         "[B] SELECT", "Apply Effect", 0x07E0,
+        drawButtonLegend("[A] NEXT FX", "Browse 1-10", 0x07FF,
+                         "[B] HOME", "Apply & Exit", 0x07E0,
                          "[C] PRESETS", "Color Schemes", 0xF81F);
     }
 
@@ -396,10 +400,10 @@ public:
         M5.Display.setTextColor(TFT_WHITE, c2);
         M5.Display.drawString("SECONDARY", 166, 94);
 
-        // Linked default effect
+        // Active effect notice
         M5.Display.setTextColor(0x6CDF, 0x10A2);
         char fxBuf[48];
-        snprintf(fxBuf, sizeof(fxBuf), "Default Synced Effect: %s", CommandProtocol::getEffectName(tempCfg.currentEffect));
+        snprintf(fxBuf, sizeof(fxBuf), "Active Studio Effect: %s", CommandProtocol::getEffectName(config.currentEffect));
         M5.Display.drawString(fxBuf, 18, 134);
 
         // Status
@@ -408,12 +412,12 @@ public:
             M5.Display.drawString("* ACTIVE COLOR PRESET", 18, 154);
         } else {
             M5.Display.setTextColor(0xFD20, 0x10A2);
-            M5.Display.drawString("Click [B] to Apply Preset", 18, 154);
+            M5.Display.drawString("Click [B] to Apply Palette", 18, 154);
         }
 
         // Bottom Button Legend
         drawButtonLegend("[A] NEXT", "Palette 1-7", 0xF81F,
-                         "[B] SELECT", "Apply Preset", 0x07E0,
+                         "[B] APPLY", "Set Colors", 0x07E0,
                          "[C] SETTINGS", "Config & Keys", 0xFD20);
     }
 

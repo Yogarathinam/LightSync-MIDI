@@ -432,10 +432,12 @@ public:
                     continue;
                 }
 
-                CRGB col = getNoteColor(activeNotes[i].pitch, activeNotes[i].centerLed);
-                addSpreadLuminance(activeNotes[i].centerLed, config.spread * 1.2f, col, 1.0f);
-
+                // ONLY draw sustain spread luminance if the effect is EFFECT_HOLD_BEAM!
+                // For all other effects (especially EFFECT_BLINK single-LED flash & fade),
+                // the particle system handles illumination.
                 if (config.currentEffect == EFFECT_HOLD_BEAM) {
+                    CRGB col = getNoteColor(activeNotes[i].pitch, activeNotes[i].centerLed);
+                    addSpreadLuminance(activeNotes[i].centerLed, config.spread * 1.2f, col, 1.0f);
                     CRGB secCol = CRGB(config.secondaryR, config.secondaryG, config.secondaryB);
                     addSpreadLuminance(activeNotes[i].centerLed, config.spread * 2.6f, secCol, 0.65f);
                 }

@@ -1172,11 +1172,13 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
         leds[i].b *= decay;
       }
 
-      // Sustain aura on held keys
-      curActiveNotes.forEach((noteData) => {
-        const cols = getNoteColors(noteData.pitch, curEff, curFlow);
-        addSpreadLuminance(noteData.centerLed, curEff.spread * 1.2, cols.primary, 1.0);
-      });
+      // Sustain aura on held keys (only for effects supporting sustain aura; single-LED blink stays clean with zero neighbor bleed)
+      if (curEff.effect !== 'blink') {
+        curActiveNotes.forEach((noteData) => {
+          const cols = getNoteColors(noteData.pitch, curEff, curFlow);
+          addSpreadLuminance(noteData.centerLed, curEff.spread * 1.2, cols.primary, 1.0);
+        });
+      }
 
       // Update active LED particles
       const particles = particlesRef.current;

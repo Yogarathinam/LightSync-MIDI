@@ -74,48 +74,48 @@ public:
         }
     }
 
-    static void applyPreset(ColorPresetId preset, DeviceConfig& cfg) {
+    static void applyPreset(ColorPresetId preset, DeviceConfig& cfg, bool overrideEffect = false) {
         cfg.currentPreset = preset;
         switch (preset) {
             case PRESET_CYBERPUNK:
                 cfg.primaryR = 0;   cfg.primaryG = 240; cfg.primaryB = 255; // Electric Cyan
                 cfg.secondaryR = 236; cfg.secondaryG = 72; cfg.secondaryB = 153; // Hot Magenta
                 cfg.rainbow = false;
-                cfg.currentEffect = EFFECT_SPARK;
+                if (overrideEffect) cfg.currentEffect = EFFECT_SPARK;
                 break;
             case PRESET_SYNTHWAVE:
                 cfg.primaryR = 245; cfg.primaryG = 158; cfg.primaryB = 11;  // Golden Amber
                 cfg.secondaryR = 139; cfg.secondaryG = 92; cfg.secondaryB = 246; // Deep Violet
                 cfg.rainbow = false;
-                cfg.currentEffect = EFFECT_PULSE;
+                if (overrideEffect) cfg.currentEffect = EFFECT_PULSE;
                 break;
             case PRESET_EMERALD:
                 cfg.primaryR = 16;  cfg.primaryG = 185; cfg.primaryB = 129; // Mint
                 cfg.secondaryR = 6; cfg.secondaryG = 182; cfg.secondaryB = 212; // Luminous Teal
                 cfg.rainbow = false;
-                cfg.currentEffect = EFFECT_GLITCH;
+                if (overrideEffect) cfg.currentEffect = EFFECT_GLITCH;
                 break;
             case PRESET_SUNSET:
                 cfg.primaryR = 244; cfg.primaryG = 63;  cfg.primaryB = 94;  // Rose Red
                 cfg.secondaryR = 251; cfg.secondaryG = 146; cfg.secondaryB = 60; // Warm Peach
                 cfg.rainbow = false;
-                cfg.currentEffect = EFFECT_RIPPLE;
+                if (overrideEffect) cfg.currentEffect = EFFECT_RIPPLE;
                 break;
             case PRESET_INDIGO:
                 cfg.primaryR = 99;  cfg.primaryG = 102; cfg.primaryB = 241; // Deep Indigo
                 cfg.secondaryR = 56; cfg.secondaryG = 189; cfg.secondaryB = 248; // Cobalt Sky
                 cfg.rainbow = false;
-                cfg.currentEffect = EFFECT_WAVE;
+                if (overrideEffect) cfg.currentEffect = EFFECT_WAVE;
                 break;
             case PRESET_CRIMSON:
                 cfg.primaryR = 239; cfg.primaryG = 68;  cfg.primaryB = 68;  // Intense Flame
                 cfg.secondaryR = 249; cfg.secondaryG = 115; cfg.secondaryB = 22; // Blaze Orange
                 cfg.rainbow = false;
-                cfg.currentEffect = EFFECT_BOUNCE;
+                if (overrideEffect) cfg.currentEffect = EFFECT_BOUNCE;
                 break;
             case PRESET_SPECTRUM:
                 cfg.rainbow = true;
-                cfg.currentEffect = EFFECT_RAIN;
+                if (overrideEffect) cfg.currentEffect = EFFECT_RAIN;
                 break;
             default:
                 break;
