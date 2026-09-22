@@ -105,10 +105,14 @@ public:
         snprintf(buf, sizeof(buf), "Spread: %.1f  Brightness: %d/255", config.spread, config.brightness);
         M5.Lcd.drawString(buf, 16, 138);
 
-        snprintf(buf, sizeof(buf), "LEDs: %d  (WS2812B @ Pin %d)", config.ledCount, LED_DATA_PIN);
+        snprintf(buf, sizeof(buf), "Module Port: %s  MIDI: %s", config.activeComPort, config.activeMidiPort);
         M5.Lcd.drawString(buf, 16, 154);
 
+        snprintf(buf, sizeof(buf), "LEDs: %d (WS2812B Pin %d)", config.ledCount, LED_DATA_PIN);
+        M5.Lcd.drawString(buf, 16, 170);
+
         // Button Legend Bar (Bottom)
+
         M5.Lcd.fillRect(0, 208, 320, 32, 0x18C3); // Dark Grey
         M5.Lcd.setTextColor(TFT_WHITE, 0x18C3);
         M5.Lcd.setTextSize(1);

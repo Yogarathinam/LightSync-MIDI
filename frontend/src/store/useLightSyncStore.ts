@@ -310,6 +310,18 @@ interface LightSyncState {
   aiCoachFeedback: AICoachFeedback | null;
   setAiCoachFeedback: (feedback: AICoachFeedback | null) => void;
 
+  // Ports & Hardware Connection State
+  midiPorts: string[];
+  activeMidiPort: string | null;
+  isMidiConnected: boolean;
+  devicePorts: Array<{ port: string; desc: string }>;
+  fetchMidiPorts: () => Promise<void>;
+  connectMidiPort: (port: string) => Promise<boolean>;
+  disconnectMidiPort: () => Promise<boolean>;
+  fetchDevicePorts: () => Promise<void>;
+  connectDevicePort: (port: string, baud?: number) => Promise<boolean>;
+  disconnectDevicePort: () => Promise<boolean>;
+
   // Hardware Device & Status
   deviceStatus: DeviceStatus;
   setDeviceStatus: (status: Partial<DeviceStatus>) => void;
@@ -320,6 +332,7 @@ interface LightSyncState {
   wsSender: ((msg: object) => void) | null;
   setWsSender: (sender: (msg: object) => void) => void;
 }
+
 
 let overlayTimer: number | null = null;
 
@@ -720,11 +733,119 @@ export const useLightSyncStore = create<LightSyncState>((set, get) => ({
     return true;
   },
 
+  // Ports & Hardware Connection State & Actions
+  midiPorts: [],
+  activeMidiPort: null,
+  isMidiConnected: false,
+  devicePorts: [{ port: 'SIMULATED', desc: 'Virtual M5Stack Strip Simulator' }],
+
+  fetchMidiPorts: async () => {
+    try {
+      const res = await fetch('/api/midi/ports');
+      if (res.ok) {
+        const data = await res.json();
+        set({
+          midiPorts: data.ports || [],
+          activeMidiPort: data.active || null,
+          isMidiConnected: !!data.active
+        });
+      }
+    } catch (e) {
+      console.warn('Could not fetch MIDI ports:', e);
+    }
+  },
+
+  connectMidiPort: async (port: string) => {
+    try {
+      const res = await fetch('/api/midi/connect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ port })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        set({
+          activeMidiPort: data.active_port || null,
+          isMidiConnected: !!data.active_port
+        });
+        get().addConsoleLog(`Connected MIDI Input Port: ${data.active_port || 'Virtual'}`);
+        return !!data.active_port;
+      }
+    } catch (e) {
+      get().addConsoleLog(`Failed to connect MIDI port ${port}`);
+    }
+    return false;
+  },
+
+  disconnectMidiPort: async () => {
+    try {
+      await fetch('/api/midi/disconnect', { method: 'POST' });
+    } catch {}
+    set({ activeMidiPort: null, isMidiConnected: false });
+    get().addConsoleLog('Disconnected MIDI Input Port.');
+    return true;
+  },
+
+  fetchDevicePorts: async () => {
+    try {
+      const res = await fetch('/api/device/ports');
+      if (res.ok) {
+        const data = await res.json();
+        set({ devicePorts: data.ports || [] });
+      }
+    } catch (e) {
+      console.warn('Could not fetch device COM ports:', e);
+    }
+  },
+
+  connectDevicePort: async (port: string, baud = 115200) => {
+    try {
+      const res = await fetch('/api/device/connect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ port, baud })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        set((state) => ({
+          deviceStatus: {
+            ...state.deviceStatus,
+            connected: data.success,
+            port: data.port,
+            simulated: data.simulated
+          }
+        }));
+        get().addConsoleLog(`Connected LightSync Module Port: ${data.port} (simulated=${data.simulated})`);
+        return data.success;
+      }
+    } catch (e) {
+      get().addConsoleLog(`Failed to connect LightSync Module Port ${port}`);
+    }
+    return false;
+  },
+
+  disconnectDevicePort: async () => {
+    try {
+      await fetch('/api/device/disconnect', { method: 'POST' });
+    } catch {}
+    set((state) => ({
+      deviceStatus: {
+        ...state.deviceStatus,
+        connected: false,
+        port: 'SIMULATED',
+        simulated: true
+      }
+    }));
+    get().addConsoleLog('Disconnected LightSync Module Port.');
+    return true;
+  },
+
   // AI Coach Feedback
   aiCoachFeedback: null,
   setAiCoachFeedback: (feedback) => set({ aiCoachFeedback: feedback }),
 
   // Device & Status
+
   deviceStatus: {
     connected: true,
     port: 'SIMULATED',
@@ -753,3 +874,4 @@ export const useLightSyncStore = create<LightSyncState>((set, get) => ({
   wsSender: null,
   setWsSender: (sender) => set({ wsSender: sender })
 }));
+

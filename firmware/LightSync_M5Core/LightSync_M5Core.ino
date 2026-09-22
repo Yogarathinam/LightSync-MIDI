@@ -122,14 +122,37 @@ void CommandProtocol::processLine(const String& rawLine, DeviceConfig& cfg, Effe
         cfg.ledCount = constrain(line.substring(5).toInt(), 10, MAX_LED_COUNT);
         deviceUi.requestRedraw();
         Serial.printf("OK LEDS %d\n", cfg.ledCount);
+    } else if (line.startsWith("PORT_CONNECT ")) {
+        String pName = line.substring(13);
+        pName.toCharArray(cfg.activeComPort, sizeof(cfg.activeComPort));
+        cfg.pcConnected = true;
+        deviceUi.requestRedraw();
+        Serial.printf("OK PORT_CONNECT %s\n", cfg.activeComPort);
+    } else if (line == "PORT_DISCONNECT") {
+        snprintf(cfg.activeComPort, sizeof(cfg.activeComPort), "DISCONNECTED");
+        cfg.pcConnected = false;
+        deviceUi.requestRedraw();
+        Serial.println("OK PORT_DISCONNECT");
+    } else if (line.startsWith("MIDI_PORT ")) {
+        String mName = line.substring(10);
+        mName.toCharArray(cfg.activeMidiPort, sizeof(cfg.activeMidiPort));
+        cfg.midiConnected = true;
+        deviceUi.requestRedraw();
+        Serial.printf("OK MIDI_PORT %s\n", cfg.activeMidiPort);
+    } else if (line == "MIDI_DISCONNECT") {
+        snprintf(cfg.activeMidiPort, sizeof(cfg.activeMidiPort), "None");
+        cfg.midiConnected = false;
+        deviceUi.requestRedraw();
+        Serial.println("OK MIDI_DISCONNECT");
     } else if (line == "PING") {
         Serial.printf("PONG LIGHTSYNC_M5 CORE FPS=%d\n", eng.currentFps);
     } else if (line == "STATUS") {
-        Serial.printf("STATUS EFFECT=%s SPD=%.2f DEC=%.2f SPR=%.1f BRT=%d LEDS=%d FPS=%d\n",
+        Serial.printf("STATUS EFFECT=%s SPD=%.2f DEC=%.2f SPR=%.1f BRT=%d LEDS=%d FPS=%d PORT=%s MIDI=%s\n",
             getEffectName(cfg.currentEffect), cfg.speed, cfg.decay, cfg.spread,
-            cfg.brightness, cfg.ledCount, eng.currentFps);
+            cfg.brightness, cfg.ledCount, eng.currentFps, cfg.activeComPort, cfg.activeMidiPort);
     }
 }
+
 
 void setup() {
     M5.begin();

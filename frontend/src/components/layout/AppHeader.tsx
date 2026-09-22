@@ -16,7 +16,11 @@ import {
   Settings as SettingsIcon,
   SlidersHorizontal,
   Minus,
-  Plus
+  Plus,
+  Radio,
+  Cable,
+  CheckCircle2,
+  XCircle
 } from 'lucide-react';
 import { useLightSyncStore } from '../../store/useLightSyncStore';
 import { useTheme } from '../../context/ThemeContext';
@@ -34,7 +38,17 @@ export const AppHeader: React.FC<{
     openUtilityOverlay,
     closeUtilityOverlay,
     currentSong,
-    deviceStatus, 
+    deviceStatus,
+    devicePorts,
+    fetchDevicePorts,
+    connectDevicePort,
+    disconnectDevicePort,
+    activeMidiPort,
+    midiPorts,
+    isMidiConnected,
+    fetchMidiPorts,
+    connectMidiPort,
+    disconnectMidiPort, 
     volume, 
     setVolume, 
     isMuted, 
@@ -48,6 +62,23 @@ export const AppHeader: React.FC<{
     incrementOctave,
     decrementOctave
   } = useLightSyncStore();
+
+  const [selectedModulePort, setSelectedModulePort] = React.useState(deviceStatus.port || 'SIMULATED');
+  const [selectedMidiPort, setSelectedMidiPort] = React.useState(activeMidiPort || '');
+
+  React.useEffect(() => {
+    fetchDevicePorts();
+    fetchMidiPorts();
+  }, []);
+
+  React.useEffect(() => {
+    if (deviceStatus.port) setSelectedModulePort(deviceStatus.port);
+  }, [deviceStatus.port]);
+
+  React.useEffect(() => {
+    if (activeMidiPort) setSelectedMidiPort(activeMidiPort);
+  }, [activeMidiPort]);
+
 
   const tabs: { id: TopNavTab; label: string; icon: React.ReactNode }[] = [
     { id: 'songs', label: 'Songs', icon: <Music className="w-3.5 h-3.5 text-amber-500" /> },
@@ -147,7 +178,93 @@ export const AppHeader: React.FC<{
         {/* Right Universal Actions Bar */}
         <div className="flex items-center gap-2 sm:gap-2.5 shrink-0 select-none">
           
-          {/* 1. Live Performance Output Capsule (Fixed width, zero layout shift) */}
+          {/* Dual Connection Pod: LightSync Module Port & MIDI Input Port */}
+          <div className="hidden 2xl:flex items-center gap-2 p-1 rounded-xl bg-slate-100 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 shadow-sm shrink-0">
+            {/* LightSync Module COM Port */}
+            <div className="flex items-center gap-1.5 pl-1.5 pr-1">
+              <Radio className={`w-3.5 h-3.5 ${deviceStatus.connected && !deviceStatus.simulated ? 'text-emerald-500' : 'text-indigo-500'}`} />
+              <select
+                value={selectedModulePort}
+                onChange={(e) => setSelectedModulePort(e.target.value)}
+                onFocus={fetchDevicePorts}
+                className="bg-transparent text-xs font-mono font-bold text-slate-800 dark:text-zinc-200 max-w-[110px] focus:outline-none cursor-pointer"
+                title="Select LightSync Module Serial COM Port"
+              >
+                {devicePorts.length > 0 ? (
+                  devicePorts.map((p) => (
+                    <option key={p.port} value={p.port} className="bg-white dark:bg-zinc-900 text-slate-900 dark:text-white">
+                      {p.port} {p.port === 'SIMULATED' ? '(Sim)' : ''}
+                    </option>
+                  ))
+                ) : (
+                  <option value="SIMULATED" className="bg-white dark:bg-zinc-900">SIMULATED</option>
+                )}
+              </select>
+              {deviceStatus.connected && !deviceStatus.simulated ? (
+                <button
+                  onClick={disconnectDevicePort}
+                  className="px-2 py-0.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-bold text-[10px] shadow-sm transition-all"
+                  title="Disconnect LightSync Module Port"
+                >
+                  Disconnect
+                </button>
+              ) : (
+                <button
+                  onClick={() => connectDevicePort(selectedModulePort)}
+                  className="px-2 py-0.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[10px] shadow-sm transition-all"
+                  title="Connect LightSync Module Port"
+                >
+                  Connect
+                </button>
+              )}
+            </div>
+
+            <div className="h-4 w-px bg-slate-300 dark:bg-zinc-800" />
+
+            {/* MIDI Input Port */}
+            <div className="flex items-center gap-1.5 pl-1 pr-1.5">
+              <Cable className={`w-3.5 h-3.5 ${isMidiConnected ? 'text-emerald-500' : 'text-amber-500'}`} />
+              <select
+                value={selectedMidiPort}
+                onChange={(e) => setSelectedMidiPort(e.target.value)}
+                onFocus={fetchMidiPorts}
+                className="bg-transparent text-xs font-mono font-bold text-slate-800 dark:text-zinc-200 max-w-[110px] focus:outline-none cursor-pointer"
+                title="Select Physical MIDI Keyboard Input Port"
+              >
+                <option value="" className="bg-white dark:bg-zinc-900 text-slate-900 dark:text-white">Virtual / None</option>
+                {midiPorts.map((mp) => (
+                  <option key={mp} value={mp} className="bg-white dark:bg-zinc-900 text-slate-900 dark:text-white">
+                    {mp}
+                  </option>
+                ))}
+              </select>
+              {isMidiConnected ? (
+                <button
+                  onClick={disconnectMidiPort}
+                  className="px-2 py-0.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-bold text-[10px] shadow-sm transition-all"
+                  title="Disconnect MIDI Input Port"
+                >
+                  Disconnect
+                </button>
+              ) : (
+                <button
+                  onClick={() => connectMidiPort(selectedMidiPort)}
+                  disabled={!selectedMidiPort}
+                  className={`px-2 py-0.5 rounded-lg font-bold text-[10px] shadow-sm transition-all ${
+                    selectedMidiPort 
+                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer' 
+                      : 'bg-slate-300 dark:bg-zinc-800 text-slate-500 dark:text-zinc-500 cursor-not-allowed'
+                  }`}
+                  title="Connect Selected MIDI Input Port"
+                >
+                  Connect
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* 1. Live Performance Output Capsule */}
+
           <div className="hidden lg:flex items-center h-8.5 px-3 rounded-xl bg-slate-100 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 shadow-sm shrink-0 select-none">
             {/* Live Chord / Pitch readout */}
             <div className="w-14 text-center">

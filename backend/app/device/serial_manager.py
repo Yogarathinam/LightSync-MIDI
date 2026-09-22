@@ -71,6 +71,7 @@ class SerialDeviceManager:
             self._thread.start()
 
             # Handshake
+            self.send_raw(f"PORT_CONNECT {port_name}")
             self.send_raw(ProtocolBuilder.ping())
 
             event_bus.publish_sync("DEVICE_STATUS", {"connected": True, "port": port_name, "simulated": False})
@@ -83,6 +84,11 @@ class SerialDeviceManager:
             return False
 
     def disconnect(self):
+        if self.ser and self.connected:
+            try:
+                self.send_raw("PORT_DISCONNECT")
+            except Exception:
+                pass
         self._running = False
         if self.ser:
             try:
@@ -93,6 +99,7 @@ class SerialDeviceManager:
         self.connected = False
         self.port_name = None
         event_bus.publish_sync("DEVICE_STATUS", {"connected": False, "port": None, "simulated": self.simulated})
+
 
     def send_raw(self, cmd: str):
         if not cmd.endswith("\n"):

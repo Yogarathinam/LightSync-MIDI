@@ -121,6 +121,11 @@ def connect_midi(data: Dict[str, str]):
     success = midi_engine.start(port)
     return {"success": success, "active_port": midi_engine.active_port_name}
 
+@app.post("/api/midi/disconnect")
+def disconnect_midi():
+    midi_engine.stop()
+    return {"success": True, "active_port": None}
+
 @app.get("/api/device/ports")
 def get_device_ports():
     return {"ports": serial_manager.list_ports(), "active": serial_manager.port_name}
@@ -129,6 +134,12 @@ def get_device_ports():
 def connect_device(data: ConnectDeviceModel):
     success = serial_manager.connect(data.port, data.baud)
     return {"success": success, "port": serial_manager.port_name, "simulated": serial_manager.simulated}
+
+@app.post("/api/device/disconnect")
+def disconnect_device():
+    serial_manager.disconnect()
+    return {"success": True, "port": None, "simulated": True}
+
 
 @app.get("/api/songs")
 def get_songs():
@@ -257,6 +268,21 @@ async def websocket_endpoint(websocket: WebSocket):
                             "coach": coach_feedback
                         }))
 
+                elif msg_type == "CONNECT_MIDI":
+                    port = msg.get("port")
+                    midi_engine.start(port)
+
+                elif msg_type == "DISCONNECT_MIDI":
+                    midi_engine.stop()
+
+                elif msg_type == "CONNECT_DEVICE":
+                    port = msg.get("port", "SIMULATED")
+                    baud = msg.get("baud", 115200)
+                    serial_manager.connect(port, baud)
+
+                elif msg_type == "DISCONNECT_DEVICE":
+                    serial_manager.disconnect()
+
                 elif msg_type == "PING":
                     serial_manager.ping()
                     await websocket.send_text(json.dumps({
@@ -264,6 +290,7 @@ async def websocket_endpoint(websocket: WebSocket):
                         "server_time": asyncio.get_event_loop().time(),
                         "latency_ms": serial_manager.last_latency_ms
                     }))
+
 
             except Exception as e:
                 logger.error(f"Error processing WS payload: {e}")

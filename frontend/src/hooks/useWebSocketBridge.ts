@@ -56,14 +56,24 @@ export const useWebSocketBridge = () => {
               simulated: data.simulated
             });
             addConsoleLog(`Device Status: ${data.connected ? 'Connected' : 'Disconnected'} (${data.port || 'None'})`);
+          } else if (type === 'MIDI_STATUS') {
+            useLightSyncStore.setState({
+              activeMidiPort: data.port || null,
+              isMidiConnected: data.connected
+            });
+            addConsoleLog(`MIDI Status: ${data.connected ? 'Connected' : 'Disconnected'} (${data.port || 'None'})`);
           } else if (type === 'SESSION_RESULT') {
             if (data.summary) addSessionResult(data.summary);
             if (data.coach) setAiCoachFeedback(data.coach);
           } else if (type === 'INITIAL_STATE') {
             if (data.device) setDeviceStatus(data.device);
+            if (data.active_midi) {
+              useLightSyncStore.setState({ activeMidiPort: data.active_midi, isMidiConnected: true });
+            }
           } else if (type === 'PONG') {
             setDeviceStatus({ latency_ms: data.latency_ms || 1 });
           }
+
         } catch (e) {
           console.error('Failed to parse WS message:', e);
         }

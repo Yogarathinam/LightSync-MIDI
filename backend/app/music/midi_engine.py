@@ -32,11 +32,19 @@ class MidiEngine:
             return []
 
     def start(self, preferred_port: Optional[str] = None):
+        self.stop()
+
+        if not preferred_port or preferred_port == "DISCONNECT" or preferred_port == "None":
+            logger.info("MIDI engine set to Disconnected / Virtual Mode.")
+            event_bus.publish_sync("MIDI_STATUS", {"connected": False, "port": None})
+            return False
+
         ports = self.get_available_ports()
-        target_port = preferred_port if (preferred_port and preferred_port in ports) else (ports[0] if ports else None)
+        target_port = preferred_port if preferred_port in ports else (ports[0] if ports else None)
 
         if not target_port:
-            logger.info("No physical MIDI device detected. Running in Virtual / WebMIDI Mode.")
+            logger.info("No matching physical MIDI device detected. Running in Virtual / WebMIDI Mode.")
+            event_bus.publish_sync("MIDI_STATUS", {"connected": False, "port": None})
             return False
 
         try:
@@ -46,9 +54,11 @@ class MidiEngine:
             self._thread = threading.Thread(target=self._listen_loop, daemon=True)
             self._thread.start()
             logger.info(f"Connected to MIDI Device: {target_port}")
+            event_bus.publish_sync("MIDI_STATUS", {"connected": True, "port": target_port})
             return True
         except Exception as e:
             logger.error(f"Failed to open MIDI port {target_port}: {e}")
+            event_bus.publish_sync("MIDI_STATUS", {"connected": False, "port": None})
             return False
 
     def stop(self):
@@ -60,6 +70,8 @@ class MidiEngine:
                 pass
             self.inport = None
         self.active_port_name = None
+        event_bus.publish_sync("MIDI_STATUS", {"connected": False, "port": None})
+
 
     def _listen_loop(self):
         while self._running and self.inport:

@@ -14,7 +14,10 @@ import {
   Activity,
   Music,
   Minus,
-  Plus
+  Plus,
+  Radio,
+  Cable,
+  RefreshCw
 } from 'lucide-react';
 import { useLightSyncStore } from '../../store/useLightSyncStore';
 import { useTheme } from '../../context/ThemeContext';
@@ -49,8 +52,27 @@ export const SettingsModal: React.FC = () => {
     toggleMute,
     instrument,
     setInstrument,
-    addConsoleLog
+    addConsoleLog,
+    deviceStatus,
+    devicePorts,
+    fetchDevicePorts,
+    connectDevicePort,
+    disconnectDevicePort,
+    activeMidiPort,
+    midiPorts,
+    isMidiConnected,
+    fetchMidiPorts,
+    connectMidiPort,
+    disconnectMidiPort
   } = useLightSyncStore();
+
+  const [selectedModulePort, setSelectedModulePort] = React.useState(deviceStatus.port || 'SIMULATED');
+  const [selectedMidiPort, setSelectedMidiPort] = React.useState(activeMidiPort || '');
+
+  React.useEffect(() => {
+    fetchDevicePorts();
+    fetchMidiPorts();
+  }, []);
 
   const handleResetDefaults = () => {
     setTheme('dark');
@@ -74,6 +96,123 @@ export const SettingsModal: React.FC = () => {
 
   return (
     <div className="space-y-6 text-sm">
+
+      {/* 0. Module Port & MIDI Connections Section */}
+      <div className="p-4 rounded-2xl bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 transition-colors space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+            <Radio className="w-4 h-4 text-indigo-500" />
+            Hardware & MIDI Port Connections
+          </h3>
+          <button
+            onClick={() => {
+              fetchDevicePorts();
+              fetchMidiPorts();
+            }}
+            className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 font-mono"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            <span>Rescan Ports</span>
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* LightSync Module COM Port */}
+          <div className="p-3 rounded-xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 space-y-2">
+            <div className="flex justify-between items-center text-xs">
+              <span className="font-bold text-slate-800 dark:text-zinc-200 flex items-center gap-1.5">
+                <Radio className="w-3.5 h-3.5 text-indigo-500" />
+                LightSync Module Port
+              </span>
+              <span className={`text-[10px] font-mono px-2 py-0.5 rounded font-bold ${
+                deviceStatus.connected && !deviceStatus.simulated ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400' : 'bg-slate-100 text-slate-600 dark:bg-zinc-800 dark:text-zinc-400'
+              }`}>
+                {deviceStatus.connected && !deviceStatus.simulated ? 'Connected' : 'Simulated'}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <select
+                value={selectedModulePort}
+                onChange={(e) => setSelectedModulePort(e.target.value)}
+                className="flex-1 p-2 rounded-xl bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 text-xs font-mono text-slate-800 dark:text-zinc-200 focus:outline-none"
+              >
+                {devicePorts.map((p) => (
+                  <option key={p.port} value={p.port}>
+                    {p.port} - {p.desc}
+                  </option>
+                ))}
+              </select>
+
+              {deviceStatus.connected && !deviceStatus.simulated ? (
+                <button
+                  onClick={disconnectDevicePort}
+                  className="px-3 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-sm"
+                >
+                  Disconnect
+                </button>
+              ) : (
+                <button
+                  onClick={() => connectDevicePort(selectedModulePort)}
+                  className="px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-sm"
+                >
+                  Connect
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* MIDI Input Port */}
+          <div className="p-3 rounded-xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 space-y-2">
+            <div className="flex justify-between items-center text-xs">
+              <span className="font-bold text-slate-800 dark:text-zinc-200 flex items-center gap-1.5">
+                <Cable className="w-3.5 h-3.5 text-amber-500" />
+                MIDI Keyboard Input Port
+              </span>
+              <span className={`text-[10px] font-mono px-2 py-0.5 rounded font-bold ${
+                isMidiConnected ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400' : 'bg-slate-100 text-slate-600 dark:bg-zinc-800 dark:text-zinc-400'
+              }`}>
+                {isMidiConnected ? 'Connected' : 'Virtual Mode'}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <select
+                value={selectedMidiPort}
+                onChange={(e) => setSelectedMidiPort(e.target.value)}
+                className="flex-1 p-2 rounded-xl bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 text-xs font-mono text-slate-800 dark:text-zinc-200 focus:outline-none"
+              >
+                <option value="">Virtual / None (On-Screen & QWERTY)</option>
+                {midiPorts.map((mp) => (
+                  <option key={mp} value={mp}>
+                    {mp}
+                  </option>
+                ))}
+              </select>
+
+              {isMidiConnected ? (
+                <button
+                  onClick={disconnectMidiPort}
+                  className="px-3 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-sm"
+                >
+                  Disconnect
+                </button>
+              ) : (
+                <button
+                  onClick={() => connectMidiPort(selectedMidiPort)}
+                  disabled={!selectedMidiPort}
+                  className={`px-3 py-2 rounded-xl font-bold text-xs shadow-sm ${
+                    selectedMidiPort ? 'bg-emerald-600 hover:bg-emerald-500 text-white' : 'bg-slate-200 text-slate-400 dark:bg-zinc-800 dark:text-zinc-600 cursor-not-allowed'
+                  }`}
+                >
+                  Connect
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
       
       {/* 1. App-Wide Theme (Daylight vs Pure Black OLED) */}
       <div className="p-4 rounded-2xl bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 transition-colors">

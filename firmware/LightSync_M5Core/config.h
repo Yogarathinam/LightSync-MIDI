@@ -59,5 +59,9 @@ struct DeviceConfig {
     uint16_t ledCount = DEFAULT_LED_COUNT;
     uint8_t keyCount = 61;
     bool pcConnected = false;
+    bool midiConnected = false;
+    char activeMidiPort[32] = "Virtual / None";
+    char activeComPort[32] = "SIMULATED";
     uint32_t lastHeartbeatMs = 0;
 };
+

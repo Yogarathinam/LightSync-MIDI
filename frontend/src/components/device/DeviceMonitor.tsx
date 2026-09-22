@@ -12,15 +12,23 @@ export const DeviceMonitor: React.FC = () => {
     setEffectParam,
     triggerNoteOn,
     triggerNoteOff,
-    wsSender 
+    wsSender,
+    midiPorts,
+    activeMidiPort,
+    isMidiConnected,
+    fetchMidiPorts,
+    connectMidiPort,
+    disconnectMidiPort
   } = useLightSyncStore();
 
   const [availablePorts, setAvailablePorts] = useState<Array<{ port: string; desc: string }>>([
     { port: 'SIMULATED', desc: 'Virtual M5Stack Strip Simulator' }
   ]);
   const [selectedPort, setSelectedPort] = useState(deviceStatus.port || 'SIMULATED');
+  const [selectedMidiPort, setSelectedMidiPort] = useState(activeMidiPort || '');
   const [copied, setCopied] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
+
 
   const fetchPorts = async () => {
     setIsScanning(true);
@@ -114,67 +122,132 @@ export const DeviceMonitor: React.FC = () => {
           <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-zinc-800">
             <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
               <Radio className="w-4 h-4 text-indigo-500" />
-              Serial Port Manager
+              LightSync Module & MIDI Port Manager
             </h2>
             <button
-              onClick={fetchPorts}
+              onClick={() => {
+                fetchPorts();
+                fetchMidiPorts();
+              }}
               disabled={isScanning}
               className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 font-mono"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isScanning ? 'animate-spin' : ''}`} />
-              <span>Rescan</span>
+              <span>Rescan Ports</span>
             </button>
           </div>
 
-          <div className="flex flex-col gap-2">
-            <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300">Select COM Port:</label>
-            <select
-              value={selectedPort}
-              onChange={(e) => setSelectedPort(e.target.value)}
-              className="w-full p-2.5 rounded-xl bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 text-xs font-mono text-slate-800 dark:text-zinc-200 focus:outline-none focus:border-indigo-500"
-            >
-              {availablePorts.map((p) => (
-                <option key={p.port} value={p.port}>
-                  {p.port} - {p.desc}
-                </option>
-              ))}
-            </select>
+          {/* 1. LightSync Module Port Control */}
+          <div className="p-3 rounded-xl bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-800 dark:text-zinc-200 flex items-center gap-1.5">
+                <Radio className="w-3.5 h-3.5 text-indigo-500" />
+                LightSync Module COM Port
+              </span>
+              <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-bold ${
+                deviceStatus.connected && !deviceStatus.simulated ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400' : 'bg-slate-200 text-slate-700 dark:bg-zinc-800 dark:text-zinc-400'
+              }`}>
+                {deviceStatus.connected && !deviceStatus.simulated ? 'CONNECTED' : 'SIMULATED'}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <select
+                value={selectedPort}
+                onChange={(e) => setSelectedPort(e.target.value)}
+                className="flex-1 p-2 rounded-xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-xs font-mono text-slate-800 dark:text-zinc-200 focus:outline-none focus:border-indigo-500"
+              >
+                {availablePorts.map((p) => (
+                  <option key={p.port} value={p.port}>
+                    {p.port} - {p.desc}
+                  </option>
+                ))}
+              </select>
+
+              {deviceStatus.connected && !deviceStatus.simulated ? (
+                <button
+                  onClick={handleDisconnect}
+                  className="px-3 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-sm"
+                >
+                  Disconnect
+                </button>
+              ) : (
+                <button
+                  onClick={handleConnect}
+                  className="px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-sm"
+                >
+                  Connect
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* 2. MIDI Input Port Control */}
+          <div className="p-3 rounded-xl bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-800 dark:text-zinc-200 flex items-center gap-1.5">
+                <Radio className="w-3.5 h-3.5 text-amber-500" />
+                Physical MIDI Keyboard Input Port
+              </span>
+              <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-bold ${
+                isMidiConnected ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400' : 'bg-slate-200 text-slate-700 dark:bg-zinc-800 dark:text-zinc-400'
+              }`}>
+                {isMidiConnected ? 'CONNECTED' : 'VIRTUAL'}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <select
+                value={selectedMidiPort || ''}
+                onChange={(e) => setSelectedMidiPort(e.target.value)}
+                className="flex-1 p-2 rounded-xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-xs font-mono text-slate-800 dark:text-zinc-200 focus:outline-none focus:border-indigo-500"
+              >
+                <option value="">Virtual / None (On-Screen & QWERTY)</option>
+                {midiPorts.map((mp) => (
+                  <option key={mp} value={mp}>
+                    {mp}
+                  </option>
+                ))}
+              </select>
+
+              {isMidiConnected ? (
+                <button
+                  onClick={disconnectMidiPort}
+                  className="px-3 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-sm"
+                >
+                  Disconnect
+                </button>
+              ) : (
+                <button
+                  onClick={() => connectMidiPort(selectedMidiPort)}
+                  disabled={!selectedMidiPort}
+                  className={`px-3 py-2 rounded-xl font-bold text-xs shadow-sm ${
+                    selectedMidiPort ? 'bg-emerald-600 hover:bg-emerald-500 text-white' : 'bg-slate-200 text-slate-400 dark:bg-zinc-800 dark:text-zinc-600 cursor-not-allowed'
+                  }`}
+                >
+                  Connect
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-2 text-xs font-mono">
             <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800">
               <span className="text-slate-400 block text-[10px]">BAUD RATE</span>
-              <span className="font-bold text-slate-800 dark:text-zinc-200">115200</span>
+              <span className="font-bold text-slate-800 dark:text-zinc-200">115200 8-N-1</span>
             </div>
-            <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800">
-              <span className="text-slate-400 block text-[10px]">ROUNDTRIP</span>
-              <span className="font-bold text-emerald-500">{deviceStatus.latency_ms} ms</span>
+            <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 flex items-center justify-between">
+              <div>
+                <span className="text-slate-400 block text-[10px]">LATENCY</span>
+                <span className="font-bold text-emerald-500">{deviceStatus.latency_ms} ms</span>
+              </div>
+              <button
+                onClick={handlePing}
+                className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-[10px] font-bold text-slate-700 dark:text-zinc-200 hover:bg-slate-100"
+              >
+                Ping
+              </button>
             </div>
-          </div>
-
-          <div className="flex items-center gap-2 pt-1">
-            {!deviceStatus.connected ? (
-              <button
-                onClick={handleConnect}
-                className="flex-1 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md shadow-indigo-600/20"
-              >
-                Connect Device
-              </button>
-            ) : (
-              <button
-                onClick={handleDisconnect}
-                className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-md shadow-rose-600/20"
-              >
-                Disconnect
-              </button>
-            )}
-
-            <button
-              onClick={handlePing}
-              className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-zinc-700 bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-xs font-bold text-slate-700 dark:text-zinc-200"
-            >
-              Ping
-            </button>
           </div>
         </div>
 
@@ -196,8 +269,8 @@ export const DeviceMonitor: React.FC = () => {
               {/* Header */}
               <div className="flex justify-between items-center bg-indigo-950 text-indigo-200 px-2 py-1 rounded text-[11px] font-bold">
                 <span>LIGHTSYNC</span>
-                <span className={deviceStatus.connected ? 'text-emerald-400' : 'text-slate-400'}>
-                  {deviceStatus.connected ? 'ONLINE' : 'STANDALONE'}
+                <span className={deviceStatus.connected && !deviceStatus.simulated ? 'text-emerald-400' : 'text-slate-400'}>
+                  {deviceStatus.connected && !deviceStatus.simulated ? 'ONLINE' : 'STANDALONE'}
                 </span>
               </div>
 
@@ -214,10 +287,13 @@ export const DeviceMonitor: React.FC = () => {
                 <div>Brt: {effectConfig.brightness}</div>
               </div>
 
-              <div className="text-[9px] text-slate-500 pt-1 border-t border-zinc-800">
-                WS2812B @ Pin 21 &bull; 144 LEDs
+              <div className="text-[9px] text-slate-400 border-t border-zinc-800 pt-1 space-y-0.5">
+                <div>Module Port: <span className="text-indigo-300 font-bold">{deviceStatus.port || 'SIMULATED'}</span></div>
+                <div>MIDI Input: <span className="text-emerald-300 font-bold">{activeMidiPort || 'Virtual / None'}</span></div>
+                <div>WS2812B @ Pin 21 &bull; 144 LEDs</div>
               </div>
             </div>
+
 
             {/* Physical Button Replicas */}
             <div className="w-full flex items-center justify-between gap-3 pt-1">
