@@ -13,15 +13,18 @@ import {
   ActiveNoteState, 
   ChordInfo, 
   SongItem, 
+  SongNote,
   SessionResult, 
   AICoachFeedback, 
   DeviceStatus,
   FlowKeyConfig,
   VisualizerBackgroundConfig,
   ColorSyncPresetId,
-  RawMidiLog
+  RawMidiLog,
+  RecordedMidiEvent
 } from '../types';
 import { synthEngine } from '../audio/synthEngine';
+import { createMidiFile, downloadMidiFile } from '../utils/midi_recorder';
 
 const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 export const getMidiNoteName = (pitch: number) => {
@@ -29,6 +32,15 @@ export const getMidiNoteName = (pitch: number) => {
   const name = NOTE_NAMES[pitch % 12];
   return `${name}${octave}`;
 };
+
+function hexToRgb(hex: string): { r: number; g: number; b: number } {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  return result ? {
+    r: parseInt(result[1], 16),
+    g: parseInt(result[2], 16),
+    b: parseInt(result[3], 16)
+  } : { r: 99, g: 102, b: 241 };
+}
 
 export const COLOR_SYNC_PRESETS: Record<ColorSyncPresetId, {
   name: string;
@@ -93,6 +105,14 @@ export const COLOR_SYNC_PRESETS: Record<ColorSyncPresetId, {
     secondary: '#ec4899',
     rainbow: true,
     effect: 'rain'
+  },
+  custom: {
+    name: 'Custom',
+    desc: 'User Tuned Palette & Effect',
+    primary: '#00f0ff',
+    secondary: '#ec4899',
+    rainbow: false,
+    effect: 'static'
   }
 };
 
@@ -302,6 +322,25 @@ interface LightSyncState {
   setPracticeMode: (mode: 'wait_for_key' | 'flow') => void;
   handFilter: 'both' | 'right' | 'left';
   setHandFilter: (filter: 'both' | 'right' | 'left') => void;
+  leftHandColor: string;
+  rightHandColor: string;
+  setLeftHandColor: (color: string) => void;
+  setRightHandColor: (color: string) => void;
+  learnMode: 'watch_listen' | 'wait_for_key' | 'flow';
+  setLearnMode: (mode: 'watch_listen' | 'wait_for_key' | 'flow') => void;
+
+  // MIDI Performance Recording (.mid) & Playback
+  isRecording: boolean;
+  recordingStartTime: number | null;
+  recordedEvents: RecordedMidiEvent[];
+  isPlayingRecording: boolean;
+  startRecording: () => void;
+  recordEvent: (event: RecordedMidiEvent) => void;
+  stopRecording: () => RecordedMidiEvent[];
+  playRecording: () => void;
+  stopPlayback: () => void;
+  downloadRecording: (filename?: string) => void;
+  saveRecordingAsSong: (title?: string) => Promise<SongItem | null>;
   expectedPitch: number | null;
   setExpectedPitch: (pitch: number | null) => void;
   sessionHistory: SessionResult[];
@@ -357,6 +396,8 @@ interface PersistedSettingsSnapshot {
   keyboardSize?: 25 | 49 | 61 | 88;
   octaveShift?: number;
   transpose?: number;
+  leftHandColor?: string;
+  rightHandColor?: string;
 }
 
 function getInitialPersistedSettings(): PersistedSettingsSnapshot | null {
@@ -395,11 +436,14 @@ function triggerPersist(state: any) {
     volume: state.volume,
     keyboardSize: state.keyboardSize,
     octaveShift: state.octaveShift,
-    transpose: state.transpose
+    transpose: state.transpose,
+    leftHandColor: state.leftHandColor,
+    rightHandColor: state.rightHandColor
   });
 }
 
 let overlayTimer: number | null = null;
+let recordingPlaybackTimers: number[] = [];
 
 export const useLightSyncStore = create<LightSyncState>((set, get) => ({
   // Navigation & Spatial Workspace / Overlay State
@@ -530,6 +574,18 @@ export const useLightSyncStore = create<LightSyncState>((set, get) => ({
       rawMidiLogs: [logItem, ...state.rawMidiLogs.slice(0, 199)]
     }));
 
+    // Record note on if recording session is active
+    if (get().isRecording) {
+      const startTime = get().recordingStartTime || performance.now();
+      const time_ms = Math.round(performance.now() - startTime);
+      get().recordEvent({
+        type: 'note_on',
+        pitch,
+        velocity,
+        time_ms
+      });
+    }
+
     // Send to backend via WS if connected
     if (sendWs && wsSender) {
       wsSender({
@@ -566,6 +622,18 @@ export const useLightSyncStore = create<LightSyncState>((set, get) => ({
       activeNotes: newMap,
       rawMidiLogs: [logItem, ...state.rawMidiLogs.slice(0, 199)]
     }));
+
+    // Record note off if recording session is active
+    if (get().isRecording) {
+      const startTime = get().recordingStartTime || performance.now();
+      const time_ms = Math.round(performance.now() - startTime);
+      get().recordEvent({
+        type: 'note_off',
+        pitch,
+        velocity: 0,
+        time_ms
+      });
+    }
 
     if (sendWs && wsSender) {
       wsSender({
@@ -671,15 +739,43 @@ export const useLightSyncStore = create<LightSyncState>((set, get) => ({
     secondaryColor: savedSettings?.effectConfig?.secondaryColor || '#6366f1'
   },
   setEffectParam: (param, value) => {
-    const newConfig = { ...get().effectConfig, [param]: value };
-    set({ effectConfig: newConfig });
+    const prevConfig = get().effectConfig;
+    const newConfig = { ...prevConfig, [param]: value };
+    let newFlowKey = get().flowKeyConfig;
+
+    if (param === 'primaryColor' || param === 'secondaryColor' || param === 'rainbow') {
+      newFlowKey = {
+        ...newFlowKey,
+        colorPreset: 'custom',
+        customColor: param === 'primaryColor' ? (value as string) : newConfig.primaryColor,
+        customSecondaryColor: param === 'secondaryColor' ? (value as string) : newConfig.secondaryColor
+      };
+      if (COLOR_SYNC_PRESETS.custom) {
+        COLOR_SYNC_PRESETS.custom.primary = newFlowKey.customColor || newConfig.primaryColor;
+        COLOR_SYNC_PRESETS.custom.secondary = newFlowKey.customSecondaryColor || newConfig.secondaryColor;
+        COLOR_SYNC_PRESETS.custom.rainbow = newConfig.rainbow;
+      }
+    }
+
+    set({ effectConfig: newConfig, flowKeyConfig: newFlowKey });
     triggerPersist(get());
+
     const { wsSender } = get();
     if (wsSender) {
       if (param === 'effect') {
         wsSender({ type: 'EFFECT_CHANGED', effect: value });
       } else {
         wsSender({ type: 'PARAM_CHANGED', param, value });
+      }
+
+      // Also forward hex color to hardware device via CLI command "color=r,g,b"
+      if (param === 'primaryColor' && typeof value === 'string') {
+        const rgb = hexToRgb(value);
+        wsSender({ type: 'CLI_COMMAND', command: `color=${rgb.r},${rgb.g},${rgb.b}` });
+        wsSender({ type: 'COLOR_PRESET_CHANGED', preset: 'Custom' });
+      } else if (param === 'secondaryColor' && typeof value === 'string') {
+        const rgb = hexToRgb(value);
+        wsSender({ type: 'CLI_COMMAND', command: `color2=${rgb.r},${rgb.g},${rgb.b}` });
       }
     }
   },
@@ -760,6 +856,8 @@ export const useLightSyncStore = create<LightSyncState>((set, get) => ({
           if (data.keyboardSize) updates.keyboardSize = data.keyboardSize;
           if (typeof data.octaveShift === 'number') updates.octaveShift = data.octaveShift;
           if (typeof data.transpose === 'number') updates.transpose = data.transpose;
+          if (data.leftHandColor) updates.leftHandColor = data.leftHandColor;
+          if (data.rightHandColor) updates.rightHandColor = data.rightHandColor;
           set(updates);
           try {
             localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(data));
@@ -791,6 +889,10 @@ export const useLightSyncStore = create<LightSyncState>((set, get) => ({
     if (wsSender) {
       wsSender({ type: 'COLOR_PRESET_CHANGED', preset: preset.name });
       wsSender({ type: 'EFFECT_CHANGED', effect: preset.effect });
+      const pRgb = hexToRgb(preset.primary);
+      const sRgb = hexToRgb(preset.secondary);
+      wsSender({ type: 'CLI_COMMAND', command: `color=${pRgb.r},${pRgb.g},${pRgb.b}` });
+      wsSender({ type: 'CLI_COMMAND', command: `color2=${sRgb.r},${sRgb.g},${sRgb.b}` });
     }
     get().addConsoleLog(`Applied Visual Sync Preset: ${preset.name}`);
   },
@@ -818,6 +920,163 @@ export const useLightSyncStore = create<LightSyncState>((set, get) => ({
   setPracticeMode: (mode) => set({ practiceMode: mode }),
   handFilter: 'both',
   setHandFilter: (filter) => set({ handFilter: filter }),
+  leftHandColor: savedSettings?.leftHandColor || '#38bdf8',
+  rightHandColor: savedSettings?.rightHandColor || '#10b981',
+  setLeftHandColor: (color) => {
+    set({ leftHandColor: color });
+    triggerPersist(get());
+  },
+  setRightHandColor: (color) => {
+    set({ rightHandColor: color });
+    triggerPersist(get());
+  },
+  learnMode: 'watch_listen',
+  setLearnMode: (mode) => set({ learnMode: mode }),
+
+  // MIDI Performance Recording (.mid) & Playback Implementation
+  isRecording: false,
+  recordingStartTime: null,
+  recordedEvents: [],
+  isPlayingRecording: false,
+
+  startRecording: () => {
+    recordingPlaybackTimers.forEach(t => clearTimeout(t));
+    recordingPlaybackTimers = [];
+    set({
+      isRecording: true,
+      recordingStartTime: performance.now(),
+      recordedEvents: [],
+      isPlayingRecording: false
+    });
+    get().addConsoleLog('Started Live MIDI Recording (.mid)...');
+  },
+
+  recordEvent: (event) => {
+    set((state) => ({
+      recordedEvents: [...state.recordedEvents, event]
+    }));
+  },
+
+  stopRecording: () => {
+    const events = get().recordedEvents;
+    set({ isRecording: false, recordingStartTime: null });
+    get().addConsoleLog(`Stopped MIDI Recording. Captured ${events.length} events.`);
+    return events;
+  },
+
+  playRecording: () => {
+    const { recordedEvents, triggerNoteOn, triggerNoteOff } = get();
+    if (recordedEvents.length === 0) return;
+
+    recordingPlaybackTimers.forEach(t => clearTimeout(t));
+    recordingPlaybackTimers = [];
+    set({ isPlayingRecording: true });
+
+    recordedEvents.forEach((ev) => {
+      const timer = window.setTimeout(() => {
+        if (ev.type === 'note_on') {
+          triggerNoteOn(ev.pitch, ev.velocity, false, 'Playback');
+        } else {
+          triggerNoteOff(ev.pitch, false, 'Playback');
+        }
+      }, ev.time_ms);
+      recordingPlaybackTimers.push(timer);
+    });
+
+    const lastEventTime = recordedEvents[recordedEvents.length - 1]?.time_ms || 1000;
+    const endTimer = window.setTimeout(() => {
+      set({ isPlayingRecording: false });
+    }, lastEventTime + 600);
+    recordingPlaybackTimers.push(endTimer);
+  },
+
+  stopPlayback: () => {
+    recordingPlaybackTimers.forEach(t => clearTimeout(t));
+    recordingPlaybackTimers = [];
+    set({ isPlayingRecording: false });
+  },
+
+  downloadRecording: (filename = 'LightSync_Performance.mid') => {
+    const { recordedEvents } = get();
+    if (recordedEvents.length === 0) return;
+    const midiBytes = createMidiFile(recordedEvents, filename.replace(/\.mid$/i, ''), 120);
+    downloadMidiFile(midiBytes, filename);
+    get().addConsoleLog(`Downloaded ${filename} (${midiBytes.length} bytes)`);
+  },
+
+  saveRecordingAsSong: async (title = 'My Live Performance') => {
+    const { recordedEvents, addSong, setCurrentSong } = get();
+    if (recordedEvents.length === 0) return null;
+
+    const activeNoteStarts = new Map<number, { startTimeMs: number; velocity: number }>();
+    const songNotes: SongNote[] = [];
+    const msPerBeat = 500; // 120 BPM
+
+    recordedEvents.forEach((ev) => {
+      if (ev.type === 'note_on') {
+        activeNoteStarts.set(ev.pitch, { startTimeMs: ev.time_ms, velocity: ev.velocity });
+      } else if (ev.type === 'note_off') {
+        const start = activeNoteStarts.get(ev.pitch);
+        if (start) {
+          const durationMs = Math.max(100, ev.time_ms - start.startTimeMs);
+          const beatTime = parseFloat((start.startTimeMs / msPerBeat).toFixed(2));
+          const beatDuration = parseFloat((durationMs / msPerBeat).toFixed(2));
+          songNotes.push({
+            pitch: ev.pitch,
+            name: getMidiNoteName(ev.pitch),
+            time: beatTime,
+            duration: beatDuration,
+            hand: ev.pitch < 60 ? 'left' : 'right'
+          });
+          activeNoteStarts.delete(ev.pitch);
+        }
+      }
+    });
+
+    activeNoteStarts.forEach((start, pitch) => {
+      const beatTime = parseFloat((start.startTimeMs / msPerBeat).toFixed(2));
+      songNotes.push({
+        pitch,
+        name: getMidiNoteName(pitch),
+        time: beatTime,
+        duration: 1.0,
+        hand: pitch < 60 ? 'left' : 'right'
+      });
+    });
+
+    songNotes.sort((a, b) => a.time - b.time);
+
+    const songId = `rec_${Date.now()}`;
+    const newSong: SongItem = {
+      id: songId,
+      title: title || 'Recorded Performance',
+      composer: 'Live User Session',
+      difficulty: 'Beginner',
+      bpm: 120,
+      time_signature: '4/4',
+      key: 'C Major',
+      notes: songNotes,
+      source: 'imported'
+    };
+
+    addSong(newSong);
+    setCurrentSong(newSong);
+    get().addConsoleLog(`Saved recorded session as song: "${newSong.title}" with ${songNotes.length} notes.`);
+
+    try {
+      await fetch('http://localhost:8000/api/midi/record/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: newSong.title,
+          events: recordedEvents,
+          bpm: 120
+        })
+      });
+    } catch (e) {}
+
+    return newSong;
+  },
   expectedPitch: null,
   setExpectedPitch: (pitch) => set({ expectedPitch: pitch }),
   sessionHistory: [],

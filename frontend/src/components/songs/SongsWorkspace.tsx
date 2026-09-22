@@ -16,7 +16,9 @@ import {
   RefreshCw,
   Copy,
   Check,
-  Trash2
+  Trash2,
+  Eye,
+  CircleDot
 } from 'lucide-react';
 import { useLightSyncStore } from '../../store/useLightSyncStore';
 import { SongItem, SongNote } from '../../types';
@@ -27,6 +29,12 @@ export const SongsWorkspace: React.FC = () => {
     addSong, 
     selectSongAndLearn, 
     currentSong, 
+    setCurrentSong,
+    isSongPlaying,
+    setIsSongPlaying,
+    isRecording,
+    startRecording,
+    stopRecording,
     triggerNoteOn, 
     triggerNoteOff,
     closeWorkspace,
@@ -37,6 +45,12 @@ export const SongsWorkspace: React.FC = () => {
     uploadMidiFile,
     deleteMidiSong
   } = useLightSyncStore();
+
+  const handleWatchAndListen = (song: SongItem) => {
+    setCurrentSong(song);
+    setIsSongPlaying(true);
+    closeWorkspace();
+  };
 
   const [searchQuery, setSearchQuery] = useState('');
   const [difficultyFilter, setDifficultyFilter] = useState<'All' | 'Beginner' | 'Intermediate' | 'Advanced'>('All');
@@ -346,8 +360,28 @@ export const SongsWorkspace: React.FC = () => {
             ))}
           </div>
 
-          {/* MIDI Import Button */}
-          <div>
+          {/* MIDI Import & Record Buttons */}
+          <div className="flex items-center gap-2">
+            {!isRecording ? (
+              <button
+                onClick={startRecording}
+                className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-zinc-900 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-slate-700 dark:text-zinc-300 hover:text-rose-600 border border-slate-200 dark:border-zinc-800 text-xs font-semibold shadow-xs transition-all cursor-pointer"
+                title="Record live session to .mid"
+              >
+                <CircleDot className="w-3.5 h-3.5 text-rose-500" />
+                <span>Record .mid</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => stopRecording()}
+                className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-xs transition-all cursor-pointer animate-pulse"
+                title="Stop live recording"
+              >
+                <CircleDot className="w-3.5 h-3.5 fill-current" />
+                <span>Recording...</span>
+              </button>
+            )}
+
             <input
               type="file"
               ref={fileInputRef}
@@ -360,7 +394,7 @@ export const SongsWorkspace: React.FC = () => {
               className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-xs transition-all cursor-pointer"
             >
               <Upload className="w-3.5 h-3.5" />
-              <span>Import MIDI (.mid)</span>
+              <span>Import MIDI</span>
             </button>
           </div>
         </div>
@@ -443,10 +477,20 @@ export const SongsWorkspace: React.FC = () => {
 
               {/* Action Buttons */}
               <div className="flex items-center gap-2 pt-2 border-t border-slate-100 dark:border-zinc-850">
+                {/* Watch & Listen (Stage Preview) */}
+                <button
+                  onClick={() => handleWatchAndListen(song)}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-white text-xs font-bold shadow-xs transition-all cursor-pointer"
+                  title="Watch falling notes and listen on the visualizer stage"
+                >
+                  <Eye className="w-3.5 h-3.5" />
+                  <span>Watch & Listen</span>
+                </button>
+
                 {/* Learn / Follow Button */}
                 <button
                   onClick={() => selectSongAndLearn(song, 'follow')}
-                  className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-xs transition-all cursor-pointer"
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-xs transition-all cursor-pointer"
                   title="Open in interactive Learn & Follow mode"
                 >
                   <GraduationCap className="w-3.5 h-3.5" />
@@ -456,24 +500,11 @@ export const SongsWorkspace: React.FC = () => {
                 {/* Practice Button */}
                 <button
                   onClick={() => selectSongAndLearn(song, 'practice')}
-                  className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-slate-100 dark:bg-zinc-900 hover:bg-slate-200 dark:hover:bg-zinc-800 text-slate-700 dark:text-zinc-300 text-xs font-semibold border border-slate-200/80 dark:border-zinc-800 transition-all cursor-pointer"
+                  className="flex items-center justify-center gap-1 py-2 px-2.5 rounded-xl bg-slate-100 dark:bg-zinc-900 hover:bg-slate-200 dark:hover:bg-zinc-800 text-slate-700 dark:text-zinc-300 text-xs font-semibold border border-slate-200/80 dark:border-zinc-800 transition-all cursor-pointer"
                   title="Open targeted drills & sub-tempo practice"
                 >
                   <Activity className="w-3.5 h-3.5 text-sky-500" />
-                  <span>Practice</span>
-                </button>
-
-                {/* Demo Listen Button */}
-                <button
-                  onClick={() => handlePlayDemo(song)}
-                  className={`p-2 rounded-xl border transition-all cursor-pointer ${
-                    isPlaying
-                      ? 'bg-amber-500 text-white border-amber-500 shadow-xs'
-                      : 'bg-slate-100 dark:bg-zinc-900 text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white border-slate-200/80 dark:border-zinc-800'
-                  }`}
-                  title={isPlaying ? 'Stop Demo' : 'Preview Demo in Visualizer'}
-                >
-                  <Play className={`w-3.5 h-3.5 ${isPlaying ? 'fill-current' : ''}`} />
+                  <span>Drills</span>
                 </button>
 
                 {/* Delete button for local/imported songs */}

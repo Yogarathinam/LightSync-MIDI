@@ -712,15 +712,28 @@ export const EffectStudio: React.FC = () => {
                   <div className="flex items-center gap-2.5">
                     {/* Dual Swatch Pill */}
                     <div className="flex items-center -space-x-1">
-                      <span className="w-3.5 h-3.5 rounded-full border border-white/30 shadow-sm" style={{ backgroundColor: p.primary }} />
-                      <span className="w-3.5 h-3.5 rounded-full border border-white/30 shadow-sm" style={{ backgroundColor: p.secondary }} />
+                      <span 
+                        className="w-3.5 h-3.5 rounded-full border border-white/30 shadow-sm" 
+                        style={{ backgroundColor: presetId === 'custom' ? (flowKeyConfig.customColor || effectConfig.primaryColor) : p.primary }} 
+                      />
+                      <span 
+                        className="w-3.5 h-3.5 rounded-full border border-white/30 shadow-sm" 
+                        style={{ backgroundColor: presetId === 'custom' ? (flowKeyConfig.customSecondaryColor || effectConfig.secondaryColor) : p.secondary }} 
+                      />
                     </div>
                     <div>
-                      <h4 className={`text-xs font-bold ${isSelected ? 'text-indigo-600 dark:text-white' : 'text-slate-800 dark:text-zinc-200'}`}>
-                        {p.name}
-                      </h4>
+                      <div className="flex items-center gap-1.5">
+                        <h4 className={`text-xs font-bold ${isSelected ? 'text-indigo-600 dark:text-white' : 'text-slate-800 dark:text-zinc-200'}`}>
+                          {p.name}
+                        </h4>
+                        {presetId === 'custom' && (
+                          <span className="text-[9px] font-mono px-1 rounded bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 font-semibold">
+                            ACTIVE USER
+                          </span>
+                        )}
+                      </div>
                       <p className="text-[10px] text-slate-500 dark:text-zinc-400 leading-tight">
-                        {p.desc}
+                        {presetId === 'custom' ? 'User-tuned colors & parameters' : p.desc}
                       </p>
                     </div>
                   </div>

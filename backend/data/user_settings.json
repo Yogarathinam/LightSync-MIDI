@@ -2,12 +2,12 @@
   "effectConfig": {
     "effect": "static",
     "speed": 1.2,
-    "decay": 0.85,
+    "decay": 0.65,
     "spread": 1,
     "brightness": 15,
     "rainbow": false,
     "primaryColor": "#00f0ff",
-    "secondaryColor": "#6366f1"
+    "secondaryColor": "#ec4899"
   },
   "flowKeyConfig": {
     "trailDuration": 1.8,

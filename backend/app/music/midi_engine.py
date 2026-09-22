@@ -70,6 +70,14 @@ class MidiEngine:
         self.current_chord: Optional[Dict[str, Any]] = None
 
     def get_available_ports(self) -> List[str]:
+        # On Windows, if WinMM reports 0 MIDI devices, return empty early to suppress C++ stderr spam
+        if is_windows and winmm:
+            try:
+                if winmm.midiInGetNumDevs() == 0:
+                    return []
+            except Exception:
+                pass
+
         found_ports: List[str] = []
 
         # Priority 1: rtmidi2

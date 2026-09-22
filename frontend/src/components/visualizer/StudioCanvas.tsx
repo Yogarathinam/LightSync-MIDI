@@ -176,6 +176,11 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
     triggerNoteOn,
     triggerNoteOff,
     expectedPitch,
+    currentSong,
+    isSongPlaying,
+    handFilter,
+    leftHandColor,
+    rightHandColor,
     activeOverlay,
     closeOverlay
   } = useLightSyncStore();
@@ -479,6 +484,18 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
   keysRef.current = keys;
   const onFpsUpdateRef = useRef(onFpsUpdate);
   onFpsUpdateRef.current = onFpsUpdate;
+  const currentSongRef = useRef(currentSong);
+  currentSongRef.current = currentSong;
+  const isSongPlayingRef = useRef(isSongPlaying);
+  isSongPlayingRef.current = isSongPlaying;
+  const handFilterRef = useRef(handFilter);
+  handFilterRef.current = handFilter;
+  const leftHandColorRef = useRef(leftHandColor);
+  leftHandColorRef.current = leftHandColor;
+  const rightHandColorRef = useRef(rightHandColor);
+  rightHandColorRef.current = rightHandColor;
+  const songBeatRef = useRef<number>(0);
+  const spawnedSongNoteIdsRef = useRef<Set<number>>(new Set());
 
   // Listen for newly pressed keys to trigger LED strip effects & 2D Runway VFX
   const prevPitchesRef = useRef<Set<number>>(new Set());
@@ -702,11 +719,12 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
         });
       }
 
-      // F. Horizontal Time & Measure Divisions (Moving UPWARDS away from the keyboard smoothly)
+      // F. Horizontal Time & Measure Divisions (Synthesia-style: moves towards keyboard in songs/practice)
       if (curBg.showHorizontalBeatLines) {
         const beatSpacing = 44;
-        // Continuous upward travel distance: increases over time (moves away from keyboard)
-        const scrollDistance = curBg.scrollGrid ? (now * 0.001 * 50 * curFlow.flowSpeed) : 0;
+        const isSongActive = isSongPlayingRef.current;
+        const scrollDir = isSongActive ? -1 : 1;
+        const scrollDistance = curBg.scrollGrid ? (now * 0.001 * 50 * curFlow.flowSpeed * scrollDir) : 0;
 
         ctx.save();
         ctx.beginPath();
@@ -787,9 +805,61 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
       ctx.fillRect(16, waterfallTop, width - 32, 35);
 
       // ==========================================
-      // 2. AUTO-DEMO WATERFALL FALLING BARS
+      // 2. SONG PLAYBACK & AUTO-DEMO WATERFALL FALLING BARS
       // ==========================================
-      if (isAutoDemoRef.current) {
+      const curSong = currentSongRef.current;
+      const isSongOn = isSongPlayingRef.current;
+
+      if (isSongOn && curSong && curSong.notes && curSong.notes.length > 0) {
+        // Song time progression in beats
+        songBeatRef.current += dt * (curSong.bpm / 60);
+        const currentBeat = songBeatRef.current;
+        const speed = 170 * curFlow.flowSpeed;
+        const travelDistance = Math.max(100, ledBarTop - waterfallTop);
+        const travelBeats = (travelDistance / speed) * (curSong.bpm / 60);
+
+        curSong.notes.forEach((note, idx) => {
+          if (spawnedSongNoteIdsRef.current.has(idx)) return;
+
+          if (note.time <= currentBeat + travelBeats) {
+            spawnedSongNoteIdsRef.current.add(idx);
+
+            const hFilter = handFilterRef.current;
+            if (hFilter === 'right' && note.hand === 'left') return;
+            if (hFilter === 'left' && note.hand === 'right') return;
+
+            const geom = getKeyGeometry(note.pitch, width, keyAreaTop, keyAreaHeight);
+            if (geom) {
+              const noteColorHex = note.hand === 'left'
+                ? (leftHandColorRef.current || '#38bdf8')
+                : (rightHandColorRef.current || '#10b981');
+              const col = hexToRgb(noteColorHex);
+
+              const timeToHitSec = (note.time - currentBeat) / (curSong.bpm / 60);
+              const noteLengthPx = Math.max(28, (note.duration * (60 / curSong.bpm)) * speed);
+              const noteY = ledBarTop - (timeToHitSec * speed) - noteLengthPx;
+
+              fallingBarsRef.current.push({
+                id: Math.random(),
+                pitch: note.pitch,
+                x: geom.x + 2,
+                width: geom.width - 4,
+                y: noteY,
+                length: noteLengthPx,
+                speed: speed,
+                color: col,
+                triggered: false,
+                active: true
+              });
+            }
+          }
+        });
+      } else if (!isSongOn && spawnedSongNoteIdsRef.current.size > 0) {
+        spawnedSongNoteIdsRef.current.clear();
+        songBeatRef.current = 0;
+      }
+
+      if (isAutoDemoRef.current && !isSongOn) {
         demoTimerRef.current += dt;
         if (demoTimerRef.current > 0.38 / curFlow.flowSpeed) {
           demoTimerRef.current = 0;

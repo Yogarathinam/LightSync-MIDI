@@ -58,7 +58,15 @@ export type ColorSyncPresetId =
   | 'sunset_horizon' 
   | 'electric_indigo' 
   | 'crimson_nova' 
-  | 'rainbow_spectrum';
+  | 'rainbow_spectrum'
+  | 'custom';
+
+export interface RecordedMidiEvent {
+  type: 'note_on' | 'note_off';
+  pitch: number;
+  velocity: number;
+  time_ms: number;
+}
 
 export interface FlowKeyConfig {
   trailDuration: number;          // in seconds: 0.5 to 4.0

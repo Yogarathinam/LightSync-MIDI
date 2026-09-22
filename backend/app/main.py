@@ -95,6 +95,11 @@ class ConnectDeviceModel(BaseModel):
     port: str
     baud: int = 115200
 
+class SaveRecordingModel(BaseModel):
+    title: str = "Recorded Performance"
+    events: List[Dict[str, Any]]
+    bpm: Optional[int] = 120
+
 # REST Endpoints
 @app.get("/api/status")
 def get_status():
@@ -206,6 +211,54 @@ def rescan_songs():
 def delete_song(song_id: str):
     success = delete_midi_file(song_id)
     return {"status": "success" if success else "not_found", "deleted": success}
+
+@app.post("/api/midi/record/save")
+def save_recording(payload: SaveRecordingModel):
+    try:
+        import time
+        import mido
+        from mido import MidiFile, MidiTrack, Message, MetaMessage
+        
+        mid = MidiFile(type=0)
+        track = MidiTrack()
+        mid.tracks.append(track)
+        
+        track.append(MetaMessage('track_name', name=payload.title, time=0))
+        track.append(MetaMessage('set_tempo', tempo=mido.bpm2tempo(payload.bpm or 120), time=0))
+        
+        sorted_events = sorted(payload.events, key=lambda e: e.get("time_ms", 0))
+        ticks_per_beat = mid.ticks_per_beat  # default 480
+        ms_per_tick = (60000.0 / (payload.bpm or 120)) / ticks_per_beat
+        
+        last_time_ms = 0
+        for ev in sorted_events:
+            ev_time = ev.get("time_ms", 0)
+            delta_ms = max(0, ev_time - last_time_ms)
+            last_time_ms = ev_time
+            delta_ticks = int(round(delta_ms / ms_per_tick))
+            
+            ev_type = ev.get("type", "note_on")
+            pitch = int(ev.get("pitch", 60))
+            velocity = int(ev.get("velocity", 64))
+            
+            if ev_type == "note_on" and velocity > 0:
+                track.append(Message('note_on', note=pitch, velocity=velocity, time=delta_ticks))
+            else:
+                track.append(Message('note_off', note=pitch, velocity=0, time=delta_ticks))
+                
+        track.append(MetaMessage('end_of_track', time=0))
+        
+        clean_name = "".join(c for c in payload.title if c.isalnum() or c in (' ', '_', '-')).strip().replace(' ', '_')
+        filename = f"rec_{clean_name}_{int(time.time())}.mid"
+        midi_dir = get_midi_folder_path()
+        out_path = Path(midi_dir) / filename
+        mid.save(str(out_path))
+        
+        refreshed_songs = rescan_midi_folder()
+        return {"status": "success", "filename": filename, "songs": refreshed_songs}
+    except Exception as e:
+        logger.error(f"Error saving recording as MIDI: {e}")
+        return {"status": "error", "detail": str(e)}
 
 @app.get("/api/presets")
 def get_presets():

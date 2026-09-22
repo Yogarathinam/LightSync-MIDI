@@ -20,7 +20,9 @@ import {
   Radio,
   Cable,
   CheckCircle2,
-  XCircle
+  XCircle,
+  CircleDot,
+  Square
 } from 'lucide-react';
 import { useLightSyncStore } from '../../store/useLightSyncStore';
 import { useTheme } from '../../context/ThemeContext';
@@ -62,7 +64,10 @@ export const AppHeader: React.FC<{
     currentChord,
     octaveShift,
     incrementOctave,
-    decrementOctave
+    decrementOctave,
+    isRecording,
+    startRecording,
+    stopRecording
   } = useLightSyncStore();
 
 
@@ -316,6 +321,25 @@ export const AppHeader: React.FC<{
             >
               <Clock className="w-3.5 h-3.5" />
             </button>
+
+            {/* Quick MIDI Record Button */}
+            {!isRecording ? (
+              <button
+                onClick={startRecording}
+                title="Record Live Performance into .mid format"
+                className="w-7 h-7 rounded-lg flex items-center justify-center text-rose-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-all cursor-pointer"
+              >
+                <CircleDot className="w-3.5 h-3.5" />
+              </button>
+            ) : (
+              <button
+                onClick={() => stopRecording()}
+                title="Stop Recording Live Session"
+                className="w-7 h-7 rounded-lg flex items-center justify-center bg-rose-600 text-white animate-pulse transition-all cursor-pointer"
+              >
+                <Square className="w-3 h-3 fill-current" />
+              </button>
+            )}
 
             {/* Divider */}
             <div className="h-3.5 w-px bg-slate-300 dark:bg-zinc-800 mx-0.5" />

@@ -129,6 +129,29 @@ class TestMidiSupport(unittest.TestCase):
         self.assertTrue(len(note_on_ev) >= 1)
         self.assertEqual(note_on_ev[0]["source"], "physical_midi")
 
+    def test_save_recording_endpoint(self):
+        from app.main import save_recording, SaveRecordingModel
+        from app.music.song_catalog import delete_midi_file, get_midi_folder_path
+        
+        payload = SaveRecordingModel(
+            title="Unit_Test_Recording",
+            events=[
+                {"type": "note_on", "pitch": 60, "velocity": 100, "time_ms": 0},
+                {"type": "note_off", "pitch": 60, "velocity": 0, "time_ms": 400},
+                {"type": "note_on", "pitch": 64, "velocity": 90, "time_ms": 500},
+                {"type": "note_off", "pitch": 64, "velocity": 0, "time_ms": 900}
+            ],
+            bpm=120
+        )
+        res = save_recording(payload)
+        self.assertEqual(res.get("status"), "success")
+        self.assertIn("filename", res)
+        created_file = get_midi_folder_path() / res["filename"]
+        self.assertTrue(created_file.exists())
+        
+        # Cleanup
+        created_file.unlink(missing_ok=True)
+
 if __name__ == "__main__":
     unittest.main()
 

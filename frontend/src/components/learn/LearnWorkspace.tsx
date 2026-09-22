@@ -16,7 +16,15 @@ import {
   Hand,
   TrendingUp,
   ChevronRight,
-  Music
+  Music,
+  Eye,
+  Volume2,
+  CircleDot,
+  Download,
+  Disc,
+  Palette,
+  Zap,
+  Info
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { useLightSyncStore } from '../../store/useLightSyncStore';
@@ -29,6 +37,7 @@ export const LearnWorkspace: React.FC = () => {
     learnSubView, 
     setLearnSubView, 
     openWorkspace,
+    closeWorkspace,
     activeNotes, 
     setExpectedPitch, 
     addSessionResult,
@@ -36,13 +45,27 @@ export const LearnWorkspace: React.FC = () => {
     setSessionHistory,
     handFilter,
     setHandFilter,
+    leftHandColor,
+    setLeftHandColor,
+    rightHandColor,
+    setRightHandColor,
+    effectConfig,
+    setEffectParam,
+    isSongPlaying,
+    setIsSongPlaying,
+    isRecording,
+    startRecording,
+    stopRecording,
+    downloadRecording,
+    playRecording,
+    isPlayingRecording,
     wsSender 
   } = useLightSyncStore();
 
   // Follow Mode State
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentNoteIndex, setCurrentNoteIndex] = useState(0);
-  const [mode, setMode] = useState<'wait_for_key' | 'flow'>('wait_for_key');
+  const [mode, setMode] = useState<'watch_listen' | 'wait_for_key' | 'flow'>('watch_listen');
   const [lastFeedback, setLastFeedback] = useState<string | null>(null);
   const [score, setScore] = useState({ hits: 0, misses: 0, streak: 0 });
   const [sessionCompleted, setSessionCompleted] = useState(false);
@@ -93,10 +116,16 @@ export const LearnWorkspace: React.FC = () => {
     setSessionCompleted(false);
     setLastFeedback(null);
     sessionStartTimeRef.current = Date.now();
+    if (mode === 'watch_listen') {
+      setIsSongPlaying(true);
+    } else {
+      setIsSongPlaying(false);
+    }
   };
 
   const handleStop = () => {
     setIsPlaying(false);
+    setIsSongPlaying(false);
     setExpectedPitch(null);
     if (flowTimerRef.current) {
       clearTimeout(flowTimerRef.current);
@@ -238,6 +267,29 @@ export const LearnWorkspace: React.FC = () => {
 
       </div>
 
+      {/* Recommended Static Effect Banner */}
+      {effectConfig.effect !== 'static' && (
+        <div className="p-3 px-4 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
+          <div className="flex items-center gap-2">
+            <Zap className="w-4 h-4 text-amber-500 shrink-0" />
+            <div>
+              <span className="text-xs font-bold text-amber-800 dark:text-amber-300">
+                Recommended for Learning: Static Key Light
+              </span>
+              <p className="text-[11px] text-amber-700/80 dark:text-amber-400/80">
+                Practice mode is designed for single-LED illumination so you can focus directly on the target key.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => setEffectParam('effect', 'static')}
+            className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold shadow-xs transition-all shrink-0 cursor-pointer"
+          >
+            Apply Static Light
+          </button>
+        </div>
+      )}
+
       {/* 2. Sub-View Body with Smooth Cross-fade */}
       <div className="transition-opacity duration-200">
         
@@ -246,15 +298,33 @@ export const LearnWorkspace: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
             
             {/* Main Interactive Stage Card (8 Cols) */}
-            <div className="md:col-span-8 p-5 rounded-2xl bg-white dark:bg-black border border-slate-200 dark:border-zinc-800 shadow-sm flex flex-col justify-between gap-5">
+            <div className="md:col-span-8 p-5 rounded-2xl bg-white dark:bg-black border border-slate-200 dark:border-zinc-800 shadow-sm flex flex-col justify-between gap-4">
               
               {/* Header Controls */}
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-zinc-850">
-                <div className="flex items-center gap-2">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-zinc-850">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-xs font-bold text-slate-700 dark:text-zinc-300">Mode:</span>
                   <div className="flex items-center p-0.5 rounded-lg bg-slate-100 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-xs">
                     <button
-                      onClick={() => setMode('wait_for_key')}
+                      onClick={() => {
+                        setMode('watch_listen');
+                        if (isPlaying) setIsSongPlaying(true);
+                      }}
+                      className={`flex items-center gap-1 px-2.5 py-1 rounded-md font-semibold transition-all cursor-pointer ${
+                        mode === 'watch_listen'
+                          ? 'bg-indigo-600 text-white shadow-sm'
+                          : 'text-slate-600 dark:text-zinc-400'
+                      }`}
+                      title="Watch and listen to the song first"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      <span>Watch & Listen</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setMode('wait_for_key');
+                        setIsSongPlaying(false);
+                      }}
                       className={`px-2.5 py-1 rounded-md font-semibold transition-all cursor-pointer ${
                         mode === 'wait_for_key'
                           ? 'bg-indigo-600 text-white shadow-sm'
@@ -264,7 +334,10 @@ export const LearnWorkspace: React.FC = () => {
                       Wait For Key
                     </button>
                     <button
-                      onClick={() => setMode('flow')}
+                      onClick={() => {
+                        setMode('flow');
+                        setIsSongPlaying(false);
+                      }}
                       className={`px-2.5 py-1 rounded-md font-semibold transition-all cursor-pointer ${
                         mode === 'flow'
                           ? 'bg-indigo-600 text-white shadow-sm'
@@ -276,15 +349,35 @@ export const LearnWorkspace: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Play / Stop Action */}
+                {/* Play / Stop Action & Record */}
                 <div className="flex items-center gap-2">
+                  {!isRecording ? (
+                    <button
+                      onClick={startRecording}
+                      className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 dark:bg-zinc-900 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-slate-700 dark:text-zinc-300 hover:text-rose-600 border border-slate-200 dark:border-zinc-800 text-xs font-semibold transition-all cursor-pointer"
+                      title="Record practice session into standard .mid MIDI file"
+                    >
+                      <CircleDot className="w-3.5 h-3.5 text-rose-500" />
+                      <span>Record .mid</span>
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => stopRecording()}
+                      className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-all cursor-pointer animate-pulse"
+                      title="Stop recording"
+                    >
+                      <Square className="w-3 h-3 fill-current" />
+                      <span>Recording...</span>
+                    </button>
+                  )}
+
                   {!isPlaying ? (
                     <button
                       onClick={handleStart}
                       className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-sm transition-all cursor-pointer"
                     >
                       <Play className="w-3.5 h-3.5 fill-current" />
-                      <span>Start Learning</span>
+                      <span>{mode === 'watch_listen' ? 'Watch & Listen' : 'Start Learning'}</span>
                     </button>
                   ) : (
                     <button
@@ -305,10 +398,70 @@ export const LearnWorkspace: React.FC = () => {
                 </div>
               </div>
 
+              {/* Hand Selection & Dedicated Hand Color Pickers */}
+              <div className="flex flex-wrap items-center justify-between gap-2.5 p-2.5 rounded-xl bg-slate-50 dark:bg-zinc-950 border border-slate-200/80 dark:border-zinc-800/80">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-slate-700 dark:text-zinc-300 flex items-center gap-1">
+                    <Hand className="w-3.5 h-3.5 text-indigo-500" />
+                    Hand:
+                  </span>
+                  <div className="flex items-center p-0.5 rounded-lg bg-slate-200/60 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-xs">
+                    <button
+                      onClick={() => setHandFilter('both')}
+                      className={`px-2 py-0.8 rounded-md font-semibold transition-all cursor-pointer ${
+                        handFilter === 'both' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 dark:text-zinc-400'
+                      }`}
+                    >
+                      Both Hands
+                    </button>
+                    <button
+                      onClick={() => setHandFilter('left')}
+                      className={`px-2 py-0.8 rounded-md font-semibold transition-all cursor-pointer ${
+                        handFilter === 'left' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 dark:text-zinc-400'
+                      }`}
+                    >
+                      Left Hand
+                    </button>
+                    <button
+                      onClick={() => setHandFilter('right')}
+                      className={`px-2 py-0.8 rounded-md font-semibold transition-all cursor-pointer ${
+                        handFilter === 'right' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 dark:text-zinc-400'
+                      }`}
+                    >
+                      Right Hand
+                    </button>
+                  </div>
+                </div>
+
+                {/* Hand Colors */}
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-1.5 text-xs">
+                    <span className="text-slate-500 dark:text-zinc-400 text-[11px] font-medium">Left Color:</span>
+                    <input
+                      type="color"
+                      value={leftHandColor || '#38bdf8'}
+                      onChange={(e) => setLeftHandColor(e.target.value)}
+                      className="w-5 h-5 rounded border-0 bg-transparent cursor-pointer"
+                      title="Left hand waterfall note color"
+                    />
+                  </div>
+                  <div className="flex items-center gap-1.5 text-xs">
+                    <span className="text-slate-500 dark:text-zinc-400 text-[11px] font-medium">Right Color:</span>
+                    <input
+                      type="color"
+                      value={rightHandColor || '#10b981'}
+                      onChange={(e) => setRightHandColor(e.target.value)}
+                      className="w-5 h-5 rounded border-0 bg-transparent cursor-pointer"
+                      title="Right hand waterfall note color"
+                    />
+                  </div>
+                </div>
+              </div>
+
               {/* Note Flow Ribbon / Target Note Display */}
               <div className="py-8 px-4 rounded-2xl bg-slate-50 dark:bg-zinc-950 border border-slate-200/80 dark:border-zinc-800/80 flex flex-col items-center justify-center gap-3">
                 <span className="text-xs uppercase tracking-wider font-semibold text-slate-400 font-mono">
-                  {isPlaying ? 'Strike Piano Key:' : 'Ready to begin'}
+                  {isPlaying ? (mode === 'watch_listen' ? 'Watching & Listening to Piece:' : 'Strike Piano Key:') : 'Ready to begin'}
                 </span>
                 <div className="flex items-center gap-3">
                   <div className="w-20 h-20 rounded-2xl bg-indigo-600 text-white flex flex-col items-center justify-center shadow-lg shadow-indigo-500/20">
@@ -398,6 +551,60 @@ export const LearnWorkspace: React.FC = () => {
                   </span>
                 </div>
               </div>
+
+              {/* MIDI Performance Recording Actions */}
+              <div className="p-4 rounded-2xl bg-white dark:bg-black border border-slate-200 dark:border-zinc-800 shadow-sm flex flex-col gap-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-800 dark:text-zinc-200 flex items-center gap-1.5">
+                    <CircleDot className="w-3.5 h-3.5 text-rose-500" />
+                    Practice Recording (.mid)
+                  </span>
+                  {isRecording && (
+                    <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-rose-500 text-white font-bold animate-pulse">
+                      REC
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2 pt-0.5">
+                  <button
+                    onClick={() => {
+                      if (isPlayingRecording) {
+                        useLightSyncStore.getState().stopPlayback();
+                      } else {
+                        playRecording();
+                      }
+                    }}
+                    className="flex-1 py-1.5 px-2.5 rounded-xl bg-slate-100 dark:bg-zinc-900 hover:bg-slate-200 dark:hover:bg-zinc-800 border border-slate-200 dark:border-zinc-800 text-[11px] font-semibold text-slate-700 dark:text-zinc-300 flex items-center justify-center gap-1 transition-all cursor-pointer"
+                  >
+                    <Disc className="w-3 h-3 text-indigo-500" />
+                    <span>{isPlayingRecording ? 'Stop Play' : 'Play Back'}</span>
+                  </button>
+
+                  <button
+                    onClick={() => downloadRecording(`${song.title}_practice.mid`)}
+                    className="flex-1 py-1.5 px-2.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 border border-indigo-200 dark:border-indigo-800/60 text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 flex items-center justify-center gap-1 transition-all cursor-pointer"
+                  >
+                    <Download className="w-3 h-3 text-indigo-500" />
+                    <span>Get .mid</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* View on Stage Action Button */}
+              <button
+                onClick={() => {
+                  closeWorkspace();
+                  if (mode === 'watch_listen') {
+                    setIsSongPlaying(true);
+                  }
+                }}
+                className="w-full py-2.5 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-md shadow-indigo-500/20 flex items-center justify-center gap-2 transition-all cursor-pointer"
+                title="Watch waterfall and practice keys on the full visualizer stage"
+              >
+                <Play className="w-3.5 h-3.5 fill-current" />
+                <span>Launch on Full Visualizer Stage</span>
+              </button>
 
               {/* Quick Actions Card */}
               <div className="p-4 rounded-2xl bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-200/60 dark:border-indigo-800/60 flex flex-col gap-2">
