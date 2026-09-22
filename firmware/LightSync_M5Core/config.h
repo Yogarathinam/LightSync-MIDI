@@ -35,7 +35,7 @@
 #define BUTTON_DEBOUNCE_MS 220
 
 // Default Effect Parameters
-#define DEFAULT_BRIGHTNESS 180
+#define DEFAULT_BRIGHTNESS 15
 #define DEFAULT_SPEED 1.2f
 #define DEFAULT_DECAY 0.85f
 #define DEFAULT_SPREAD 3.0f

@@ -155,8 +155,8 @@ public:
 
         switch (config.currentScreen) {
             case SCREEN_DASHBOARD: {
-                // Smooth Low to High steps: 15% (38) -> 30% (76) -> 50% (128) -> 70% (178) -> 85% (217) -> 100% (255)
-                const uint8_t brightnessLevels[] = {38, 76, 128, 178, 217, 255};
+                // Smooth Low to High steps: 15 (6%) -> 45 (18%) -> 90 (35%) -> 140 (55%) -> 195 (76%) -> 255 (100%)
+                const uint8_t brightnessLevels[] = {15, 45, 90, 140, 195, 255};
                 const int numLevels = 6;
                 int nextIdx = 0;
                 for (int i = 0; i < numLevels; i++) {
@@ -166,7 +166,7 @@ public:
                     }
                 }
                 if (config.brightness >= brightnessLevels[numLevels - 1]) {
-                    nextIdx = 0; // wrap back to 15%
+                    nextIdx = 0; // wrap back to 15
                 }
                 config.brightness = brightnessLevels[nextIdx];
                 FastLED.setBrightness(config.brightness);

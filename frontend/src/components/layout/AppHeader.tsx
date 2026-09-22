@@ -101,7 +101,7 @@ export const AppHeader: React.FC<{
 
   return (
     <header className="sticky top-0 z-40 bg-white dark:bg-black border-b border-slate-200 dark:border-zinc-800 transition-colors shadow-sm w-full">
-      <div className="w-full px-2.5 sm:px-4 h-14 sm:h-15 flex items-center justify-between gap-1.5 sm:gap-2.5 select-none overflow-hidden">
+      <div className="w-full px-2 sm:px-3 lg:px-4 h-14 sm:h-15 flex items-center justify-between gap-1.5 sm:gap-2 select-none overflow-hidden">
         
         {/* Left: Brand Identity */}
         <div className="flex items-center gap-2 sm:gap-2.5 shrink-0 select-none">
@@ -117,14 +117,15 @@ export const AppHeader: React.FC<{
                 v2.0
               </span>
             </div>
-            <p className="text-[10px] text-slate-400 dark:text-zinc-500 hidden sm:block leading-tight whitespace-nowrap">
+            {/* Subtitle hidden on smaller screens to prevent header cut-off */}
+            <p className="text-[10px] text-slate-400 dark:text-zinc-500 hidden 2xl:block leading-tight whitespace-nowrap">
               Music Interaction Platform
             </p>
           </div>
         </div>
 
         {/* Center: Studio Tabs with Click-to-Open Overlay */}
-        <nav className="hidden md:flex items-center p-1 sm:p-1.5 rounded-2xl bg-slate-100/90 dark:bg-zinc-900/80 border border-slate-200/80 dark:border-zinc-800 shrink-0 gap-1 sm:gap-1.5 shadow-sm">
+        <nav className="hidden md:flex items-center p-1 sm:p-1.5 rounded-2xl bg-slate-100/90 dark:bg-zinc-900/80 border border-slate-200/80 dark:border-zinc-800 shrink-0 gap-1 lg:gap-1.5 shadow-sm">
           {tabs.map((tab) => {
             const isWorkspaceActive = activeWorkspace === tab.id;
             const isDefaultPlay = (tab.id === 'play' || tab.id === 'visualize') && activeWorkspace === null;
@@ -132,7 +133,7 @@ export const AppHeader: React.FC<{
               <button
                 key={tab.id}
                 onClick={() => handleTabClick(tab.id)}
-                className={`flex items-center gap-2 px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-xl text-xs sm:text-[13px] font-semibold transition-all select-none cursor-pointer whitespace-nowrap shrink-0 ${
+                className={`flex items-center gap-1.5 lg:gap-2 px-2.5 lg:px-3.5 py-1.5 sm:py-2 rounded-xl text-xs lg:text-[13px] font-semibold transition-all select-none cursor-pointer whitespace-nowrap shrink-0 ${
                   isWorkspaceActive
                     ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/20 font-bold'
                     : isDefaultPlay
@@ -163,10 +164,10 @@ export const AppHeader: React.FC<{
         </nav>
 
         {/* Right Universal Actions Bar */}
-        <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0 select-none">
+        <div className="flex items-center gap-1 sm:gap-2 shrink-0 select-none">
           
           {/* 1. Live Performance Output Capsule (Compact: Real-time Chord & Active Keys) */}
-          <div className="hidden lg:flex items-center h-8.5 px-2.5 rounded-xl bg-slate-100 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 shadow-sm shrink-0 select-none">
+          <div className="hidden xl:flex items-center h-8.5 px-2.5 rounded-xl bg-slate-100 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 shadow-sm shrink-0 select-none">
             {/* Live Chord / Pitch readout */}
             <div className="min-w-[34px] max-w-[50px] text-center">
               <span className="font-mono font-bold text-[11px] text-indigo-600 dark:text-indigo-400 truncate block" title={currentChord ? `Chord: ${currentChord.chord}` : 'No active chord'}>
@@ -192,7 +193,7 @@ export const AppHeader: React.FC<{
           </div>
 
           {/* 2. Pitch Shift & Quick Settings Pod */}
-          <div className="flex items-center gap-1.5 shrink-0">
+          <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
             {/* Octave Switching: [-] [Oct 0] [+] */}
             <div className="flex items-center h-8.5 bg-slate-100 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-0.5 shadow-sm">
               <button
@@ -203,7 +204,7 @@ export const AppHeader: React.FC<{
                 <Minus className="w-3.5 h-3.5" />
               </button>
               <div 
-                className="px-2 font-mono font-bold text-xs text-slate-800 dark:text-zinc-200 min-w-[46px] text-center select-none"
+                className="px-1.5 sm:px-2 font-mono font-bold text-xs text-slate-800 dark:text-zinc-200 min-w-[42px] sm:min-w-[46px] text-center select-none"
                 title={`Current Octave: ${octaveShift > 0 ? `+${octaveShift}` : octaveShift}`}
               >
                 {octaveShift === 0 ? 'Oct 0' : `Oct ${octaveShift > 0 ? `+${octaveShift}` : octaveShift}`}
@@ -217,43 +218,40 @@ export const AppHeader: React.FC<{
               </button>
             </div>
 
-            {/* Quick Settings Dropdown Trigger */}
-            <div className="relative">
-              <button
-                onClick={() => {
-                  if (activeUtilityOverlay === 'quick_settings') closeUtilityOverlay();
-                  else openUtilityOverlay('quick_settings');
-                }}
-                className={`h-8.5 flex items-center gap-1.5 px-2.5 sm:px-3 rounded-xl border text-xs font-medium transition-all shadow-sm cursor-pointer ${
-                  activeUtilityOverlay === 'quick_settings'
-                    ? 'bg-indigo-600 text-white border-indigo-600'
-                    : 'bg-slate-100 dark:bg-zinc-900 text-slate-700 dark:text-zinc-300 hover:bg-slate-200 dark:hover:bg-zinc-800 border-slate-200 dark:border-zinc-800'
-                }`}
-                title="Quick Settings (Keyboard, Transpose, Octave, Diffuser)"
-              >
-                <SlidersHorizontal className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline text-xs whitespace-nowrap">Settings</span>
-              </button>
-            </div>
+            {/* Quick Settings Icon-Only Trigger (No text words) */}
+            <button
+              onClick={() => {
+                if (activeUtilityOverlay === 'quick_settings') closeUtilityOverlay();
+                else openUtilityOverlay('quick_settings');
+              }}
+              className={`w-8.5 h-8.5 flex items-center justify-center rounded-xl border text-xs font-medium transition-all shadow-sm cursor-pointer ${
+                activeUtilityOverlay === 'quick_settings'
+                  ? 'bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-500/20'
+                  : 'bg-slate-100 dark:bg-zinc-900 text-slate-700 dark:text-zinc-300 hover:bg-slate-200 dark:hover:bg-zinc-800 border-slate-200 dark:border-zinc-800'
+              }`}
+              title="Quick Settings (Keyboard, Transpose, Octave, Diffuser)"
+            >
+              <SlidersHorizontal className="w-4 h-4" />
+            </button>
           </div>
 
           {/* 3. Audio, Brightness & System Toolbar Pod */}
           <div className="flex items-center h-8.5 bg-slate-100 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-0.5 shadow-sm shrink-0">
             
-            {/* Brightness Control Slider (Optical WS2812B & Visualizer) */}
-            <div className="flex items-center gap-1.5 px-1.5 sm:px-2" title={`Hardware & Visualizer Brightness: ${Math.round((effectConfig.brightness / 255) * 100)}% (${effectConfig.brightness}/255)`}>
+            {/* Brightness Control Slider (Optical WS2812B & Visualizer, Default 15) */}
+            <div className="flex items-center gap-1 sm:gap-1.5 px-1.5" title={`Hardware & Visualizer Brightness: ${effectConfig.brightness}/255 (${Math.round((effectConfig.brightness / 255) * 100)}%)`}>
               <Sun className="w-3.5 h-3.5 text-amber-500 shrink-0" />
               <input
                 type="range"
-                min="10"
+                min="5"
                 max="255"
                 step="5"
                 value={effectConfig.brightness}
                 onChange={(e) => setEffectParam('brightness', parseInt(e.target.value, 10))}
-                className="w-14 sm:w-16 h-1.5 accent-amber-500 cursor-pointer"
-                title={`Brightness: ${Math.round((effectConfig.brightness / 255) * 100)}%`}
+                className="w-11 sm:w-13 md:w-16 h-1.5 accent-amber-500 cursor-pointer"
+                title={`Brightness: ${effectConfig.brightness}/255 (${Math.round((effectConfig.brightness / 255) * 100)}%)`}
               />
-              <span className="text-[10px] font-mono font-semibold text-slate-600 dark:text-zinc-400 min-w-[28px] tabular-nums select-none">
+              <span className="text-[10px] font-mono font-semibold text-slate-600 dark:text-zinc-400 min-w-[24px] sm:min-w-[28px] tabular-nums select-none">
                 {Math.round((effectConfig.brightness / 255) * 100)}%
               </span>
             </div>
@@ -262,7 +260,7 @@ export const AppHeader: React.FC<{
             <div className="h-3.5 w-px bg-slate-300 dark:bg-zinc-800 mx-0.5" />
 
             {/* Volume / Sound Control Slider */}
-            <div className="flex items-center gap-1.5 px-1.5 sm:px-2">
+            <div className="flex items-center gap-1 sm:gap-1.5 px-1.5">
               <button
                 onClick={toggleMute}
                 className="p-0.5 rounded text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white cursor-pointer"
@@ -277,10 +275,10 @@ export const AppHeader: React.FC<{
                 step="0.05"
                 value={isMuted ? 0 : volume}
                 onChange={(e) => setVolume(parseFloat(e.target.value))}
-                className="w-14 sm:w-16 h-1.5 accent-indigo-600 cursor-pointer"
+                className="w-11 sm:w-13 md:w-16 h-1.5 accent-indigo-600 cursor-pointer"
                 title={`Volume: ${Math.round(volume * 100)}%`}
               />
-              <span className="text-[10px] font-mono font-semibold text-slate-600 dark:text-zinc-400 min-w-[28px] tabular-nums select-none">
+              <span className="text-[10px] font-mono font-semibold text-slate-600 dark:text-zinc-400 min-w-[24px] sm:min-w-[28px] tabular-nums select-none">
                 {isMuted ? '0%' : `${Math.round(volume * 100)}%`}
               </span>
             </div>

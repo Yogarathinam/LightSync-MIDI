@@ -591,7 +591,7 @@ export const useLightSyncStore = create<LightSyncState>((set, get) => ({
     speed: 1.2,
     decay: 0.85,
     spread: 3.0,
-    brightness: 200,
+    brightness: 15,
     rainbow: false,
     primaryColor: '#00f0ff',
     secondaryColor: '#6366f1'
