@@ -41,6 +41,18 @@ class TestLightSyncCore(unittest.TestCase):
         effect_cmd = ProtocolBuilder.set_effect("ripple")
         self.assertEqual(effect_cmd, "EFFECT ripple\n")
 
+        preset_cmd = ProtocolBuilder.preset("Cyberpunk Neon")
+        self.assertEqual(preset_cmd, "PRESET Cyberpunk Neon\n")
+
+        keys_cmd = ProtocolBuilder.set_keyboard_size(88)
+        self.assertEqual(keys_cmd, "KEY_COUNT 88\n")
+
+        port_cmd = ProtocolBuilder.port_connect("COM5")
+        self.assertEqual(port_cmd, "PORT_CONNECT COM5\n")
+
+        midi_cmd = ProtocolBuilder.midi_port("Yamaha Digital Piano")
+        self.assertEqual(midi_cmd, "MIDI_PORT Yamaha Digital Piano\n")
+
         speed_param = ProtocolBuilder.set_param("speed", 1.25)
         self.assertEqual(speed_param, "speed=1.25\n")
 
@@ -54,6 +66,21 @@ class TestLightSyncCore(unittest.TestCase):
 
         self.assertEqual(len(received), 1)
         self.assertEqual(received[0]["pitch"], 64)
+
+    def test_bidirectional_sync(self):
+        m5_events = []
+        def on_m5_event(data):
+            m5_events.append(data)
+
+        event_bus.subscribe("M5_HARDWARE_EVENT", on_m5_event)
+        event_bus.publish_sync("M5_HARDWARE_EVENT", {"event": "EFFECT_CHANGED", "value": "ripple"})
+        event_bus.publish_sync("M5_HARDWARE_EVENT", {"event": "KEY_COUNT", "value": "88"})
+
+        self.assertEqual(len(m5_events), 2)
+        self.assertEqual(m5_events[0]["event"], "EFFECT_CHANGED")
+        self.assertEqual(m5_events[0]["value"], "ripple")
+        self.assertEqual(m5_events[1]["event"], "KEY_COUNT")
+        self.assertEqual(m5_events[1]["value"], "88")
 
     def test_performance_tracker_and_db(self):
         performance_tracker.start_session("test_drill", "Test Drill", "practice")

@@ -245,6 +245,14 @@ async def websocket_endpoint(websocket: WebSocket):
                     val = msg.get("value")
                     event_bus.publish_sync("PARAM_CHANGED", {"param": param, "value": val})
 
+                elif msg_type == "COLOR_PRESET_CHANGED":
+                    preset = msg.get("preset", "Cyberpunk Neon")
+                    event_bus.publish_sync("COLOR_PRESET_CHANGED", {"preset": preset})
+
+                elif msg_type == "KEY_COUNT_CHANGED":
+                    key_count = msg.get("key_count", 61)
+                    event_bus.publish_sync("KEY_COUNT_CHANGED", {"key_count": key_count})
+
                 elif msg_type == "START_SESSION":
                     song_id = msg.get("song_id", "freestyle")
                     song_title = msg.get("song_title", "Freestyle Play")

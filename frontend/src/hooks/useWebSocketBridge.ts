@@ -72,6 +72,47 @@ export const useWebSocketBridge = () => {
             }
           } else if (type === 'PONG') {
             setDeviceStatus({ latency_ms: data.latency_ms || 1 });
+          } else if (type === 'M5_HARDWARE_EVENT') {
+            const ev = data.event;
+            const val = data.value;
+            addConsoleLog(`M5 Hardware Event: ${ev} ${val || ''}`);
+
+            if (ev === 'EFFECT_CHANGED' && val) {
+              const effLower = val.toLowerCase().trim();
+              useLightSyncStore.getState().setEffectParam('effect', effLower as any);
+            } else if (ev === 'BRIGHTNESS_CHANGED' && val) {
+              const b = parseInt(val, 10);
+              if (!isNaN(b)) {
+                useLightSyncStore.getState().setEffectParam('brightness', b);
+              }
+            } else if (ev === 'SPEED_CHANGED' && val) {
+              const spd = parseFloat(val);
+              if (!isNaN(spd)) {
+                useLightSyncStore.getState().setEffectParam('speed', spd);
+              }
+            } else if (ev === 'KEY_COUNT' && val) {
+              const keys = parseInt(val, 10);
+              if (keys === 25 || keys === 49 || keys === 61 || keys === 88) {
+                useLightSyncStore.setState({ keyboardSize: keys });
+              }
+            } else if (ev === 'PRESET_CHANGED' && val) {
+              const pLower = val.toLowerCase();
+              if (pLower.includes('cyberpunk')) useLightSyncStore.getState().applyColorPreset('cyberpunk');
+              else if (pLower.includes('synthwave')) useLightSyncStore.getState().applyColorPreset('synthwave');
+              else if (pLower.includes('emerald')) useLightSyncStore.getState().applyColorPreset('emerald_matrix');
+              else if (pLower.includes('sunset')) useLightSyncStore.getState().applyColorPreset('sunset_horizon');
+              else if (pLower.includes('indigo')) useLightSyncStore.getState().applyColorPreset('electric_indigo');
+              else if (pLower.includes('crimson')) useLightSyncStore.getState().applyColorPreset('crimson_nova');
+              else if (pLower.includes('spectrum')) useLightSyncStore.getState().applyColorPreset('rainbow_spectrum');
+            } else if (ev === 'TEST_ARPEGGIO_TRIGGERED') {
+              const arpeggioNotes = [60, 64, 67, 72, 76, 79, 84];
+              arpeggioNotes.forEach((pitch, i) => {
+                setTimeout(() => {
+                  triggerNoteOn(pitch, 90, false);
+                  setTimeout(() => triggerNoteOff(pitch, false), 180);
+                }, i * 80);
+              });
+            }
           }
 
         } catch (e) {

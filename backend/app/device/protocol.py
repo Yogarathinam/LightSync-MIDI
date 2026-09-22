@@ -49,5 +49,25 @@ class ProtocolBuilder:
         return "STATUS\n"
 
     @staticmethod
+    def set_keyboard_size(keys: int) -> str:
+        return f"KEY_COUNT {keys}\n"
+
+    @staticmethod
+    def port_connect(port_name: str) -> str:
+        return f"PORT_CONNECT {port_name}\n"
+
+    @staticmethod
+    def port_disconnect() -> str:
+        return "PORT_DISCONNECT\n"
+
+    @staticmethod
+    def midi_port(midi_name: str) -> str:
+        return f"MIDI_PORT {midi_name}\n"
+
+    @staticmethod
+    def midi_disconnect() -> str:
+        return "MIDI_DISCONNECT\n"
+
+    @staticmethod
     def to_json_payload(config: Dict[str, Any]) -> str:
         return json.dumps(config) + "\n"

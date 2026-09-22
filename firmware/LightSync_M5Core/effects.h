@@ -40,6 +40,7 @@ public:
     uint16_t currentFps = 60;
     uint32_t frameCount = 0;
     uint32_t fpsTimer = 0;
+    uint8_t previewStep = 0;
 
     EffectEngine(DeviceConfig& cfg) : config(cfg) {}
 
@@ -59,7 +60,12 @@ public:
     }
 
     int16_t mapPitchToLed(uint8_t pitch) {
-        int startMidi = (config.keyCount == 61) ? 36 : (config.keyCount == 88 ? 21 : 48);
+        int startMidi = 36;
+        if (config.keyCount == 25) startMidi = 48;       // C3
+        else if (config.keyCount == 49) startMidi = 36;  // C2
+        else if (config.keyCount == 61) startMidi = 36;  // C2
+        else if (config.keyCount == 88) startMidi = 21;  // A0
+
         int keyIndex = pitch - startMidi;
         if (keyIndex < 0) keyIndex = 0;
         if (keyIndex >= config.keyCount) keyIndex = config.keyCount - 1;
@@ -110,6 +116,29 @@ public:
                 break;
             }
         }
+    }
+
+    void triggerEffectPreview(EffectType eff) {
+        // Generates an automated musical demo trigger for live previewing
+        previewStep = (previewStep + 1) % 4;
+        int16_t positions[] = {
+            (int16_t)(config.ledCount * 0.25f),
+            (int16_t)(config.ledCount * 0.50f),
+            (int16_t)(config.ledCount * 0.75f),
+            (int16_t)(config.ledCount * 0.40f)
+        };
+        int16_t centerLed = positions[previewStep];
+        CRGB col = getNoteColor(60 + previewStep * 4, centerLed);
+        spawnEffect(eff, centerLed, col, 100);
+    }
+
+    void playArpeggioDemo() {
+        // C Major Arpeggio: C4(60), E4(64), G4(67), C5(72)
+        uint8_t notes[] = {60, 64, 67, 72};
+        for (int i = 0; i < 4; i++) {
+            onNoteOn(notes[i], 100);
+        }
+        strncpy(config.currentChord, "C Major", sizeof(config.currentChord));
     }
 
     void spawnEffect(EffectType type, int16_t centerLed, CRGB col, uint8_t velocity) {
@@ -280,15 +309,6 @@ public:
                 leds[i].b = qadd8(leds[i].b, (uint8_t)(color.b * intensity));
             }
         }
-    }
-
-    void playArpeggioDemo() {
-        // C Major Arpeggio: C4(60), E4(64), G4(67), C5(72)
-        uint8_t notes[] = {60, 64, 67, 72};
-        for (int i = 0; i < 4; i++) {
-            onNoteOn(notes[i], 100);
-        }
-        strncpy(config.currentChord, "C Major", sizeof(config.currentChord));
     }
 
     void update() {

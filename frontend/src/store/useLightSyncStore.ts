@@ -486,7 +486,13 @@ export const useLightSyncStore = create<LightSyncState>((set, get) => ({
   fallingNotes: true,
   flowSpeed: 1.2,
   isAutoDemo: false,
-  setKeyboardSize: (size) => set({ keyboardSize: size }),
+  setKeyboardSize: (size) => {
+    set({ keyboardSize: size });
+    const { wsSender } = get();
+    if (wsSender) {
+      wsSender({ type: 'KEY_COUNT_CHANGED', key_count: size });
+    }
+  },
   setKeyboardHeight: (height) => set({ keyboardHeight: Math.max(100, Math.min(420, height)) }),
   setOctaveShift: (shift) => set({ octaveShift: Math.max(-4, Math.min(4, shift)) }),
   incrementOctave: () => set((state) => ({ octaveShift: Math.max(-4, Math.min(4, state.octaveShift + 1)) })),
@@ -625,6 +631,11 @@ export const useLightSyncStore = create<LightSyncState>((set, get) => ({
         effect: preset.effect
       }
     }));
+    const { wsSender } = get();
+    if (wsSender) {
+      wsSender({ type: 'COLOR_PRESET_CHANGED', preset: preset.name });
+      wsSender({ type: 'EFFECT_CHANGED', effect: preset.effect });
+    }
     get().addConsoleLog(`Applied Visual Sync Preset: ${preset.name}`);
   },
 

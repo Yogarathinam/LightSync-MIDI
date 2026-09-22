@@ -21,6 +21,9 @@
 #define SERIAL_BAUD_RATE 115200
 #define SERIAL_RX_BUFFER_SIZE 512
 
+// Button Debounce Threshold (ms) to eliminate hardware switch chatter
+#define BUTTON_DEBOUNCE_MS 220
+
 // Default Effect Parameters
 #define DEFAULT_BRIGHTNESS 180
 #define DEFAULT_SPEED 1.2f
@@ -35,6 +38,15 @@
 #define DEFAULT_SEC_R 236
 #define DEFAULT_SEC_G 72
 #define DEFAULT_SEC_B 153
+
+// 4 Interactive On-Device Screen Modes
+enum ScreenMode {
+    SCREEN_DASHBOARD = 0,
+    SCREEN_EFFECTS_MENU,
+    SCREEN_PRESETS_MENU,
+    SCREEN_SETTINGS_MENU,
+    SCREEN_COUNT
+};
 
 // 9 Visual Effects matching Web Studio
 enum EffectType {
@@ -64,13 +76,21 @@ enum ColorPresetId {
 
 // Runtime configuration state
 struct DeviceConfig {
+    ScreenMode currentScreen = SCREEN_DASHBOARD;
     EffectType currentEffect = EFFECT_BOUNCE;
     ColorPresetId currentPreset = PRESET_CYBERPUNK;
+
+    // Menu Navigation State
+    uint8_t menuEffectIndex = 0;
+    uint8_t menuPresetIndex = 0;
+    uint8_t menuSettingIndex = 0; // 0: Key Count, 1: Speed, 2: Audio, 3: Port Info
+
     float speed = DEFAULT_SPEED;
     float decay = DEFAULT_DECAY;
     float spread = DEFAULT_SPREAD;
     uint8_t brightness = DEFAULT_BRIGHTNESS;
     bool rainbow = false;
+    bool soundEnabled = true;
     
     // Primary Color (RGB)
     uint8_t primaryR = DEFAULT_COLOR_R;
@@ -97,5 +117,8 @@ struct DeviceConfig {
     char activeMidiPort[32] = "Virtual / None";
     char activeComPort[32] = "SIMULATED";
     uint32_t lastHeartbeatMs = 0;
-};
 
+    // Button & Animation Timers
+    uint32_t lastButtonPressMs = 0;
+    uint32_t previewTimer = 0;
+};

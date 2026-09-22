@@ -176,6 +176,13 @@ void CommandProtocol::processLine(const String& rawLine, DeviceConfig& cfg, Effe
         cfg.ledCount = constrain(line.substring(5).toInt(), 10, MAX_LED_COUNT);
         ui.requestRedraw();
         Serial.printf("OK LEDS %d\n", cfg.ledCount);
+    } else if (line.startsWith("keys=") || line.startsWith("KEY_COUNT ")) {
+        int val = line.startsWith("keys=") ? line.substring(5).toInt() : line.substring(10).toInt();
+        if (val == 25 || val == 49 || val == 61 || val == 88) {
+            cfg.keyCount = val;
+            ui.requestRedraw();
+            Serial.printf("OK KEY_COUNT %d\n", cfg.keyCount);
+        }
     } else if (line.startsWith("PORT_CONNECT ")) {
         String pName = line.substring(13);
         pName.toCharArray(cfg.activeComPort, sizeof(cfg.activeComPort));
@@ -201,9 +208,9 @@ void CommandProtocol::processLine(const String& rawLine, DeviceConfig& cfg, Effe
     } else if (line == "PING") {
         Serial.printf("PONG LIGHTSYNC_M5 CORE FPS=%d TEAM=XLR8\n", eng.currentFps);
     } else if (line == "STATUS") {
-        Serial.printf("STATUS EFFECT=%s PRESET=%s SPD=%.2f DEC=%.2f SPR=%.1f BRT=%d LEDS=%d FPS=%d CHORD=%s PORT=%s MIDI=%s\n",
+        Serial.printf("STATUS EFFECT=%s PRESET=%s SPD=%.2f DEC=%.2f SPR=%.1f BRT=%d LEDS=%d KEYS=%d FPS=%d CHORD=%s PORT=%s MIDI=%s\n",
             getEffectName(cfg.currentEffect), getPresetName(cfg.currentPreset),
-            cfg.speed, cfg.decay, cfg.spread, cfg.brightness, cfg.ledCount, eng.currentFps, cfg.currentChord,
+            cfg.speed, cfg.decay, cfg.spread, cfg.brightness, cfg.ledCount, cfg.keyCount, eng.currentFps, cfg.currentChord,
             cfg.activeComPort, cfg.activeMidiPort);
     }
 }

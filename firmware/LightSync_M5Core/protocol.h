@@ -4,7 +4,7 @@
 #include <ArduinoJson.h>
 #include "config.h"
 
-// Forward declaration
+// Forward declarations
 class EffectEngine;
 class DeviceUI;
 
@@ -43,6 +43,21 @@ public:
         }
     }
 
+    static const char* getEffectDescription(EffectType eff) {
+        switch (eff) {
+            case EFFECT_BOUNCE:    return "Dynamic ballistic particles with boundary rebound";
+            case EFFECT_RIPPLE:    return "Dual circular acoustic wave crests";
+            case EFFECT_PULSE:     return "Breathing rhythmic radial expansion";
+            case EFFECT_HOLD_BEAM: return "Continuous luminous glow while keys held";
+            case EFFECT_GLITCH:    return "Cyberpunk scanlines & digital jitter";
+            case EFFECT_SPARK:     return "High-velocity explosive particle burst";
+            case EFFECT_SPRINKLE:  return "Gentle falling fairy dust sparkles";
+            case EFFECT_RAIN:      return "Flowing neon comet trails along strip";
+            case EFFECT_WAVE:      return "Interfering sinusoidal harmonic wave";
+            default:               return "Dynamic visual LED effect";
+        }
+    }
+
     static const char* getPresetName(ColorPresetId preset) {
         switch (preset) {
             case PRESET_CYBERPUNK: return "Cyberpunk Neon";
@@ -52,7 +67,7 @@ public:
             case PRESET_INDIGO:    return "Electric Indigo";
             case PRESET_CRIMSON:   return "Crimson Nova";
             case PRESET_SPECTRUM:  return "Pitch Spectrum";
-            default:               return "Custom";
+            default:               return "Custom Palette";
         }
     }
 
@@ -60,38 +75,38 @@ public:
         cfg.currentPreset = preset;
         switch (preset) {
             case PRESET_CYBERPUNK:
-                cfg.primaryR = 0;   cfg.primaryG = 240; cfg.primaryB = 255; // Cyan
-                cfg.secondaryR = 236; cfg.secondaryG = 72; cfg.secondaryB = 153; // Magenta
+                cfg.primaryR = 0;   cfg.primaryG = 240; cfg.primaryB = 255; // Electric Cyan
+                cfg.secondaryR = 236; cfg.secondaryG = 72; cfg.secondaryB = 153; // Hot Magenta
                 cfg.rainbow = false;
                 cfg.currentEffect = EFFECT_SPARK;
                 break;
             case PRESET_SYNTHWAVE:
-                cfg.primaryR = 245; cfg.primaryG = 158; cfg.primaryB = 11;  // Amber
-                cfg.secondaryR = 139; cfg.secondaryG = 92; cfg.secondaryB = 246; // Violet
+                cfg.primaryR = 245; cfg.primaryG = 158; cfg.primaryB = 11;  // Golden Amber
+                cfg.secondaryR = 139; cfg.secondaryG = 92; cfg.secondaryB = 246; // Deep Violet
                 cfg.rainbow = false;
                 cfg.currentEffect = EFFECT_PULSE;
                 break;
             case PRESET_EMERALD:
                 cfg.primaryR = 16;  cfg.primaryG = 185; cfg.primaryB = 129; // Mint
-                cfg.secondaryR = 6; cfg.secondaryG = 182; cfg.secondaryB = 212; // Teal
+                cfg.secondaryR = 6; cfg.secondaryG = 182; cfg.secondaryB = 212; // Luminous Teal
                 cfg.rainbow = false;
                 cfg.currentEffect = EFFECT_GLITCH;
                 break;
             case PRESET_SUNSET:
-                cfg.primaryR = 244; cfg.primaryG = 63;  cfg.primaryB = 94;  // Rose
-                cfg.secondaryR = 251; cfg.secondaryG = 146; cfg.secondaryB = 60; // Peach
+                cfg.primaryR = 244; cfg.primaryG = 63;  cfg.primaryB = 94;  // Rose Red
+                cfg.secondaryR = 251; cfg.secondaryG = 146; cfg.secondaryB = 60; // Warm Peach
                 cfg.rainbow = false;
                 cfg.currentEffect = EFFECT_RIPPLE;
                 break;
             case PRESET_INDIGO:
-                cfg.primaryR = 99;  cfg.primaryG = 102; cfg.primaryB = 241; // Indigo
-                cfg.secondaryR = 56; cfg.secondaryG = 189; cfg.secondaryB = 248; // Sky Blue
+                cfg.primaryR = 99;  cfg.primaryG = 102; cfg.primaryB = 241; // Deep Indigo
+                cfg.secondaryR = 56; cfg.secondaryG = 189; cfg.secondaryB = 248; // Cobalt Sky
                 cfg.rainbow = false;
                 cfg.currentEffect = EFFECT_WAVE;
                 break;
             case PRESET_CRIMSON:
-                cfg.primaryR = 239; cfg.primaryG = 68;  cfg.primaryB = 68;  // Red flame
-                cfg.secondaryR = 249; cfg.secondaryG = 115; cfg.secondaryB = 22; // Orange
+                cfg.primaryR = 239; cfg.primaryG = 68;  cfg.primaryB = 68;  // Intense Flame
+                cfg.secondaryR = 249; cfg.secondaryG = 115; cfg.secondaryB = 22; // Blaze Orange
                 cfg.rainbow = false;
                 cfg.currentEffect = EFFECT_BOUNCE;
                 break;
@@ -102,6 +117,13 @@ public:
             default:
                 break;
         }
+    }
+
+    static void cycleKeyboardSize(DeviceConfig& cfg) {
+        if (cfg.keyCount == 25) cfg.keyCount = 49;
+        else if (cfg.keyCount == 49) cfg.keyCount = 61;
+        else if (cfg.keyCount == 61) cfg.keyCount = 88;
+        else cfg.keyCount = 25;
     }
 
     static void processLine(const String& rawLine, DeviceConfig& cfg, EffectEngine& eng, DeviceUI& ui);

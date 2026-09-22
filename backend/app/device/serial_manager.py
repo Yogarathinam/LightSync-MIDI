@@ -36,6 +36,9 @@ class SerialDeviceManager:
         event_bus.subscribe("NOTE_OFF", self._on_note_off)
         event_bus.subscribe("EFFECT_CHANGED", self._on_effect_changed)
         event_bus.subscribe("PARAM_CHANGED", self._on_param_changed)
+        event_bus.subscribe("COLOR_PRESET_CHANGED", self._on_preset_changed)
+        event_bus.subscribe("KEY_COUNT_CHANGED", self._on_key_count_changed)
+        event_bus.subscribe("MIDI_STATUS", self._on_midi_status)
 
     def list_ports(self) -> List[Dict[str, str]]:
         if not serial:
@@ -72,6 +75,12 @@ class SerialDeviceManager:
 
             # Handshake
             self.send_raw(f"PORT_CONNECT {port_name}")
+            try:
+                from app.music.midi_engine import midi_engine
+                if midi_engine.active_port_name:
+                    self.send_raw(ProtocolBuilder.midi_port(midi_engine.active_port_name))
+            except Exception:
+                pass
             self.send_raw(ProtocolBuilder.ping())
 
             event_bus.publish_sync("DEVICE_STATUS", {"connected": True, "port": port_name, "simulated": False})
@@ -142,6 +151,20 @@ class SerialDeviceManager:
         value = data.get("value")
         if param and value is not None:
             self.send_raw(ProtocolBuilder.set_param(param, value))
+
+    def _on_preset_changed(self, data: Dict[str, Any]):
+        preset = data.get("preset", "Cyberpunk Neon")
+        self.send_raw(ProtocolBuilder.preset(preset))
+
+    def _on_key_count_changed(self, data: Dict[str, Any]):
+        keys = data.get("key_count", 61)
+        self.send_raw(ProtocolBuilder.set_keyboard_size(keys))
+
+    def _on_midi_status(self, data: Dict[str, Any]):
+        if data.get("connected") and data.get("port"):
+            self.send_raw(ProtocolBuilder.midi_port(str(data["port"])))
+        else:
+            self.send_raw(ProtocolBuilder.midi_disconnect())
 
     def _reader_loop(self):
         while self._running and self.ser:
