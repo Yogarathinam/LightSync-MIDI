@@ -101,7 +101,7 @@ export const OverlayContainer: React.FC = () => {
       {/* Click-away backdrop */}
       <div 
         onClick={handleRequestClose}
-        className={`absolute top-16 inset-x-0 bottom-0 bg-black/40 dark:bg-black/70 backdrop-blur-sm pointer-events-auto transition-opacity duration-150 ${
+        className={`absolute top-16 inset-x-0 bottom-0 bg-black/60 dark:bg-black/80 pointer-events-auto transition-opacity duration-150 ${
           animPhase !== 'exit' ? 'opacity-100' : 'opacity-0'
         }`}
       />

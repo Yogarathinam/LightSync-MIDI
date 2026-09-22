@@ -22,7 +22,8 @@ import { PlayStudio } from '../play/PlayStudio';
 import { HardwareWorkspace } from '../device/HardwareWorkspace';
 
 export const ForegroundWorkspace: React.FC = () => {
-  const { activeWorkspace, closeWorkspace } = useLightSyncStore();
+  const activeWorkspace = useLightSyncStore((s) => s.activeWorkspace);
+  const closeWorkspace = useLightSyncStore((s) => s.closeWorkspace);
 
   const [displayedWorkspace, setDisplayedWorkspace] = useState<WorkspaceId | null>(activeWorkspace);
   const [animPhase, setAnimPhase] = useState<'enter' | 'static' | 'exit'>('static');

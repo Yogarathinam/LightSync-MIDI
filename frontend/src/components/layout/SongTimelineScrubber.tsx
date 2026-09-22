@@ -192,7 +192,7 @@ export const SongTimelineScrubber: React.FC<SongTimelineScrubberProps> = ({
           setIsExpanded(true);
           resetTimer();
         }}
-        className={`select-none mx-auto rounded-full bg-slate-950/85 dark:bg-[#0c0c0e]/90 backdrop-blur-xl border border-slate-700/60 dark:border-zinc-800/80 shadow-2xl px-3 py-1.5 flex items-center gap-2.5 transition-all duration-300 cursor-pointer hover:border-indigo-500/80 hover:shadow-indigo-500/25 hover:scale-[1.03] group ${className}`}
+        className={`select-none mx-auto rounded-full bg-slate-950/95 dark:bg-[#0c0c0e]/95 border border-slate-700/60 dark:border-zinc-800/80 shadow-2xl px-3 py-1.5 flex items-center gap-2.5 transition-all duration-300 cursor-pointer hover:border-indigo-500/80 hover:shadow-indigo-500/25 hover:scale-[1.03] group ${className}`}
         title="Hover or click to expand timeline controls"
       >
         {/* Play/Pause Mini Toggle */}
@@ -265,7 +265,7 @@ export const SongTimelineScrubber: React.FC<SongTimelineScrubberProps> = ({
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       onMouseMove={handleMouseMove}
-      className={`select-none rounded-2xl bg-white/95 dark:bg-[#0c0c0e]/95 backdrop-blur-xl border border-slate-200/90 dark:border-zinc-800/90 shadow-2xl p-2 sm:px-3.5 sm:py-2 flex flex-col gap-1.5 transition-all duration-300 animate-in fade-in zoom-in-95 ${className}`}
+      className={`select-none rounded-2xl bg-white dark:bg-[#0c0c0e] border border-slate-200/90 dark:border-zinc-800/90 shadow-2xl p-2 sm:px-3.5 sm:py-2 flex flex-col gap-1.5 transition-all duration-300 ${className}`}
     >
       <div className="flex items-center justify-between gap-2 text-xs">
         

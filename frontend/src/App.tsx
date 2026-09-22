@@ -21,11 +21,18 @@ const MainApp: React.FC = () => {
 
   const [fps, setFps] = useState(60);
   const [showSplash, setShowSplash] = useState(true);
-  const { activeWorkspace, closeWorkspace, loadSettingsFromFile } = useLightSyncStore();
+  
+  const activeWorkspace = useLightSyncStore((s) => s.activeWorkspace);
+  const closeWorkspace = useLightSyncStore((s) => s.closeWorkspace);
+  const loadSettingsFromFile = useLightSyncStore((s) => s.loadSettingsFromFile);
 
   useEffect(() => {
     loadSettingsFromFile();
   }, [loadSettingsFromFile]);
+
+  const handleFpsUpdate = React.useCallback((val: number) => {
+    setFps(val);
+  }, []);
 
   const isReceded = activeWorkspace !== null && activeWorkspace !== 'learn';
 
@@ -50,7 +57,7 @@ const MainApp: React.FC = () => {
         >
           {/* Main Immersive Visualizer Engine Stage */}
           <main className="flex-1 w-full min-h-0 flex flex-col items-center justify-center p-0.5 sm:px-3 sm:py-1.5 overflow-hidden bg-black relative">
-            <StudioCanvas onFpsUpdate={setFps} />
+            <StudioCanvas onFpsUpdate={handleFpsUpdate} />
           </main>
 
           {/* Bottom Real-time Engine Status Bar */}

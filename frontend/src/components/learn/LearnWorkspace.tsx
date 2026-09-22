@@ -244,7 +244,7 @@ export const LearnWorkspace: React.FC = () => {
       <div className="w-full pointer-events-auto flex flex-col gap-2 z-40 max-w-7xl mx-auto">
         
         {/* Main Glassmorphic HUD Bar */}
-        <div className="w-full p-2 sm:px-3.5 sm:py-2.5 rounded-2xl bg-white/95 dark:bg-[#0c0c0e]/95 backdrop-blur-xl border border-slate-200/90 dark:border-zinc-800/90 shadow-2xl flex flex-wrap items-center justify-between gap-2.5">
+        <div className="w-full p-2 sm:px-3.5 sm:py-2.5 rounded-2xl bg-white/95 dark:bg-[#0c0c0e]/95 border border-slate-200/90 dark:border-zinc-800/90 shadow-2xl flex flex-wrap items-center justify-between gap-2.5">
           
           {/* A. Song Capsule & Piece Switcher */}
           <div className="flex items-center gap-2.5 shrink-0">
@@ -530,7 +530,7 @@ export const LearnWorkspace: React.FC = () => {
         
         {/* Left Floating Target Key Badge */}
         {isPlaying && mode !== 'watch_listen' && currentNote && (
-          <div className="pointer-events-auto p-3.5 rounded-2xl bg-white/95 dark:bg-[#0c0c0e]/95 backdrop-blur-xl border border-slate-200/90 dark:border-zinc-800/90 shadow-2xl flex items-center gap-3.5 animate-in fade-in slide-in-from-left duration-200">
+          <div className="pointer-events-auto p-3.5 rounded-2xl bg-white/95 dark:bg-[#0c0c0e]/95 border border-slate-200/90 dark:border-zinc-800/90 shadow-2xl flex items-center gap-3.5">
             <div 
               className="w-14 h-14 rounded-2xl text-white flex flex-col items-center justify-center shadow-lg font-mono font-black"
               style={{
@@ -567,7 +567,7 @@ export const LearnWorkspace: React.FC = () => {
         )}
 
         {/* Right Floating Score & Streak Pod */}
-        <div className="pointer-events-auto p-3 rounded-2xl bg-white/95 dark:bg-[#0c0c0e]/95 backdrop-blur-xl border border-slate-200/90 dark:border-zinc-800/90 shadow-2xl flex items-center gap-3 ml-auto">
+        <div className="pointer-events-auto p-3 rounded-2xl bg-white/95 dark:bg-[#0c0c0e]/95 border border-slate-200/90 dark:border-zinc-800/90 shadow-2xl flex items-center gap-3 ml-auto">
           {/* Streak */}
           <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200/70 dark:border-amber-800/60">
             <Flame className="w-4 h-4 text-amber-500 fill-current" />
@@ -747,7 +747,7 @@ export const LearnWorkspace: React.FC = () => {
       {/* 5. QUICK PIECE SWITCHER POPOVER */}
       {/* ============================================================ */}
       {showSongPicker && (
-        <div className="fixed inset-0 z-50 pointer-events-auto bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 pointer-events-auto bg-black/75 flex items-center justify-center p-4">
           <div className="w-full max-w-lg bg-white dark:bg-[#0c0c0e] border border-slate-200 dark:border-zinc-800 rounded-2xl shadow-2xl p-5 flex flex-col gap-4 max-h-[80vh] overflow-hidden">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-zinc-850">
               <div className="flex items-center gap-2">

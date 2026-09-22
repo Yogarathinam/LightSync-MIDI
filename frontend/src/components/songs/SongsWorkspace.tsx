@@ -266,7 +266,7 @@ export const SongsWorkspace: React.FC = () => {
       
       {/* Drag & Drop Visual Overlay */}
       {isDraggingOver && (
-        <div className="absolute inset-0 z-50 rounded-3xl border-2 border-dashed border-indigo-500 bg-slate-900/80 backdrop-blur-sm flex flex-col items-center justify-center text-white pointer-events-none gap-2">
+        <div className="absolute inset-0 z-50 rounded-3xl border-2 border-dashed border-indigo-500 bg-slate-900/90 flex flex-col items-center justify-center text-white pointer-events-none gap-2">
           <Upload className="w-10 h-10 text-indigo-400 animate-bounce" />
           <p className="text-base font-bold">Drop MIDI (.mid / .midi) file to import</p>
           <p className="text-xs text-slate-300">File will be saved to your backend MIDI library</p>
@@ -425,7 +425,7 @@ export const SongsWorkspace: React.FC = () => {
           return (
             <div
               key={song.id}
-              className={`p-4 rounded-2xl border transition-all flex flex-col justify-between gap-4 relative group ${
+              className={`p-4 rounded-2xl border transition-colors duration-150 flex flex-col justify-between gap-4 relative group ${
                 isCurrent
                   ? 'bg-indigo-50/40 dark:bg-indigo-950/20 border-indigo-500/60 shadow-md ring-1 ring-indigo-500/30'
                   : 'bg-white dark:bg-black/60 border-slate-200/90 dark:border-zinc-800/90 hover:border-slate-300 dark:hover:border-zinc-700 shadow-xs'

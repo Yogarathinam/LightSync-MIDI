@@ -199,7 +199,8 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
     activeWorkspace,
     activeOverlay,
     closeOverlay,
-    completePracticeSession
+    completePracticeSession,
+    showSessionAnalysis
   } = useLightSyncStore();
 
   const isResizingRef = useRef(false);
@@ -522,10 +523,14 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
   learnModeRef.current = learnMode;
   const completePracticeSessionRef = useRef(completePracticeSession);
   completePracticeSessionRef.current = completePracticeSession;
+  const showSessionAnalysisRef = useRef(showSessionAnalysis);
+  showSessionAnalysisRef.current = showSessionAnalysis;
+  const hasCompletedPieceRef = useRef<boolean>(false);
   const playbackPublishTimerRef = useRef<number>(0);
 
   // Cleanly synchronize song playback: whenever songPlaybackId or currentSong changes, reset notes
   useEffect(() => {
+    hasCompletedPieceRef.current = false;
     songBeatRef.current = 0;
     soundingSongNotesRef.current.forEach((pitch) => triggerNoteOff(pitch));
     soundingSongNotesRef.current.clear();
@@ -536,6 +541,7 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
   // Handle interactive timeline seeking (scrub forward / reverse)
   useEffect(() => {
     if (seekEpoch > 0) {
+      hasCompletedPieceRef.current = false;
       songBeatRef.current = targetSeekBeat;
       soundingSongNotesRef.current.forEach((pitch) => triggerNoteOff(pitch));
       soundingSongNotesRef.current.clear();
@@ -661,6 +667,12 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
         if (onFpsUpdateRef.current) onFpsUpdateRef.current(frameCounter);
         frameCounter = 0;
         fpsTimer = now;
+      }
+
+      // When session analysis modal is open, pause canvas rendering loop to eliminate GPU compositing friction
+      if (showSessionAnalysisRef.current) {
+        animId = requestAnimationFrame(render);
+        return;
       }
 
       const width = canvas.width;
@@ -1073,8 +1085,10 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
               });
             }
 
-            // Piece completion: auto trigger analysis modal
-            if (currentBeat > maxNoteEnd + 1.2) {
+            // Piece completion: auto trigger analysis modal exactly once
+            if (currentBeat > maxNoteEnd + 1.2 && !hasCompletedPieceRef.current) {
+              hasCompletedPieceRef.current = true;
+              isSongPlayingRef.current = false;
               stopSongPlayback();
               completePracticeSessionRef.current(curLearnMode);
             }

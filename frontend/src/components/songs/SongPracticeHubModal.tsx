@@ -29,18 +29,16 @@ interface SongPracticeHubModalProps {
 }
 
 export const SongPracticeHubModal: React.FC<SongPracticeHubModalProps> = ({ song, onClose }) => {
-  const { 
-    startSongPlayback, 
-    setCurrentSong, 
-    setLearnMode, 
-    handFilter, 
-    setHandFilter, 
-    closeWorkspace, 
-    sessionHistory,
-    geminiRelayUrl,
-    triggerNoteOn,
-    triggerNoteOff
-  } = useLightSyncStore();
+  const startSongPlayback = useLightSyncStore((s) => s.startSongPlayback);
+  const setCurrentSong = useLightSyncStore((s) => s.setCurrentSong);
+  const setLearnMode = useLightSyncStore((s) => s.setLearnMode);
+  const handFilter = useLightSyncStore((s) => s.handFilter);
+  const setHandFilter = useLightSyncStore((s) => s.setHandFilter);
+  const closeWorkspace = useLightSyncStore((s) => s.closeWorkspace);
+  const sessionHistory = useLightSyncStore((s) => s.sessionHistory);
+  const geminiRelayUrl = useLightSyncStore((s) => s.geminiRelayUrl);
+  const triggerNoteOn = useLightSyncStore((s) => s.triggerNoteOn);
+  const triggerNoteOff = useLightSyncStore((s) => s.triggerNoteOff);
 
   const [selectedMode, setSelectedMode] = useState<'wait_for_key' | 'watch_listen' | 'flow'>('wait_for_key');
   const [selectedHand, setSelectedHand] = useState<'both' | 'left' | 'right'>('both');
@@ -155,7 +153,7 @@ Wrap your response starting with token [${token}] and ending with token [/${toke
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-3 sm:p-4 select-none animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-3 sm:p-4 select-none">
       <div 
         className="w-full max-w-2xl bg-white dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]"
         onClick={(e) => e.stopPropagation()}
@@ -352,7 +350,7 @@ Wrap your response starting with token [${token}] and ending with token [/${toke
 
             {/* MIRA Answer */}
             {miraAnswer && (
-              <div className="p-3 rounded-xl bg-purple-50/90 dark:bg-purple-950/60 border border-purple-200 dark:border-purple-800 text-xs text-purple-900 dark:text-purple-200 animate-in fade-in">
+              <div className="p-3 rounded-xl bg-purple-50/90 dark:bg-purple-950/60 border border-purple-200 dark:border-purple-800 text-xs text-purple-900 dark:text-purple-200">
                 <p className="font-bold mb-1 flex items-center gap-1.5">
                   <Sparkles className="w-3 h-3 text-purple-500" />
                   MIRA:
