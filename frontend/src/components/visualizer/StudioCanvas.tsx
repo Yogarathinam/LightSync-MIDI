@@ -178,9 +178,12 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
     expectedPitch,
     currentSong,
     isSongPlaying,
+    songPlaybackId,
+    stopSongPlayback,
     handFilter,
     leftHandColor,
     rightHandColor,
+    activeWorkspace,
     activeOverlay,
     closeOverlay
   } = useLightSyncStore();
@@ -494,8 +497,17 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
   leftHandColorRef.current = leftHandColor;
   const rightHandColorRef = useRef(rightHandColor);
   rightHandColorRef.current = rightHandColor;
+  const activeWorkspaceRef = useRef(activeWorkspace);
+  activeWorkspaceRef.current = activeWorkspace;
   const songBeatRef = useRef<number>(0);
   const spawnedSongNoteIdsRef = useRef<Set<number>>(new Set());
+
+  // Cleanly synchronize song playback: whenever songPlaybackId or currentSong changes, reset notes
+  useEffect(() => {
+    songBeatRef.current = 0;
+    spawnedSongNoteIdsRef.current.clear();
+    fallingBarsRef.current = [];
+  }, [songPlaybackId, currentSong?.id]);
 
   // Listen for newly pressed keys to trigger LED strip effects & 2D Runway VFX
   const prevPitchesRef = useRef<Set<number>>(new Set());
@@ -854,9 +866,16 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
             }
           }
         });
-      } else if (!isSongOn && spawnedSongNoteIdsRef.current.size > 0) {
+
+        // Automatically detect song completion and stop
+        const maxNoteEnd = Math.max(...curSong.notes.map(n => n.time + n.duration));
+        if (currentBeat > maxNoteEnd + travelBeats + 1 && fallingBarsRef.current.length === 0) {
+          stopSongPlayback();
+        }
+      } else if (!isSongOn && (spawnedSongNoteIdsRef.current.size > 0 || songBeatRef.current > 0)) {
         spawnedSongNoteIdsRef.current.clear();
         songBeatRef.current = 0;
+        fallingBarsRef.current = [];
       }
 
       if (isAutoDemoRef.current && !isSongOn) {
@@ -959,9 +978,18 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
       // ==========================================
       const trails = flowTrailsRef.current;
       const speedPxPerSec = 170 * curFlow.flowSpeed;
+      const isSongPlayingActive = isSongPlayingRef.current || isSongOn;
+      const isSongOrLearnActive = isSongPlayingActive || activeWorkspaceRef.current === 'songs' || activeWorkspaceRef.current === 'learn';
 
-      // A. Register new trails for actively pressed keys (only when NOT in auto-demo)
-      if (!isAutoDemoRef.current) {
+      // When song is playing or in Song/Learn mode:
+      // Flow key is strictly TOP TO BOTTOM ONLY (Synthesia waterfall).
+      // The bottom-to-top play tab flow key trails are completely suppressed!
+      if (isSongOrLearnActive) {
+        if (trails.length > 0) {
+          trails.length = 0;
+        }
+      } else if (!isAutoDemoRef.current) {
+        // A. Register new trails for actively pressed keys (only when in standard Play mode with no song playing)
         curActiveNotes.forEach((_noteData, pitch) => {
           const existing = trails.find(t => t.pitch === pitch && t.endTime === null);
           if (!existing) {

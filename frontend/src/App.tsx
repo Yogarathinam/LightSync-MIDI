@@ -26,7 +26,7 @@ const MainApp: React.FC = () => {
     loadSettingsFromFile();
   }, [loadSettingsFromFile]);
 
-  const isReceded = activeWorkspace !== null;
+  const isReceded = activeWorkspace !== null && activeWorkspace !== 'learn';
 
   return (
     <div className="h-screen w-full max-h-screen max-w-full overflow-hidden flex flex-col relative bg-black text-slate-900 dark:text-zinc-100 antialiased selection:bg-indigo-500 selection:text-white select-none">

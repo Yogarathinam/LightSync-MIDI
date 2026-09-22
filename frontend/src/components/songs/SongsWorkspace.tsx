@@ -32,6 +32,8 @@ export const SongsWorkspace: React.FC = () => {
     setCurrentSong,
     isSongPlaying,
     setIsSongPlaying,
+    startSongPlayback,
+    stopSongPlayback,
     isRecording,
     startRecording,
     stopRecording,
@@ -47,8 +49,7 @@ export const SongsWorkspace: React.FC = () => {
   } = useLightSyncStore();
 
   const handleWatchAndListen = (song: SongItem) => {
-    setCurrentSong(song);
-    setIsSongPlaying(true);
+    startSongPlayback(song);
     closeWorkspace();
   };
 

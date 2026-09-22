@@ -318,6 +318,9 @@ interface LightSyncState {
   selectSongAndLearn: (song: SongItem, subView?: LearnSubView) => void;
   isSongPlaying: boolean;
   setIsSongPlaying: (playing: boolean) => void;
+  songPlaybackId: number;
+  startSongPlayback: (song?: SongItem) => void;
+  stopSongPlayback: () => void;
   practiceMode: 'wait_for_key' | 'flow';
   setPracticeMode: (mode: 'wait_for_key' | 'flow') => void;
   handFilter: 'both' | 'right' | 'left';
@@ -817,7 +820,8 @@ export const useLightSyncStore = create<LightSyncState>((set, get) => ({
     showParticles: savedSettings?.flowKeyConfig?.showParticles ?? true,
     bloomGlow: savedSettings?.flowKeyConfig?.bloomGlow ?? true,
     customColor: savedSettings?.flowKeyConfig?.customColor || '#00f0ff',
-    customSecondaryColor: savedSettings?.flowKeyConfig?.customSecondaryColor || '#ec4899'
+    customSecondaryColor: savedSettings?.flowKeyConfig?.customSecondaryColor || '#ec4899',
+    flowDirection: savedSettings?.flowKeyConfig?.flowDirection || 'down'
   },
   setFlowKeyParam: (param, value) => {
     set((state) => ({
@@ -916,6 +920,31 @@ export const useLightSyncStore = create<LightSyncState>((set, get) => ({
   },
   isSongPlaying: false,
   setIsSongPlaying: (playing) => set({ isSongPlaying: playing }),
+  songPlaybackId: 0,
+  startSongPlayback: (song) => {
+    try {
+      synthEngine.initContext();
+    } catch (_) {}
+    const current = song || get().currentSong;
+    if (!current) return;
+    // Release any previous active notes
+    const { activeNotes, triggerNoteOff } = get();
+    for (const pitch of activeNotes.keys()) {
+      triggerNoteOff(pitch);
+    }
+    set((state) => ({
+      currentSong: current,
+      isSongPlaying: true,
+      songPlaybackId: (state.songPlaybackId || 0) + 1
+    }));
+  },
+  stopSongPlayback: () => {
+    const { activeNotes, triggerNoteOff } = get();
+    for (const pitch of activeNotes.keys()) {
+      triggerNoteOff(pitch);
+    }
+    set({ isSongPlaying: false });
+  },
   practiceMode: 'wait_for_key',
   setPracticeMode: (mode) => set({ practiceMode: mode }),
   handFilter: 'both',

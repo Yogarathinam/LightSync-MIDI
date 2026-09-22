@@ -17,7 +17,7 @@ class SynthEngine {
   public isMuted: boolean = false;
   public volume: number = 0.7;
 
-  private initContext() {
+  public initContext() {
     if (!this.ctx) {
       const AudioCtxClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       this.ctx = new AudioCtxClass();

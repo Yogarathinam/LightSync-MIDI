@@ -78,6 +78,7 @@ export interface FlowKeyConfig {
   bloomGlow: boolean;             // Outer glow aura
   customColor?: string;           // Custom FlowKey Primary Color (hex)
   customSecondaryColor?: string;  // Custom FlowKey Secondary Color (hex)
+  flowDirection?: 'up' | 'down';  // 'down' (top-to-bottom waterfall) or 'up' (bottom-to-top trail)
 }
 
 export interface VisualizerBackgroundConfig {

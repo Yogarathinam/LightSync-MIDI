@@ -132,6 +132,21 @@ export const ForegroundWorkspace: React.FC = () => {
     animPhase === 'exit' ? 'spatial-fg-exit' :
     'spatial-fg-static';
 
+  if (displayedWorkspace === 'learn') {
+    return (
+      <div 
+        onAnimationEnd={(e) => {
+          if (e.target === e.currentTarget && animPhase === 'enter') {
+            setAnimPhase('static');
+          }
+        }}
+        className={`absolute inset-0 z-30 pointer-events-none overflow-hidden ${animClass}`}
+      >
+        <LearnWorkspace />
+      </div>
+    );
+  }
+
   return (
     <div className="absolute inset-0 z-30 pointer-events-none flex items-center justify-center p-2 sm:p-4 md:p-5">
       <div 
@@ -180,7 +195,6 @@ export const ForegroundWorkspace: React.FC = () => {
         {/* Workspace Scrollable Body */}
         <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4">
           {displayedWorkspace === 'songs' && <SongsWorkspace />}
-          {displayedWorkspace === 'learn' && <LearnWorkspace />}
           {displayedWorkspace === 'effects' && <EffectStudio />}
           {displayedWorkspace === 'aicoach' && <AICoachStudio />}
           {displayedWorkspace === 'play' && <PlayStudio />}
