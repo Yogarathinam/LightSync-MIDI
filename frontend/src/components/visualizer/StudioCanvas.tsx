@@ -342,7 +342,7 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
         break;
       case 'blink':
         p.pos = centerLed;
-        p.spread = Math.max(1.0, effectConfig.spread * 0.8);
+        p.spread = 0; // strictly one LED only!
         p.life = 1.0;
         break;
     }
@@ -1235,10 +1235,18 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
             if (wavePos >= 0 && wavePos < ledCount) addSpreadLuminance(wavePos, 2.5, p.color, p.life);
             break;
           case 'blink':
+            // Instantaneous flash with smooth, snappy quadratic decay on ONLY THE ONE LED
             p.life -= dt * (2.8 * p.speed);
             if (p.life > 0) {
               const fadeCurve = p.life * p.life;
-              addSpreadLuminance(p.pos, p.spread, p.color, fadeCurve * 1.25);
+              const targetLed = Math.round(p.pos);
+              if (targetLed >= 0 && targetLed < ledCount) {
+                const brt = (curEff.brightness / 255) * fadeCurve * 1.5;
+                const cur = leds[targetLed];
+                cur.r = Math.min(255, cur.r + p.color.r * brt);
+                cur.g = Math.min(255, cur.g + p.color.g * brt);
+                cur.b = Math.min(255, cur.b + p.color.b * brt);
+              }
             }
             break;
         }

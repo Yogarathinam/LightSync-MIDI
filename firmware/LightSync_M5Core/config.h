@@ -88,11 +88,11 @@ enum ColorPresetId {
 // Runtime configuration state
 struct DeviceConfig {
     ScreenMode currentScreen = SCREEN_DASHBOARD;
-    EffectType currentEffect = EFFECT_BOUNCE;
+    EffectType currentEffect = EFFECT_BLINK;
     ColorPresetId currentPreset = PRESET_CYBERPUNK;
 
     // Menu Navigation State
-    uint8_t menuEffectIndex = 0;
+    uint8_t menuEffectIndex = (uint8_t)EFFECT_BLINK;
     uint8_t menuPresetIndex = 0;
     uint8_t menuSettingIndex = 0; // 0: Key Count, 1: Speed, 2: Audio, 3: Port Info
 

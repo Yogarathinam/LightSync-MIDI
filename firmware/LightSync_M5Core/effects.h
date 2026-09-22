@@ -366,7 +366,7 @@ public:
                     particles[pIdx].pos = centerLed;
                     particles[pIdx].color = col;
                     particles[pIdx].life = 1.0f;
-                    particles[pIdx].spread = max(1.0f, config.spread * 0.8f);
+                    particles[pIdx].spread = 0.0f; // strictly one LED only!
                 }
                 break;
             }
@@ -548,11 +548,17 @@ public:
                 }
 
                 case EFFECT_BLINK: {
-                    // Instantaneous flash with smooth, snappy quadratic decay
+                    // Instantaneous flash with smooth, snappy quadratic decay on ONLY THE ONE LED
                     p.life -= dt * (2.8f * config.speed);
                     if (p.life > 0.0f) {
                         float fadeCurve = p.life * p.life;
-                        addSpreadLuminance(p.pos, p.spread, p.color, fadeCurve * 1.25f);
+                        float brtFactor = (config.brightness / 255.0f) * fadeCurve;
+                        int16_t ledIdx = (int16_t)roundf(p.pos);
+                        if (ledIdx >= 0 && ledIdx < (int16_t)config.ledCount) {
+                            leds[ledIdx].r = qadd8(leds[ledIdx].r, (uint8_t)(p.color.r * brtFactor));
+                            leds[ledIdx].g = qadd8(leds[ledIdx].g, (uint8_t)(p.color.g * brtFactor));
+                            leds[ledIdx].b = qadd8(leds[ledIdx].b, (uint8_t)(p.color.b * brtFactor));
+                        }
                     }
                     break;
                 }

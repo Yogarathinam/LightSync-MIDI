@@ -1,0 +1,38 @@
+{
+  "effectConfig": {
+    "effect": "blink",
+    "speed": 1.2,
+    "decay": 0.85,
+    "spread": 1.0,
+    "brightness": 15,
+    "rainbow": false,
+    "primaryColor": "#00f0ff",
+    "secondaryColor": "#6366f1"
+  },
+  "flowKeyConfig": {
+    "trailDuration": 1.8,
+    "flowSpeed": 1.2,
+    "trailStyle": "neon_bar",
+    "colorPreset": "cyberpunk",
+    "glowIntensity": 85,
+    "showParticles": true,
+    "bloomGlow": true,
+    "customColor": "#00f0ff",
+    "customSecondaryColor": "#ec4899"
+  },
+  "bgConfig": {
+    "showVerticalPitchLanes": true,
+    "showKeyRegions": true,
+    "showOctaveDividers": true,
+    "showHorizontalBeatLines": true,
+    "showSubtleGrid": true,
+    "scrollGrid": true,
+    "gridColor": "#6366f1",
+    "laneColor": "#38bdf8",
+    "hazeColor": "#a855f7"
+  },
+  "volume": 0.7,
+  "keyboardSize": 61,
+  "octaveShift": 0,
+  "transpose": 0
+}
