@@ -25,8 +25,8 @@ class SerialDeviceManager:
         self.last_ping_ms = 0
         self.last_latency_ms = 0
         self.device_info: Dict[str, Any] = {
-            "name": "Simulated M5Stack Core",
-            "firmware": "v2.0-sim",
+            "name": "LightSync M5 Core",
+            "firmware": "v2.0-PRO",
             "fps": 60,
             "led_count": 144
         }
@@ -42,26 +42,26 @@ class SerialDeviceManager:
 
     def list_ports(self) -> List[Dict[str, str]]:
         if not serial:
-            return [{"port": "SIMULATED", "desc": "Virtual M5Stack Strip Simulator"}]
+            return [{"port": "STANDALONE", "desc": "LightSync Optical Engine (Virtual)"}]
 
         try:
             ports = serial.tools.list_ports.comports()
             res = [{"port": p.device, "desc": p.description} for p in ports]
-            res.append({"port": "SIMULATED", "desc": "Virtual M5Stack Strip Simulator"})
+            res.append({"port": "STANDALONE", "desc": "LightSync Optical Engine (Virtual)"})
             return res
         except Exception as e:
             logger.warning(f"Error listing serial ports: {e}")
-            return [{"port": "SIMULATED", "desc": "Virtual M5Stack Strip Simulator"}]
+            return [{"port": "STANDALONE", "desc": "LightSync Optical Engine (Virtual)"}]
 
     def connect(self, port_name: str, baud: int = 115200) -> bool:
         self.disconnect()
 
-        if port_name == "SIMULATED" or not serial:
+        if port_name in ("SIMULATED", "STANDALONE") or not serial:
             self.simulated = True
             self.connected = True
-            self.port_name = "SIMULATED"
-            self.device_info["name"] = "Virtual M5Stack Core (Simulated)"
-            event_bus.publish_sync("DEVICE_STATUS", {"connected": True, "port": "SIMULATED", "simulated": True})
+            self.port_name = "STANDALONE"
+            self.device_info["name"] = "LightSync Optical Engine"
+            event_bus.publish_sync("DEVICE_STATUS", {"connected": True, "port": "STANDALONE", "simulated": True})
             return True
 
         try:

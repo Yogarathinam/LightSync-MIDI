@@ -124,8 +124,8 @@ struct DeviceConfig {
     // Connectivity Status
     bool pcConnected = false;
     bool midiConnected = false;
-    char activeMidiPort[32] = "Virtual / None";
-    char activeComPort[32] = "SIMULATED";
+    char activeMidiPort[32] = "None";
+    char activeComPort[32] = "Standalone";
     uint32_t lastHeartbeatMs = 0;
 
     // Button & Animation Timers

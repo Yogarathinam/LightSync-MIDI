@@ -154,17 +154,26 @@ public:
         playClickChime(1000, 25);
 
         switch (config.currentScreen) {
-            case SCREEN_DASHBOARD:
-                // Step Brightness (50 -> 100 -> 160 -> 220 -> 255)
-                if (config.brightness >= 240) config.brightness = 50;
-                else if (config.brightness < 100) config.brightness = 100;
-                else if (config.brightness < 160) config.brightness = 160;
-                else if (config.brightness < 220) config.brightness = 220;
-                else config.brightness = 255;
+            case SCREEN_DASHBOARD: {
+                // Smooth Low to High steps: 15% (38) -> 30% (76) -> 50% (128) -> 70% (178) -> 85% (217) -> 100% (255)
+                const uint8_t brightnessLevels[] = {38, 76, 128, 178, 217, 255};
+                const int numLevels = 6;
+                int nextIdx = 0;
+                for (int i = 0; i < numLevels; i++) {
+                    if (config.brightness < brightnessLevels[i]) {
+                        nextIdx = i;
+                        break;
+                    }
+                }
+                if (config.brightness >= brightnessLevels[numLevels - 1]) {
+                    nextIdx = 0; // wrap back to 15%
+                }
+                config.brightness = brightnessLevels[nextIdx];
                 FastLED.setBrightness(config.brightness);
                 needsFullRedraw = true;
                 Serial.printf("EVENT BRIGHTNESS_CHANGED %d\n", config.brightness);
                 break;
+            }
 
             case SCREEN_EFFECTS_MENU:
                 // Apply Selected Effect and return to Dashboard
@@ -271,9 +280,7 @@ public:
         M5.Display.drawRoundRect(8, 34, 304, 28, 6, 0x2124);
         M5.Display.setTextSize(1);
         M5.Display.setTextColor(0x6CDF, 0x10A2);
-        char stripTitle[48];
-        snprintf(stripTitle, sizeof(stripTitle), "LIVE OPTICAL STRIP SIMULATION (Pin %d)", LED_DATA_PIN);
-        M5.Display.drawString(stripTitle, 16, 37);
+        M5.Display.drawString("OPTICAL STRIP MONITOR", 16, 37);
 
         // Center Deck: Left Card (Effect & Preset)
         M5.Display.fillRoundRect(8, 66, 148, 118, 6, 0x10A2);
@@ -287,13 +294,17 @@ public:
         updateDynamicWidgets();
 
         // Bottom Button Legend
+        uint8_t brtPct = (uint8_t)((config.brightness * 100 + 127) / 255);
+        char brtLegend[16];
+        snprintf(brtLegend, sizeof(brtLegend), "Level: %d%%", brtPct);
+
         if (config.demoActive) {
             drawButtonLegend("[A] MENU", "Browse FX", 0x07FF,
-                             "[B] BRIGHT", "Step 50-255", 0xFD20,
+                             "[B] BRIGHT", brtLegend, 0xFD20,
                              "[C] STOP", "Stop Demo", 0xF800);
         } else {
             drawButtonLegend("[A] MENU", "Browse FX", 0x07FF,
-                             "[B] BRIGHT", "Step 50-255", 0xFD20,
+                             "[B] BRIGHT", brtLegend, 0xFD20,
                              "[C] DEMO", "Random Keys", 0x07E0);
         }
     }
@@ -428,7 +439,11 @@ public:
         snprintf(valBuf[0], sizeof(valBuf[0]), "%d Keys", config.keyCount);
         snprintf(valBuf[1], sizeof(valBuf[1]), "%.1fx", config.speed);
         snprintf(valBuf[2], sizeof(valBuf[2]), "%s", config.soundEnabled ? "Enabled" : "Muted");
-        snprintf(valBuf[3], sizeof(valBuf[3]), "%s | %s", config.activeComPort, config.activeMidiPort);
+        if (config.pcConnected) {
+            snprintf(valBuf[3], sizeof(valBuf[3]), "%s | %s", config.activeComPort, config.midiConnected ? config.activeMidiPort : "MIDI");
+        } else {
+            snprintf(valBuf[3], sizeof(valBuf[3]), "%s", config.midiConnected ? config.activeMidiPort : "Standalone Engine");
+        }
 
         for (int i = 0; i < 4; i++) {
             int y = startY + i * rowH;
@@ -453,9 +468,9 @@ public:
         M5.Display.setTextSize(1);
         M5.Display.setTextColor(config.pcConnected ? 0x07E0 : 0xFD20, 0x10A2);
         char connBuf[64];
-        snprintf(connBuf, sizeof(connBuf), "Status: %s (Strip: %d LEDs @ Pin %d)",
-                 config.pcConnected ? "USB Online (Synced)" : "Standalone Mode",
-                 config.ledCount, LED_DATA_PIN);
+        snprintf(connBuf, sizeof(connBuf), "System: %s (%d Optical LEDs)",
+                 config.pcConnected ? "USB Online (Synchronized)" : "Standalone Optical Engine",
+                 config.ledCount);
         M5.Display.drawString(connBuf, 18, 156);
 
         // Bottom Button Legend
@@ -588,11 +603,16 @@ public:
         M5.Display.drawString(p1Buf, 172, 130);
 
         char p2Buf[32];
-        snprintf(p2Buf, sizeof(p2Buf), "Spr: %.1f  Brt: %d", config.spread, config.brightness);
+        uint8_t brtPct = (uint8_t)((config.brightness * 100 + 127) / 255);
+        snprintf(p2Buf, sizeof(p2Buf), "Spr: %.1f  Brt: %d%%", config.spread, brtPct);
         M5.Display.drawString(p2Buf, 172, 144);
 
         char portBuf[32];
-        snprintf(portBuf, sizeof(portBuf), "%s | %s", config.activeComPort, config.activeMidiPort);
+        if (config.pcConnected) {
+            snprintf(portBuf, sizeof(portBuf), "%s | %s", config.activeComPort, config.midiConnected ? config.activeMidiPort : "MIDI");
+        } else {
+            snprintf(portBuf, sizeof(portBuf), "%s", config.midiConnected ? config.activeMidiPort : "Standalone Engine");
+        }
         M5.Display.setTextColor(0xFD20, 0x10A2);
         M5.Display.drawString(portBuf, 172, 158);
     }
