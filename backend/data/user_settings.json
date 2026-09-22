@@ -3,7 +3,7 @@
     "effect": "static",
     "speed": 1.2,
     "decay": 0.85,
-    "spread": 1.0,
+    "spread": 1,
     "brightness": 15,
     "rainbow": false,
     "primaryColor": "#00f0ff",

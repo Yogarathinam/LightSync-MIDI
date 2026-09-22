@@ -122,13 +122,29 @@ public:
             activeNotes[slot].durationMs = durationMs;
         }
 
-        spawnEffect(config.currentEffect, centerLed, col, velocity);
+        // Only spawn particle effects for dynamic animations;
+        // For EFFECT_STATIC, the LED is held solidly by activeNotes until key release!
+        if (config.currentEffect != EFFECT_STATIC) {
+            spawnEffect(config.currentEffect, centerLed, col, velocity);
+        }
     }
 
     void onNoteOff(uint8_t pitch) {
         for (int i = 0; i < MAX_ACTIVE_NOTES; i++) {
             if (activeNotes[i].active && activeNotes[i].pitch == pitch) {
                 activeNotes[i].active = false;
+                // When key is released in EFFECT_STATIC, trigger smooth release fade for the single LED
+                if (config.currentEffect == EFFECT_STATIC) {
+                    int pIdx = allocateParticle();
+                    if (pIdx >= 0) {
+                        particles[pIdx].active = true;
+                        particles[pIdx].type = EFFECT_STATIC;
+                        particles[pIdx].pos = activeNotes[i].centerLed;
+                        particles[pIdx].color = getNoteColor(pitch, activeNotes[i].centerLed);
+                        particles[pIdx].life = 1.0f;
+                        particles[pIdx].spread = 0.0f; // strictly one LED only!
+                    }
+                }
                 break;
             }
         }
@@ -358,15 +374,8 @@ public:
             }
 
             case EFFECT_STATIC: {
-                int pIdx = allocateParticle();
-                if (pIdx >= 0) {
-                    particles[pIdx].active = true;
-                    particles[pIdx].type = EFFECT_STATIC;
-                    particles[pIdx].pos = centerLed;
-                    particles[pIdx].color = col;
-                    particles[pIdx].life = 1.0f;
-                    particles[pIdx].spread = 0.0f; // strictly one LED only!
-                }
+                // EFFECT_STATIC note holding is directly maintained by activeNotes.
+                // No decaying particle is spawned on note-on.
                 break;
             }
             default: break;
@@ -382,7 +391,7 @@ public:
 
     void addSpreadLuminance(float centerPos, float spread, CRGB color, float factor) {
         if (factor <= 0.001f) return;
-        float brtFactor = (config.brightness / 255.0f) * factor;
+        float brtFactor = factor;
 
         int minLed = max(0, (int)floor(centerPos - spread * 2.2f));
         int maxLed = min((int)config.ledCount - 1, (int)ceil(centerPos + spread * 2.2f));
@@ -424,22 +433,31 @@ public:
         // 1. Process held notes with auto-release duration
         for (int i = 0; i < MAX_ACTIVE_NOTES; i++) {
             if (activeNotes[i].active) {
-                // Auto-expire note if duration has elapsed (or fail-safe timeout of 4 seconds)
+                // Auto-expire note if duration has elapsed (e.g. from demo mode)
+                // or fail-safe timeout of 60 seconds (prevents permanently stuck notes)
                 if ((activeNotes[i].durationMs > 0 && (now - activeNotes[i].startTime >= activeNotes[i].durationMs)) ||
-                    (now - activeNotes[i].startTime > 4000)) {
+                    (now - activeNotes[i].startTime > 60000)) {
                     activeNotes[i].active = false;
+                    if (config.currentEffect == EFFECT_STATIC) {
+                        int pIdx = allocateParticle();
+                        if (pIdx >= 0) {
+                            particles[pIdx].active = true;
+                            particles[pIdx].type = EFFECT_STATIC;
+                            particles[pIdx].pos = activeNotes[i].centerLed;
+                            particles[pIdx].color = getNoteColor(activeNotes[i].pitch, activeNotes[i].centerLed);
+                            particles[pIdx].life = 1.0f;
+                            particles[pIdx].spread = 0.0f;
+                        }
+                    }
                     continue;
                 }
 
                 // STATIC KEY LIGHT: Solid single-LED illumination held continuously until key release!
                 if (config.currentEffect == EFFECT_STATIC) {
                     CRGB col = getNoteColor(activeNotes[i].pitch, activeNotes[i].centerLed);
-                    float brtFactor = (config.brightness / 255.0f);
                     int16_t ledIdx = activeNotes[i].centerLed;
                     if (ledIdx >= 0 && ledIdx < (int16_t)config.ledCount) {
-                        leds[ledIdx].r = (uint8_t)(col.r * brtFactor);
-                        leds[ledIdx].g = (uint8_t)(col.g * brtFactor);
-                        leds[ledIdx].b = (uint8_t)(col.b * brtFactor);
+                        leds[ledIdx] = col; // Direct full CRGB; FastLED master brightness handles overall dimming cleanly.
                     }
                 }
                 else if (config.currentEffect == EFFECT_HOLD_BEAM) {
@@ -557,16 +575,15 @@ public:
                 }
 
                 case EFFECT_STATIC: {
-                    // Subtle quadratic fade on release for ONLY THE ONE LED
+                    // Smooth quadratic fade on release for ONLY THE ONE LED
                     p.life -= dt * (2.2f * config.speed);
                     if (p.life > 0.0f) {
                         float fadeCurve = p.life * p.life;
-                        float brtFactor = (config.brightness / 255.0f) * fadeCurve;
                         int16_t ledIdx = (int16_t)roundf(p.pos);
                         if (ledIdx >= 0 && ledIdx < (int16_t)config.ledCount) {
-                            leds[ledIdx].r = qadd8(leds[ledIdx].r, (uint8_t)(p.color.r * brtFactor));
-                            leds[ledIdx].g = qadd8(leds[ledIdx].g, (uint8_t)(p.color.g * brtFactor));
-                            leds[ledIdx].b = qadd8(leds[ledIdx].b, (uint8_t)(p.color.b * brtFactor));
+                            leds[ledIdx].r = qadd8(leds[ledIdx].r, (uint8_t)(p.color.r * fadeCurve));
+                            leds[ledIdx].g = qadd8(leds[ledIdx].g, (uint8_t)(p.color.g * fadeCurve));
+                            leds[ledIdx].b = qadd8(leds[ledIdx].b, (uint8_t)(p.color.b * fadeCurve));
                         }
                     }
                     break;

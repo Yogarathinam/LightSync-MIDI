@@ -493,8 +493,10 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
         const velocity = noteData ? noteData.velocity : 100;
         const cols = getNoteColors(pitch, effectConfig, flowKeyConfig);
 
-        // Spawn LED strip burst
-        if (effectConfig.effect === 'spark') {
+        // Spawn LED strip burst (static effect is sustained directly while held)
+        if (effectConfig.effect === 'static' || effectConfig.effect === 'blink') {
+          // Maintained solid in held loop!
+        } else if (effectConfig.effect === 'spark') {
           for (let i = 0; i < 6; i++) spawnParticle('spark', centerLed, cols.primary);
         } else if (effectConfig.effect === 'glitch') {
           for (let i = 0; i < 5; i++) spawnParticle('glitch', centerLed, cols.primary);
@@ -523,8 +525,20 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
         }
       }
     }
+
+    // Trigger smooth release fade when keys are released
+    for (const pitch of prevPitches) {
+      if (!currentPitches.has(pitch)) {
+        if (effectConfig.effect === 'static' || effectConfig.effect === 'blink') {
+          const keyIdx = Math.max(0, Math.min(keyboardSize - 1, pitch - startMidi));
+          const centerLed = Math.floor((keyIdx / (keyboardSize - 1)) * 143);
+          const cols = getNoteColors(pitch, effectConfig, flowKeyConfig);
+          spawnParticle('static', centerLed, cols.primary);
+        }
+      }
+    }
     prevPitchesRef.current = currentPitches;
-  }, [activeNotes, effectConfig, flowKeyConfig, spawnParticle, getKeyGeometry, spawnRunwayBursts, spawnShockwaveRipple, spawnLensFlare]);
+  }, [activeNotes, effectConfig, flowKeyConfig, spawnParticle, getKeyGeometry, spawnRunwayBursts, spawnShockwaveRipple, spawnLensFlare, keyboardSize, startMidi]);
 
   // Main Rock-Solid 60/120 FPS Render Loop (Zero teardown on keypress or resize)
   useEffect(() => {
@@ -1184,11 +1198,10 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
           const cols = getNoteColors(noteData.pitch, curEff, curFlow);
           const targetLed = Math.round(noteData.centerLed);
           if (targetLed >= 0 && targetLed < ledCount) {
-            const brt = (curEff.brightness / 255) * 1.5;
             const cur = leds[targetLed];
-            cur.r = Math.min(255, cols.primary.r * brt);
-            cur.g = Math.min(255, cols.primary.g * brt);
-            cur.b = Math.min(255, cols.primary.b * brt);
+            cur.r = cols.primary.r;
+            cur.g = cols.primary.g;
+            cur.b = cols.primary.b;
           }
         });
       } else {
@@ -1256,17 +1269,16 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
             break;
           case 'static':
           case 'blink':
-            // Subtle release quadratic decay on ONLY THE ONE LED for staccato key releases
+            // Smooth release quadratic decay on ONLY THE ONE LED for key release
             p.life -= dt * (2.2 * p.speed);
             if (p.life > 0) {
               const fadeCurve = p.life * p.life;
               const targetLed = Math.round(p.pos);
               if (targetLed >= 0 && targetLed < ledCount) {
-                const brt = (curEff.brightness / 255) * fadeCurve * 1.5;
                 const cur = leds[targetLed];
-                cur.r = Math.min(255, cur.r + p.color.r * brt);
-                cur.g = Math.min(255, cur.g + p.color.g * brt);
-                cur.b = Math.min(255, cur.b + p.color.b * brt);
+                cur.r = Math.min(255, cur.r + p.color.r * fadeCurve);
+                cur.g = Math.min(255, cur.g + p.color.g * fadeCurve);
+                cur.b = Math.min(255, cur.b + p.color.b * fadeCurve);
               }
             }
             break;
