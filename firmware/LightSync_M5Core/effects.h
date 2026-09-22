@@ -28,6 +28,7 @@ struct ActiveNote {
     uint8_t velocity = 0;
     int16_t centerLed = 0;
     uint32_t startTime = 0;
+    uint32_t durationMs = 0; // 0 = hold until explicit NoteOff; >0 = auto-release after duration
 };
 
 class EffectEngine {
@@ -87,7 +88,7 @@ public:
         return CRGB(config.primaryR, config.primaryG, config.primaryB);
     }
 
-    void onNoteOn(uint8_t pitch, uint8_t velocity) {
+    void onNoteOn(uint8_t pitch, uint8_t velocity, uint32_t durationMs = 0) {
         int16_t centerLed = mapPitchToLed(pitch);
         CRGB col = getNoteColor(pitch, centerLed);
 
@@ -95,15 +96,30 @@ public:
         config.lastVelocity = velocity;
         config.lastNoteTime = millis();
 
+        // Find existing slot for this pitch or allocate empty slot
+        int slot = -1;
         for (int i = 0; i < MAX_ACTIVE_NOTES; i++) {
-            if (!activeNotes[i].active) {
-                activeNotes[i].active = true;
-                activeNotes[i].pitch = pitch;
-                activeNotes[i].velocity = velocity;
-                activeNotes[i].centerLed = centerLed;
-                activeNotes[i].startTime = millis();
+            if (activeNotes[i].active && activeNotes[i].pitch == pitch) {
+                slot = i;
                 break;
             }
+        }
+        if (slot == -1) {
+            for (int i = 0; i < MAX_ACTIVE_NOTES; i++) {
+                if (!activeNotes[i].active) {
+                    slot = i;
+                    break;
+                }
+            }
+        }
+
+        if (slot >= 0) {
+            activeNotes[slot].active = true;
+            activeNotes[slot].pitch = pitch;
+            activeNotes[slot].velocity = velocity;
+            activeNotes[slot].centerLed = centerLed;
+            activeNotes[slot].startTime = millis();
+            activeNotes[slot].durationMs = durationMs;
         }
 
         spawnEffect(config.currentEffect, centerLed, col, velocity);
@@ -132,13 +148,74 @@ public:
         spawnEffect(eff, centerLed, col, 100);
     }
 
-    void playArpeggioDemo() {
-        // C Major Arpeggio: C4(60), E4(64), G4(67), C5(72)
-        uint8_t notes[] = {60, 64, 67, 72};
-        for (int i = 0; i < 4; i++) {
-            onNoteOn(notes[i], 100);
+    uint16_t pitchToFreq(uint8_t pitch) {
+        if (pitch < 21 || pitch > 108) return 440;
+        return (uint16_t)(440.0f * powf(2.0f, (pitch - 69.0f) / 12.0f));
+    }
+
+    void toggleDemo() {
+        config.demoActive = !config.demoActive;
+        if (config.demoActive) {
+            config.lastDemoStepMs = 0;
+            config.nextDemoIntervalMs = 120;
+            Serial.println("EVENT DEMO_STARTED");
+        } else {
+            stopDemo();
+            Serial.println("EVENT DEMO_STOPPED");
         }
-        strncpy(config.currentChord, "C Major", sizeof(config.currentChord));
+    }
+
+    void stopDemo() {
+        config.demoActive = false;
+        for (int i = 0; i < MAX_ACTIVE_NOTES; i++) activeNotes[i].active = false;
+        strncpy(config.currentChord, "Ready", sizeof(config.currentChord));
+        FastLED.show();
+    }
+
+    void updateRandomDemo(uint32_t now) {
+        if (!config.demoActive) return;
+
+        if (now - config.lastDemoStepMs < config.nextDemoIntervalMs) {
+            return;
+        }
+        config.lastDemoStepMs = now;
+        config.nextDemoIntervalMs = random(180, 360);
+
+        // Musical Pentatonic & Diatonic scale intervals
+        const uint8_t scaleIntervals[] = {0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24, 26, 28, 31, 33, 36};
+        const int numIntervals = sizeof(scaleIntervals) / sizeof(scaleIntervals[0]);
+
+        // Base MIDI root depending on keyboard size
+        uint8_t baseRoot = 48; // C3 default
+        if (config.keyCount == 25) baseRoot = 48;       // C3
+        else if (config.keyCount == 49) baseRoot = 36;  // C2
+        else if (config.keyCount == 61) baseRoot = 36;  // C2
+        else if (config.keyCount == 88) baseRoot = 33;  // A1
+
+        // Pick a random melodic note
+        uint8_t noteOffset = scaleIntervals[random(0, numIntervals)];
+        uint8_t pitch = baseRoot + noteOffset;
+        uint8_t vel = random(85, 120);
+        uint32_t noteDur = random(200, 380);
+
+        // Random harmonic chords displayed on UI
+        const char* demoChords[] = {
+            "C Major", "Am7", "Fmaj7", "G7", "Em7", "Dm7", "Cadd9", "F#dim", "Bb", "A Major"
+        };
+        if (random(0, 3) == 0) {
+            strncpy(config.currentChord, demoChords[random(0, 10)], sizeof(config.currentChord));
+        }
+
+        // Trigger note with auto-release duration!
+        onNoteOn(pitch, vel, noteDur);
+
+        // Sound tone if enabled
+        if (config.soundEnabled && M5.Speaker.isEnabled()) {
+            M5.Speaker.tone(pitchToFreq(pitch), min((uint32_t)70, noteDur / 3));
+        }
+
+        // Send note event to PC / Web UI
+        Serial.printf("EVENT NOTE_ON %d %d\n", pitch, vel);
     }
 
     void spawnEffect(EffectType type, int16_t centerLed, CRGB col, uint8_t velocity) {
@@ -317,6 +394,11 @@ public:
         if (dt > 0.05f) dt = 0.05f;
         lastUpdateMs = now;
 
+        // Process random melodic demo if active
+        if (config.demoActive) {
+            updateRandomDemo(now);
+        }
+
         frameCount++;
         if (now - fpsTimer >= 1000) {
             currentFps = frameCount;
@@ -327,9 +409,16 @@ public:
         uint8_t fadeAmt = (uint8_t)((1.0f - config.decay) * 255.0f);
         fadeToBlackBy(leds, config.ledCount, max((uint8_t)12, fadeAmt));
 
-        // 1. Process held notes
+        // 1. Process held notes with auto-release duration
         for (int i = 0; i < MAX_ACTIVE_NOTES; i++) {
             if (activeNotes[i].active) {
+                // Auto-expire note if duration has elapsed (or fail-safe timeout of 4 seconds)
+                if ((activeNotes[i].durationMs > 0 && (now - activeNotes[i].startTime >= activeNotes[i].durationMs)) ||
+                    (now - activeNotes[i].startTime > 4000)) {
+                    activeNotes[i].active = false;
+                    continue;
+                }
+
                 CRGB col = getNoteColor(activeNotes[i].pitch, activeNotes[i].centerLed);
                 addSpreadLuminance(activeNotes[i].centerLed, config.spread * 1.2f, col, 1.0f);
 

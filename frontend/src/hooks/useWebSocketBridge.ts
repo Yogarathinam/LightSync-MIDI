@@ -104,6 +104,18 @@ export const useWebSocketBridge = () => {
               else if (pLower.includes('indigo')) useLightSyncStore.getState().applyColorPreset('electric_indigo');
               else if (pLower.includes('crimson')) useLightSyncStore.getState().applyColorPreset('crimson_nova');
               else if (pLower.includes('spectrum')) useLightSyncStore.getState().applyColorPreset('rainbow_spectrum');
+            } else if (ev === 'NOTE_ON' && val) {
+              const parts = val.trim().split(/\s+/);
+              const pitch = parseInt(parts[0], 10);
+              const vel = parseInt(parts[1], 10) || 90;
+              if (!isNaN(pitch)) {
+                triggerNoteOn(pitch, vel, false);
+                setTimeout(() => triggerNoteOff(pitch, false), 220);
+              }
+            } else if (ev === 'DEMO_STARTED') {
+              addConsoleLog('M5Stack Random Melodic Demo Started');
+            } else if (ev === 'DEMO_STOPPED') {
+              addConsoleLog('M5Stack Random Melodic Demo Stopped');
             } else if (ev === 'TEST_ARPEGGIO_TRIGGERED') {
               const arpeggioNotes = [60, 64, 67, 72, 76, 79, 84];
               arpeggioNotes.forEach((pitch, i) => {

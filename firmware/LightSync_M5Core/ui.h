@@ -24,6 +24,7 @@ public:
     uint8_t lastDrawnMenuEffectIdx = 255;
     uint8_t lastDrawnMenuPresetIdx = 255;
     uint8_t lastDrawnMenuSettingIdx = 255;
+    bool lastDrawnDemoActive = false;
 
     // Debounce timers for each button
     uint32_t btnADebounceTimer = 0;
@@ -90,6 +91,11 @@ public:
         // =================================================================
         // 4. UI Screen & Telemetry Refresh
         // =================================================================
+        if (lastDrawnDemoActive != config.demoActive) {
+            needsFullRedraw = true;
+            lastDrawnDemoActive = config.demoActive;
+        }
+
         if (needsFullRedraw || (now - lastDrawMs >= 150)) {
             if (needsFullRedraw || lastDrawnScreen != config.currentScreen) {
                 drawScreen();
@@ -207,13 +213,9 @@ public:
 
         switch (config.currentScreen) {
             case SCREEN_DASHBOARD:
-                // Play Musical Arpeggio Demo
-                engine.playArpeggioDemo();
+                // Toggle Random Melodic Keys Demo
+                engine.toggleDemo();
                 needsFullRedraw = true;
-                Serial.println("EVENT TEST_ARPEGGIO_TRIGGERED");
-                if (config.soundEnabled && M5.Speaker.isEnabled()) {
-                    M5.Speaker.tone(523, 60);
-                }
                 break;
 
             case SCREEN_EFFECTS_MENU:
@@ -285,9 +287,15 @@ public:
         updateDynamicWidgets();
 
         // Bottom Button Legend
-        drawButtonLegend("[A] MENU", "Browse FX", 0x07FF,
-                         "[B] BRIGHT", "Step 50-255", 0xFD20,
-                         "[C] DEMO", "Arpeggio", 0x07E0);
+        if (config.demoActive) {
+            drawButtonLegend("[A] MENU", "Browse FX", 0x07FF,
+                             "[B] BRIGHT", "Step 50-255", 0xFD20,
+                             "[C] STOP", "Stop Demo", 0xF800);
+        } else {
+            drawButtonLegend("[A] MENU", "Browse FX", 0x07FF,
+                             "[B] BRIGHT", "Step 50-255", 0xFD20,
+                             "[C] DEMO", "Random Keys", 0x07E0);
+        }
     }
 
     // --- Screen 1: Effects Browser with Live Preview ---
@@ -555,8 +563,13 @@ public:
         M5.Display.fillRect(168, 70, 140, 110, 0x10A2);
 
         M5.Display.setTextSize(1);
-        M5.Display.setTextColor(0x07E0, 0x10A2); // Green
-        M5.Display.drawString("DETECTED CHORD", 172, 72);
+        if (config.demoActive) {
+            M5.Display.setTextColor(0xFD20, 0x10A2); // Gold
+            M5.Display.drawString("* RANDOM DEMO *", 172, 72);
+        } else {
+            M5.Display.setTextColor(0x07E0, 0x10A2); // Green
+            M5.Display.drawString("DETECTED CHORD", 172, 72);
+        }
 
         M5.Display.setTextSize(2);
         M5.Display.setTextColor(0x07FF, 0x10A2); // Cyan

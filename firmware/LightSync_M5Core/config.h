@@ -131,4 +131,9 @@ struct DeviceConfig {
     // Button & Animation Timers
     uint32_t lastButtonPressMs = 0;
     uint32_t previewTimer = 0;
+
+    // Random Demo State
+    bool demoActive = false;
+    uint32_t lastDemoStepMs = 0;
+    uint16_t nextDemoIntervalMs = 240;
 };

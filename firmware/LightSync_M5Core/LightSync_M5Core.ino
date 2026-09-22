@@ -212,6 +212,14 @@ void CommandProtocol::processLine(const String& rawLine, DeviceConfig& cfg, Effe
             getEffectName(cfg.currentEffect), getPresetName(cfg.currentPreset),
             cfg.speed, cfg.decay, cfg.spread, cfg.brightness, cfg.ledCount, cfg.keyCount, eng.currentFps, cfg.currentChord,
             cfg.activeComPort, cfg.activeMidiPort);
+    } else if (line == "DEMO_START") {
+        if (!cfg.demoActive) eng.toggleDemo();
+        ui.requestRedraw();
+        Serial.println("OK DEMO_START");
+    } else if (line == "DEMO_STOP") {
+        if (cfg.demoActive) eng.toggleDemo();
+        ui.requestRedraw();
+        Serial.println("OK DEMO_STOP");
     }
 }
 
