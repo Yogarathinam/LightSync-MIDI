@@ -111,17 +111,17 @@ class MidiLightControllerApp:
         self.start_button.config(text="Start")
 
     def handle_midi(self, msg):
-        if msg.type == 'note_on':
-            velocity = msg.velocity
+        if msg.type == 'note_on' and msg.velocity > 0:
             note = msg.note + self.octave_shift + self.transpose
             led_index = self.map_note_to_led(note)
             if led_index is not None:
-                self.send_to_arduino(led_index, self.selected_color[0], self.selected_color[1], self.selected_color[2], velocity)
-        elif msg.type == 'note_off':
+                self.send_to_arduino(led_index, self.selected_color[0], self.selected_color[1], self.selected_color[2], msg.velocity)
+        elif msg.type == 'note_off' or (msg.type == 'note_on' and msg.velocity == 0):
             note = msg.note + self.octave_shift + self.transpose
             led_index = self.map_note_to_led(note)
             if led_index is not None:
                 self.send_to_arduino(led_index, 0, 0, 0, 0)
+
 
     def map_note_to_led(self, note):
         # Map each key to an LED with a space between each
