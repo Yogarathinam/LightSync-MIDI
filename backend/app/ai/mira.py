@@ -2,11 +2,75 @@ import json
 import logging
 import re
 import time
+import uuid
 from typing import Dict, Any, List, Optional
 import urllib.request
 import urllib.error
 
 logger = logging.getLogger("LightSync.MIRA")
+
+def generate_unique_token() -> str:
+    """Generates a high-entropy unique token for request/response integrity tracking."""
+    return f"MIRA_TOKEN_{int(time.time() * 1000)}_{uuid.uuid4().hex[:8].upper()}"
+
+def extract_token_from_prompt(prompt: str) -> Optional[str]:
+    """Finds a MIRA token in the prompt or text if present."""
+    match = re.search(r"(?:__)?(MIRA_TOKEN_[A-Za-z0-9_]+)(?:__)?", prompt)
+    if match:
+        return match.group(1)
+    return None
+
+def strip_token_from_response(raw_text: str, token: str) -> str:
+    """
+    Extracts the clean response text enclosed between start and end tokens.
+    Handles start and end occurrences cleanly, regardless of whether tokens
+    include leading/trailing markdown underscores.
+    """
+    if not token:
+        return raw_text.strip()
+    
+    # Check both literal token and core stripped token
+    core_token = token.strip("_")
+    active_token = None
+    if token in raw_text:
+        active_token = token
+    elif core_token in raw_text:
+        active_token = core_token
+        
+    if not active_token:
+        return raw_text.strip()
+    
+    start_pos = raw_text.find(active_token)
+    end_pos = raw_text.rfind(active_token)
+    
+    if start_pos != -1 and end_pos != -1 and end_pos > start_pos:
+        content = raw_text[start_pos + len(active_token):end_pos]
+        return content.strip()
+    elif start_pos != -1:
+        content = raw_text[start_pos + len(active_token):]
+        return content.strip()
+    return raw_text.strip()
+
+def format_prompt_with_token(prompt: str, token: str) -> str:
+    """
+    Attaches the unique token and strict protocol instructions in the system prompt.
+    The response of the AI MUST start and end with this same token.
+    """
+    return (
+        f"[SYSTEM INSTRUCTION: UNIQUE RESPONSE TOKEN PROTOCOL]\n"
+        f"You are connected to LightSync MIRA via the Gemini Relay Whiteboard.\n"
+        f"CRITICAL INTEGRITY PROTOCOL:\n"
+        f"You MUST start and end your response with the following unique verification token:\n"
+        f"{token}\n\n"
+        f"Strict Format Requirement:\n"
+        f"{token}\n"
+        f"<Your complete response here>\n"
+        f"{token}\n\n"
+        f"Do not omit, modify, or place any characters before or after the token on the first and last lines.\n"
+        f"The client application uses this token to match responses and verify that the whiteboard contains the latest response.\n\n"
+        f"[USER REQUEST / TASK]:\n"
+        f"{prompt.strip()}"
+    )
 
 class MiraAssistant:
     """
@@ -19,16 +83,23 @@ class MiraAssistant:
     DEFAULT_RELAY_URL = "http://127.0.0.1:8000"
 
     @staticmethod
-    def query_gemini_relay(prompt: str, relay_url: Optional[str] = None, timeout_sec: int = 15) -> Optional[str]:
+    def query_gemini_relay(prompt: str, relay_url: Optional[str] = None, timeout_sec: int = 15, custom_token: Optional[str] = None) -> Optional[str]:
         """
         Sends prompt to Gemini Relay API and polls GET /api/response until ready.
-        Returns generated text or None if relay is offline/busy.
+        Enforces Unique Token Protocol:
+        - Generates or uses unique token.
+        - Attaches unique token in system prompt.
+        - The response of the AI must start and end with that matching token.
+        - Polling verifies that the response contains the token, ignoring stale whiteboard data.
+        - Returns stripped clean text or None if relay is offline/busy/timed out.
         """
         base_url = (relay_url or MiraAssistant.DEFAULT_RELAY_URL).rstrip("/")
+        unique_token = custom_token or generate_unique_token()
+        formatted_prompt = format_prompt_with_token(prompt, unique_token)
         
         try:
-            # 1. POST /api/prompt
-            payload = json.dumps({"prompt": prompt}).encode("utf-8")
+            # 1. POST /api/prompt with system instruction + unique token
+            payload = json.dumps({"prompt": formatted_prompt}).encode("utf-8")
             req = urllib.request.Request(
                 f"{base_url}/api/prompt",
                 data=payload,
@@ -52,25 +123,35 @@ class MiraAssistant:
             request_id = data["request_id"]
             start_poll = time.time()
 
-            # 2. Poll GET /api/response
+            # 2. Poll GET /api/response until matching token is verified
             while time.time() - start_poll < timeout_sec:
-                time.sleep(1.0)
+                time.sleep(0.5)
                 try:
                     poll_req = urllib.request.Request(f"{base_url}/api/response")
                     with urllib.request.urlopen(poll_req, timeout=3) as poll_resp:
                         poll_data = json.loads(poll_resp.read().decode("utf-8"))
                         
-                    if poll_data.get("request_id") == request_id:
-                        state = poll_data.get("state")
+                    poll_req_id = poll_data.get("request_id")
+                    state = poll_data.get("state")
+                    raw_text = poll_data.get("text", "") or ""
+
+                    # Verify matching request_id and that raw_text contains the matching unique token
+                    if poll_req_id == request_id:
                         if state == "ready":
-                            return poll_data.get("text")
+                            core_tok = unique_token.strip("_")
+                            if unique_token in raw_text or core_tok in raw_text:
+                                clean_text = strip_token_from_response(raw_text, unique_token)
+                                logger.info(f"Gemini Relay response verified with token {unique_token} ({len(clean_text)} chars)")
+                                return clean_text
+                            else:
+                                logger.debug(f"State is ready but matching token {unique_token} not yet detected in whiteboard response.")
                         elif state == "error":
                             logger.warning(f"Gemini Relay returned error: {poll_data.get('message')}")
                             return None
                 except Exception as poll_err:
                     logger.debug(f"Error polling Gemini Relay: {poll_err}")
 
-            logger.info("Gemini Relay polling timed out, using intelligent local engine.")
+            logger.info(f"Gemini Relay polling timed out waiting for token {unique_token}, using intelligent local engine.")
             return None
 
         except urllib.error.URLError as e:
@@ -417,8 +498,11 @@ class GeminiRelayServer:
     def _generate_response(self, prompt: str) -> str:
         p = prompt.strip()
         pl = p.lower()
+        token = extract_token_from_prompt(prompt)
+
+        # Generate contextual content
         if "prime" in pl and "python" in pl:
-            return (
+            content = (
                 "```python\n"
                 "def is_prime(n: int) -> bool:\n"
                 "    if n <= 1:\n"
@@ -432,7 +516,7 @@ class GeminiRelayServer:
                 "```"
             )
         elif "reverse" in pl and "c program" in pl:
-            return (
+            content = (
                 "```c\n"
                 "#include <stdio.h>\n"
                 "#include <string.h>\n\n"
@@ -440,22 +524,88 @@ class GeminiRelayServer:
                 "    int i = 0, j = strlen(str) - 1;\n"
                 "    while (i < j) {\n"
                 "        char temp = str[i];\n"
-                "        str[i] = str[j];\n"
                 "        str[j] = temp;\n"
                 "        i++; j--;\n"
                 "    }\n"
                 "}\n"
                 "```"
             )
+        elif "curriculum" in pl or "course" in pl:
+            content = json.dumps({
+                "songTitle": "Practice Piece",
+                "headline": "MIRA 4-Phase Mastery Curriculum",
+                "summary": "AI tailored course for rhythmic precision and finger independence.",
+                "steps": [
+                    {
+                        "step": 1,
+                        "title": "Sub-Tempo Articulation & Hand Isolation",
+                        "description": "Practice right hand melody slowly at 65% tempo.",
+                        "tempoScale": 65,
+                        "hand": "right",
+                        "loopSection": "m1_4",
+                        "targetGoal": "Target 95%+ note accuracy"
+                    },
+                    {
+                        "step": 2,
+                        "title": "Harmonic Foundation & Bass Pocket",
+                        "description": "Left hand chord stability at 75% tempo.",
+                        "tempoScale": 75,
+                        "hand": "left",
+                        "loopSection": "m1_4",
+                        "targetGoal": "Consistent downbeat velocity"
+                    },
+                    {
+                        "step": 3,
+                        "title": "Bimanual Sync & Groove",
+                        "description": "Both hands together with metronome pocket.",
+                        "tempoScale": 85,
+                        "hand": "both",
+                        "loopSection": "all",
+                        "targetGoal": "Timing deviation < 20ms"
+                    },
+                    {
+                        "step": 4,
+                        "title": "Performance Mastery",
+                        "description": "Full speed recital with dynamics.",
+                        "tempoScale": 100,
+                        "hand": "both",
+                        "loopSection": "all",
+                        "targetGoal": "Unbroken streak and 95%+ score"
+                    }
+                ]
+            })
+        elif "accuracy" in pl or "timing" in pl or "practice run" in pl or "student's practice run" in pl:
+            content = json.dumps({
+                "headline": "Solid Rhythmic Articulation!",
+                "tone": "Promising",
+                "summary": "Great pocket alignment on the downbeats. Minor anticipations can be smoothed out with sub-tempo practice.",
+                "timing_diagnosis": "Average deviation sits comfortably within tolerance. Focus on relaxing your wrists on octave transitions.",
+                "drills": [
+                    {"title": "Subdivision Click Drill", "action": "Count 16th subdivisions out loud during bars 1-4."},
+                    {"title": "Tempo Ladder", "action": "Play 3 repetitions at 70%, 85%, and 100% tempo."}
+                ]
+            })
+        elif "student live session context" in pl or "student query" in pl:
+            content = (
+                "Focus on keeping your wrists relaxed and using gentle arm weight rather than fingertip tension. "
+                "Practicing with the 'Wait for Key' mode will anchor your muscle memory before moving to full tempo!"
+            )
         else:
-            return f"MIRA Relay: Processed prompt '{p[:60]}...' successfully."
+            content = f"MIRA Relay: Processed prompt '{p[:60]}...' successfully."
+
+        # If a unique token was attached in the prompt, wrap the response strictly starting and ending with that token
+        if token:
+            return f"{token}\n{content}\n{token}"
+        return content
 
     def get_response(self) -> Dict[str, Any]:
+        token = extract_token_from_prompt(self.prompt)
         return {
             "request_id": self.request_id,
             "state": self.state,
             "prompt": self.prompt,
             "text": self.text,
+            "token": token,
             "updated_at": self.updated_at,
             "message": self.message,
             "public_url": self.public_url,
@@ -463,4 +613,3 @@ class GeminiRelayServer:
         }
 
 gemini_relay_server = GeminiRelayServer()
-

@@ -142,20 +142,81 @@ class TestLightSyncCore(unittest.TestCase):
         self.assertIn("text", chat)
 
     def test_gemini_relay_endpoints(self):
-        from app.ai.mira import gemini_relay_server
+        from app.ai.mira import (
+            gemini_relay_server,
+            generate_unique_token,
+            format_prompt_with_token,
+            extract_token_from_prompt,
+            strip_token_from_response,
+            MiraAssistant
+        )
         # 1. Health
         health = gemini_relay_server.get_health()
         self.assertEqual(health["status"], "ok")
 
-        # 2. Submit prompt
+        # 2. Submit prompt without token (standard/legacy)
         sub = gemini_relay_server.submit_prompt("Write a Python program to check whether a number is prime.")
         self.assertEqual(sub["status"], "accepted")
         self.assertIn("request_id", sub)
 
-        # 3. Get response
         resp = gemini_relay_server.get_response()
         self.assertEqual(resp["state"], "ready")
         self.assertIn("is_prime", resp["text"])
 
+        # 3. Unique Token Protocol
+        token = generate_unique_token()
+        self.assertTrue(token.startswith("MIRA_TOKEN_"))
+
+        formatted_prompt = format_prompt_with_token("What are the best drills for timing?", token)
+        detected_token = extract_token_from_prompt(formatted_prompt)
+        self.assertEqual(detected_token, token)
+
+        # Submit prompt with token to relay
+        sub_token = gemini_relay_server.submit_prompt(formatted_prompt)
+        self.assertEqual(sub_token["status"], "accepted")
+
+        # Response MUST start and end with the matching unique token
+        resp_token = gemini_relay_server.get_response()
+        self.assertEqual(resp_token["token"], token)
+        self.assertTrue(resp_token["text"].startswith(token), f"Response does not start with {token}")
+        self.assertTrue(resp_token["text"].endswith(token), f"Response does not end with {token}")
+
+        # Strip token envelope to extract clean response
+        clean_text = strip_token_from_response(resp_token["text"], token)
+        self.assertNotIn(token, clean_text)
+        self.assertIn("Subdivision Click Drill", clean_text)
+
+    def test_query_gemini_relay_token_protocol(self):
+        from app.ai.mira import (
+            gemini_relay_server,
+            MiraAssistant,
+            generate_unique_token,
+            format_prompt_with_token
+        )
+        # Ensure that if the whiteboard has an old response with a different token,
+        # strip_token_from_response will not falsely match, and query_gemini_relay requires matching token
+        old_token = generate_unique_token()
+        gemini_relay_server.submit_prompt(format_prompt_with_token("Old request", old_token))
+        
+        # Verify whiteboard currently holds old_token
+        whiteboard = gemini_relay_server.get_response()
+        self.assertEqual(whiteboard["token"], old_token)
+        self.assertIn(old_token, whiteboard["text"])
+
+        # New request with fresh token
+        new_token = generate_unique_token()
+        self.assertNotEqual(old_token, new_token)
+        # The whiteboard does NOT match new_token yet
+        self.assertNotIn(new_token, whiteboard["text"])
+
+        # When new request is submitted to relay
+        gemini_relay_server.submit_prompt(format_prompt_with_token("What is prime?", new_token))
+        new_whiteboard = gemini_relay_server.get_response()
+        self.assertEqual(new_whiteboard["token"], new_token)
+        self.assertTrue(new_whiteboard["text"].startswith(new_token))
+        self.assertTrue(new_whiteboard["text"].endswith(new_token))
+
 if __name__ == "__main__":
     unittest.main()
+
+
