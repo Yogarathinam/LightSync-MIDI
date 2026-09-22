@@ -882,80 +882,97 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
 
         if (isSongOn) {
           if (curLearnMode === 'wait_for_key') {
-            // Find next target note that matches hand filter and has not finished its duration
-            const targetNote = curSong.notes.find(
-              n => isMatchingHand(n.hand) && songBeatRef.current < (n.time + n.duration)
+            const currentBeat = songBeatRef.current;
+
+            // 1. All notes for the active hand filter, sorted chronologically
+            const matchingNotes = curSong.notes
+              .filter(n => isMatchingHand(n.hand))
+              .sort((a, b) => a.time - b.time || a.pitch - b.pitch);
+
+            // 2. Identify notes whose start has arrived at the hitline (n.time <= currentBeat + 0.02)
+            // AND whose duration has not yet completed (currentBeat < n.time + n.duration)
+            const activeDurationNotes = matchingNotes.filter(
+              n => n.time <= currentBeat + 0.02 && currentBeat < (n.time + n.duration)
             );
 
-            if (targetNote) {
-              // Check if note has arrived at hitline (ledBarTop)
-              if (songBeatRef.current >= targetNote.time) {
-                // Find all notes in this chord (within 0.05 beats of targetNote.time)
-                const chordNotes = curSong.notes.filter(
-                  n => isMatchingHand(n.hand) && Math.abs(n.time - targetNote.time) < 0.05 && songBeatRef.current < (n.time + n.duration)
-                );
+            // 3. Find newly struck notes to trigger VFX & Telemetry
+            activeDurationNotes.forEach((n) => {
+              const noteKey = `${n.pitch}_${n.time.toFixed(2)}`;
+              if (curActiveNotes.has(n.pitch) && !struckNotesRef.current.has(noteKey)) {
+                struckNotesRef.current.add(noteKey);
 
-                // Detect newly struck keys in this chord
-                chordNotes.forEach((n) => {
-                  const keyId = `${n.pitch}_${n.time.toFixed(2)}`;
-                  if (curActiveNotes.has(n.pitch) && !struckNotesRef.current.has(keyId)) {
-                    struckNotesRef.current.add(keyId);
-
-                    // Impact visual burst on target note strike
-                    const geom = getKeyGeometry(n.pitch, width, keyAreaTop, keyAreaHeight);
-                    if (geom) {
-                      const noteColorHex = n.hand === 'left'
-                        ? (leftHandColorRef.current || '#38bdf8')
-                        : (rightHandColorRef.current || '#10b981');
-                      const col = hexToRgb(noteColorHex);
-                      const keyIdx = Math.max(0, Math.min(keyboardSize - 1, n.pitch - startMidi));
-                      const centerLed = Math.floor((keyIdx / (keyboardSize - 1)) * 143);
-                      for (let s = 0; s < 5; s++) spawnParticle('spark', centerLed, col);
-                      const keyCenterX = geom.x + geom.width / 2;
-                      spawnRunwayBursts(keyCenterX, ledBarTop, col, 14, true);
-                      spawnShockwaveRipple(keyCenterX, ledBarTop, col, geom.width * 2.8 + 48);
-                      spawnLensFlare(keyCenterX, ledBarTop, col, 260);
-                    }
-
-                    // Record performance telemetry
-                    const timeOffsetMs = Math.round((n.time - songBeatRef.current) * (60 / curSong.bpm) * 1000);
-                    recordNoteAttempt({
-                      pitch: n.pitch,
-                      expectedPitch: n.pitch,
-                      timeOffsetMs,
-                      velocity: 100,
-                      hand: (n.hand === 'left' ? 'left' : 'right'),
-                      measure: Math.floor(n.time / 4) + 1,
-                      hit: true
-                    });
-                  }
-                });
-
-                // Check if all chord notes have either been struck or are currently held
-                const allStruckOrHeld = chordNotes.every(n => {
-                  const keyId = `${n.pitch}_${n.time.toFixed(2)}`;
-                  return curActiveNotes.has(n.pitch) || struckNotesRef.current.has(keyId);
-                });
-
-                if (!allStruckOrHeld) {
-                  // Freeze right at targetNote.time until user strikes key!
-                  songBeatRef.current = Math.max(targetNote.time, songBeatRef.current);
-                  canAdvance = false;
-                  setWaitingState(true, targetNote.pitch);
-                  setExpectedPitch(targetNote.pitch);
-                } else {
-                  // Key is struck or actively held: let timeline progress through its duration!
-                  canAdvance = true;
-                  setWaitingState(false, null);
-                  setExpectedPitch(null);
+                // Spawn impact visual burst on target note strike
+                const geom = getKeyGeometry(n.pitch, width, keyAreaTop, keyAreaHeight);
+                if (geom) {
+                  const noteColorHex = n.hand === 'left'
+                    ? (leftHandColorRef.current || '#38bdf8')
+                    : (rightHandColorRef.current || '#10b981');
+                  const col = hexToRgb(noteColorHex);
+                  const keyIdx = Math.max(0, Math.min(keyboardSize - 1, n.pitch - startMidi));
+                  const centerLed = Math.floor((keyIdx / (keyboardSize - 1)) * 143);
+                  for (let s = 0; s < 5; s++) spawnParticle('spark', centerLed, col);
+                  const keyCenterX = geom.x + geom.width / 2;
+                  spawnRunwayBursts(keyCenterX, ledBarTop, col, 14, true);
+                  spawnShockwaveRipple(keyCenterX, ledBarTop, col, geom.width * 2.8 + 48);
+                  spawnLensFlare(keyCenterX, ledBarTop, col, 260);
                 }
+
+                // Record performance telemetry
+                const timeOffsetMs = Math.round((n.time - currentBeat) * (60 / curSong.bpm) * 1000);
+                recordNoteAttempt({
+                  pitch: n.pitch,
+                  expectedPitch: n.pitch,
+                  timeOffsetMs,
+                  velocity: 100,
+                  hand: (n.hand === 'left' ? 'left' : 'right'),
+                  measure: Math.floor(n.time / 4) + 1,
+                  hit: true
+                });
+              }
+            });
+
+            if (activeDurationNotes.length > 0) {
+              // The flowkey duration is currently crossing the hitline!
+              // Rule: The key MUST be actively held for the full duration of the flowkey!
+              // Until the duration ends, do not move to the next key.
+              const unheldNote = activeDurationNotes.find(n => !curActiveNotes.has(n.pitch));
+
+              if (unheldNote) {
+                // Key was released early or hasn't been pressed: freeze playback right here!
+                canAdvance = false;
+                setWaitingState(true, unheldNote.pitch);
+                setExpectedPitch(unheldNote.pitch);
               } else {
+                // All active notes are currently being held: advance through the duration!
+                canAdvance = true;
                 setWaitingState(false, null);
                 setExpectedPitch(null);
               }
             } else {
-              setWaitingState(false, null);
-              setExpectedPitch(null);
+              // No notes are active right now (e.g. between notes or at start)
+              // Find the next upcoming note
+              const upcomingNotes = matchingNotes.filter(n => n.time > currentBeat);
+              const nextUpcoming = upcomingNotes[0] || null;
+
+              if (nextUpcoming) {
+                // If the next upcoming note is within this frame's step, clamp right to its start!
+                const step = dt * (curSong.bpm / 60);
+                if (currentBeat + step >= nextUpcoming.time) {
+                  songBeatRef.current = nextUpcoming.time;
+                  canAdvance = false;
+                  setWaitingState(true, nextUpcoming.pitch);
+                  setExpectedPitch(nextUpcoming.pitch);
+                } else {
+                  canAdvance = true;
+                  setWaitingState(false, null);
+                  setExpectedPitch(nextUpcoming.pitch);
+                }
+              } else {
+                // End of song reached
+                canAdvance = true;
+                setWaitingState(false, null);
+                setExpectedPitch(null);
+              }
             }
           }
 
