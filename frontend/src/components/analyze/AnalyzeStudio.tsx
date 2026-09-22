@@ -110,18 +110,19 @@ export const AnalyzeStudio: React.FC = () => {
 
           <div className="flex flex-col gap-3 mt-4">
             {[
-              { label: 'PERFECT (within ±35ms)', count: ratings.PERFECT, color: 'bg-emerald-500', text: 'text-emerald-500' },
-              { label: 'GREAT (within ±75ms)', count: ratings.GREAT, color: 'bg-sky-500', text: 'text-sky-500' },
-              { label: 'EARLY (rushed >75ms)', count: ratings.EARLY, color: 'bg-amber-500', text: 'text-amber-500' },
-              { label: 'LATE (lagged >75ms)', count: ratings.LATE, color: 'bg-orange-500', text: 'text-orange-500' },
-              { label: 'MISS (wrong pitch)', count: ratings.MISS, color: 'bg-rose-500', text: 'text-rose-500' },
+              { label: 'PERFECT (within ±35ms)', count: ratings.PERFECT || 0, color: 'bg-emerald-500', text: 'text-emerald-500' },
+              { label: 'GOOD / GREAT (within ±75ms)', count: (ratings.GOOD ?? ratings.GREAT) || 0, color: 'bg-sky-500', text: 'text-sky-500' },
+              { label: 'EARLY (rushed >75ms)', count: ratings.EARLY || 0, color: 'bg-amber-500', text: 'text-amber-500' },
+              { label: 'LATE (lagged >75ms)', count: ratings.LATE || 0, color: 'bg-orange-500', text: 'text-orange-500' },
+              { label: 'MISS (wrong pitch)', count: ratings.MISS || 0, color: 'bg-rose-500', text: 'text-rose-500' },
             ].map((item) => {
-              const pct = Math.round((item.count / totalRatings) * 100);
+              const safeCount = item.count || 0;
+              const pct = Math.round((safeCount / totalRatings) * 100);
               return (
                 <div key={item.label} className="flex flex-col gap-1 text-xs">
                   <div className="flex justify-between items-center font-mono">
                     <span className="text-slate-600 dark:text-zinc-300">{item.label}</span>
-                    <span className={`font-bold ${item.text}`}>{item.count} notes ({pct}%)</span>
+                    <span className={`font-bold ${item.text}`}>{safeCount} notes ({pct}%)</span>
                   </div>
                   <div className="w-full h-2 rounded-full bg-slate-100 dark:bg-zinc-800 overflow-hidden">
                     <div className={`h-full ${item.color} transition-all duration-300`} style={{ width: `${pct}%` }} />

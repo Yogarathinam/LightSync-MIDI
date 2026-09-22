@@ -76,7 +76,7 @@ export const AppHeader: React.FC<{
     { id: 'learn', label: 'Learn', icon: <GraduationCap className="w-3.5 h-3.5 text-emerald-500" /> },
     { id: 'play', label: 'Play', icon: <Play className="w-3.5 h-3.5 text-indigo-500" /> },
     { id: 'effects', label: 'Effects', icon: <Sliders className="w-3.5 h-3.5 text-sky-500" /> },
-    { id: 'aicoach', label: 'AI Coach', icon: <Sparkles className="w-3.5 h-3.5 text-purple-500" /> },
+    { id: 'aicoach', label: 'MIRA AI', icon: <Sparkles className="w-3.5 h-3.5 text-purple-500" /> },
     { id: 'hardware', label: 'Hardware', icon: <Radio className="w-3.5 h-3.5 text-cyan-500" /> },
   ];
 

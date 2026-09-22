@@ -158,11 +158,15 @@ export interface SessionResult {
   avg_deviation_ms: number;
   ratings_count: {
     PERFECT: number;
-    GREAT: number;
+    GOOD?: number;
+    GREAT?: number;
     EARLY: number;
     LATE: number;
     MISS: number;
   };
+  max_streak?: number;
+  avg_velocity?: number;
+  problem_measures?: number[];
   notes_detail?: NoteAttempt[];
   created_at?: string;
 }

@@ -72,7 +72,9 @@ export const LearnWorkspace: React.FC = () => {
     geminiRelayUrl,
     miraCurriculum,
     setMiraCurriculum,
-    playbackBeat
+    playbackBeat,
+    openSessionAnalysis,
+    completePracticeSession
   } = useLightSyncStore();
 
   // If no song is selected, default to the first song in library (e.g. Ode to Joy)
@@ -192,29 +194,8 @@ export const LearnWorkspace: React.FC = () => {
       origin: { y: 0.6 }
     });
 
-    const durationSec = Math.max(1, (Date.now() - sessionStartTimeRef.current) / 1000);
-    const totalNotes = song?.notes.length || 1;
-    const accuracy = Math.round((score.hits / totalNotes) * 100);
-
-    const result: SessionResult = {
-      song_id: song?.id || 'unknown',
-      song_title: song?.title || 'Unknown Piece',
-      mode: 'learn',
-      duration_sec: durationSec,
-      total_notes: totalNotes,
-      correct_notes: score.hits,
-      missed_notes: score.misses,
-      accuracy_pct: accuracy,
-      avg_deviation_ms: 14.5,
-      ratings_count: {
-        PERFECT: score.hits,
-        GREAT: 0,
-        EARLY: 0,
-        LATE: 0,
-        MISS: score.misses
-      }
-    };
-    addSessionResult(result);
+    const result = completePracticeSession(mode);
+    openSessionAnalysis(result);
   };
 
   const handleSelectSong = (newSong: SongItem) => {

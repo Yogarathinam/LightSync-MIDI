@@ -11,6 +11,7 @@ import { ForegroundWorkspace } from './components/layout/ForegroundWorkspace';
 import { OverlayContainer } from './components/layout/OverlayContainer';
 import { StudioCanvas } from './components/visualizer/StudioCanvas';
 import { StartupSplash } from './components/layout/StartupSplash';
+import { SessionAnalysisModal } from './components/analysis/SessionAnalysisModal';
 
 const MainApp: React.FC = () => {
   // Real-time hooks
@@ -71,6 +72,9 @@ const MainApp: React.FC = () => {
 
       {/* 3. UTILITY OVERLAY: Quick Settings & Settings Modal Popovers (z-50) */}
       <OverlayContainer />
+
+      {/* 4. PERFORMANCE & PRACTICE SESSION ANALYSIS MODAL (z-50) */}
+      <SessionAnalysisModal />
 
     </div>
   );

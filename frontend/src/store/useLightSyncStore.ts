@@ -365,6 +365,11 @@ interface LightSyncState {
   sessionHistory: SessionResult[];
   setSessionHistory: (history: SessionResult[]) => void;
   addSessionResult: (res: SessionResult) => void;
+  showSessionAnalysis: boolean;
+  completedSessionResult: SessionResult | null;
+  openSessionAnalysis: (result?: SessionResult) => void;
+  closeSessionAnalysis: () => void;
+  completePracticeSession: (mode?: string) => SessionResult;
   midiFolderPath: string | null;
   isScanningMidi: boolean;
   fetchSongs: () => Promise<void>;
@@ -1200,6 +1205,51 @@ export const useLightSyncStore = create<LightSyncState>((set, get) => ({
   sessionHistory: [],
   setSessionHistory: (history) => set({ sessionHistory: history }),
   addSessionResult: (res) => set((state) => ({ sessionHistory: [res, ...state.sessionHistory] })),
+  showSessionAnalysis: false,
+  completedSessionResult: null,
+  openSessionAnalysis: (result) => {
+    if (result) {
+      set({ completedSessionResult: result, showSessionAnalysis: true });
+    } else {
+      const res = get().completePracticeSession();
+      set({ completedSessionResult: res, showSessionAnalysis: true });
+    }
+  },
+  closeSessionAnalysis: () => set({ showSessionAnalysis: false }),
+  completePracticeSession: (mode = 'learn') => {
+    const { currentTelemetry, currentSong, addSessionResult } = get();
+    const totalNotes = currentSong?.notes?.length || currentTelemetry.totalNotes || 1;
+    const correctNotes = currentTelemetry.hits;
+    const accuracy = Math.round((correctNotes / Math.max(1, totalNotes)) * 100);
+
+    const result: SessionResult = {
+      id: Date.now(),
+      song_id: currentSong?.id || currentTelemetry.songId || 'unknown',
+      song_title: currentSong?.title || currentTelemetry.songTitle || 'Practice Piece',
+      mode,
+      duration_sec: currentTelemetry.durationSec || 60,
+      total_notes: totalNotes,
+      correct_notes: correctNotes,
+      missed_notes: currentTelemetry.misses,
+      accuracy_pct: accuracy,
+      avg_deviation_ms: currentTelemetry.avgDeviationMs,
+      ratings_count: {
+        PERFECT: currentTelemetry.timingRatings.PERFECT,
+        GOOD: currentTelemetry.timingRatings.GOOD,
+        EARLY: currentTelemetry.timingRatings.EARLY,
+        LATE: currentTelemetry.timingRatings.LATE,
+        MISS: currentTelemetry.timingRatings.MISS
+      },
+      max_streak: currentTelemetry.streak,
+      avg_velocity: currentTelemetry.avgVelocity,
+      problem_measures: currentTelemetry.problemMeasures,
+      created_at: new Date().toISOString()
+    };
+
+    addSessionResult(result);
+    set({ completedSessionResult: result, showSessionAnalysis: true });
+    return result;
+  },
 
   midiFolderPath: null,
   isScanningMidi: false,

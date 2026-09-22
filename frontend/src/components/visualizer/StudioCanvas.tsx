@@ -198,7 +198,8 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
     rightHandColor,
     activeWorkspace,
     activeOverlay,
-    closeOverlay
+    closeOverlay,
+    completePracticeSession
   } = useLightSyncStore();
 
   const isResizingRef = useRef(false);
@@ -519,6 +520,8 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
   const soundingSongNotesRef = useRef<Map<number, number>>(new Map());
   const learnModeRef = useRef(learnMode);
   learnModeRef.current = learnMode;
+  const completePracticeSessionRef = useRef(completePracticeSession);
+  completePracticeSessionRef.current = completePracticeSession;
   const playbackPublishTimerRef = useRef<number>(0);
 
   // Cleanly synchronize song playback: whenever songPlaybackId or currentSong changes, reset notes
@@ -961,40 +964,64 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
                 setExpectedPitch(remainingPending[0].pitch);
               }
             } else {
-              // 3. No pending notes at the hitline right now.
-              // Find the next upcoming unstruck note
-              const nextUpcoming = matchingNotes.find(
-                n => !struckNotesRef.current.has(`${n.pitch}_${n.time.toFixed(2)}`)
+              // 3. No pending notes waiting at the hitline.
+              // CHECK: Are there any notes that were struck whose duration is currently crossing the hitline?
+              const activeDurationNotes = matchingNotes.filter(
+                n => struckNotesRef.current.has(`${n.pitch}_${n.time.toFixed(2)}`) &&
+                     currentBeat >= n.time &&
+                     currentBeat < (n.time + n.duration)
               );
 
-              if (nextUpcoming) {
-                const step = dt * (curSong.bpm / 60);
-                if (currentBeat + step >= nextUpcoming.time) {
-                  // Approaching next note: check if already being held
-                  if (curActiveNotes.has(nextUpcoming.pitch)) {
-                    const keyId = `${nextUpcoming.pitch}_${nextUpcoming.time.toFixed(2)}`;
-                    struckNotesRef.current.add(keyId);
+              if (activeDurationNotes.length > 0) {
+                // Notes are crossing the hitline: User MUST hold the key down for the note's duration!
+                // If user just tapped and released early, freeze right here until held again!
+                const isHoldingActive = activeDurationNotes.some(n => curActiveNotes.has(n.pitch));
+
+                if (!isHoldingActive) {
+                  canAdvance = false;
+                  setWaitingState(true, activeDurationNotes[0].pitch);
+                  setExpectedPitch(activeDurationNotes[0].pitch);
+                } else {
+                  canAdvance = true;
+                  setWaitingState(false, null);
+                  setExpectedPitch(null);
+                }
+              } else {
+                // 4. No notes crossing hitline right now (rest/gap or between notes).
+                // Find the next upcoming unstruck note
+                const nextUpcoming = matchingNotes.find(
+                  n => !struckNotesRef.current.has(`${n.pitch}_${n.time.toFixed(2)}`)
+                );
+
+                if (nextUpcoming) {
+                  const step = dt * (curSong.bpm / 60);
+                  if (currentBeat + step >= nextUpcoming.time) {
+                    // Approaching next note: check if already being held
+                    if (curActiveNotes.has(nextUpcoming.pitch)) {
+                      const keyId = `${nextUpcoming.pitch}_${nextUpcoming.time.toFixed(2)}`;
+                      struckNotesRef.current.add(keyId);
+                      canAdvance = true;
+                      setWaitingState(false, null);
+                      setExpectedPitch(null);
+                    } else {
+                      // Clamp to start of next note and wait
+                      songBeatRef.current = nextUpcoming.time;
+                      canAdvance = false;
+                      setWaitingState(true, nextUpcoming.pitch);
+                      setExpectedPitch(nextUpcoming.pitch);
+                    }
+                  } else {
+                    // Freely stream falling notes forward
                     canAdvance = true;
                     setWaitingState(false, null);
-                    setExpectedPitch(null);
-                  } else {
-                    // Clamp to start of next note and wait
-                    songBeatRef.current = nextUpcoming.time;
-                    canAdvance = false;
-                    setWaitingState(true, nextUpcoming.pitch);
                     setExpectedPitch(nextUpcoming.pitch);
                   }
                 } else {
-                  // Freely stream falling notes forward (including held note durations)
+                  // All notes struck: allow piece to play to conclusion
                   canAdvance = true;
                   setWaitingState(false, null);
-                  setExpectedPitch(nextUpcoming.pitch);
+                  setExpectedPitch(null);
                 }
-              } else {
-                // All notes struck: allow piece to play to conclusion
-                canAdvance = true;
-                setWaitingState(false, null);
-                setExpectedPitch(null);
               }
             }
           }
@@ -1046,9 +1073,10 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
               });
             }
 
-            // Piece completion
-            if (currentBeat > maxNoteEnd + 2) {
+            // Piece completion: auto trigger analysis modal
+            if (currentBeat > maxNoteEnd + 1.2) {
               stopSongPlayback();
+              completePracticeSessionRef.current(curLearnMode);
             }
           }
 

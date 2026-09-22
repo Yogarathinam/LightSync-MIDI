@@ -18,10 +18,12 @@ import {
   Check,
   Trash2,
   Eye,
-  CircleDot
+  CircleDot,
+  Trophy
 } from 'lucide-react';
 import { useLightSyncStore } from '../../store/useLightSyncStore';
 import { SongItem, SongNote } from '../../types';
+import { SongPracticeHubModal } from './SongPracticeHubModal';
 
 export const SongsWorkspace: React.FC = () => {
   const { 
@@ -45,7 +47,8 @@ export const SongsWorkspace: React.FC = () => {
     fetchSongs,
     rescanMidiFolder,
     uploadMidiFile,
-    deleteMidiSong
+    deleteMidiSong,
+    sessionHistory
   } = useLightSyncStore();
 
   const handleWatchAndListen = (song: SongItem) => {
@@ -61,6 +64,7 @@ export const SongsWorkspace: React.FC = () => {
   const [playingDemoId, setPlayingDemoId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const demoTimersRef = useRef<number[]>([]);
+  const [selectedPracticeSong, setSelectedPracticeSong] = useState<SongItem | null>(null);
 
   // Auto-fetch songs on mount
   useEffect(() => {
@@ -406,8 +410,12 @@ export const SongsWorkspace: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {filteredSongs.map((song) => {
           const isCurrent = currentSong?.id === song.id;
-          const isPlaying = playingDemoId === song.id;
           const isLocalOrImported = song.source === 'local_midi' || song.source === 'imported';
+
+          const songAttempts = sessionHistory.filter(s => s.song_id === song.id);
+          const bestAttempt = songAttempts.length > 0 
+            ? [...songAttempts].sort((a, b) => b.accuracy_pct - a.accuracy_pct)[0] 
+            : null;
 
           const difficultyBadgeColor = 
             song.difficulty === 'Beginner' ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800' :
@@ -436,6 +444,13 @@ export const SongsWorkspace: React.FC = () => {
                   </div>
                   
                   <div className="flex items-center gap-1.5 shrink-0">
+                    {/* Best Attempt Badge */}
+                    {bestAttempt && (
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-md border font-semibold bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800 flex items-center gap-1" title={`Best score: ${bestAttempt.accuracy_pct}% accuracy`}>
+                        <Trophy className="w-2.5 h-2.5 text-amber-500" />
+                        <span>{bestAttempt.accuracy_pct}% Best</span>
+                      </span>
+                    )}
                     {/* Source Badge */}
                     {song.source === 'local_midi' && (
                       <span className="text-[10px] font-mono px-2 py-0.5 rounded-md border font-semibold bg-cyan-50 dark:bg-cyan-950/40 text-cyan-600 dark:text-cyan-400 border-cyan-200 dark:border-cyan-800 flex items-center gap-1">
@@ -477,52 +492,65 @@ export const SongsWorkspace: React.FC = () => {
               </div>
 
               {/* Action Buttons */}
-              <div className="flex items-center gap-2 pt-2 border-t border-slate-100 dark:border-zinc-850">
-                {/* Watch & Listen (Stage Preview) */}
+              <div className="flex flex-col gap-2 pt-2 border-t border-slate-100 dark:border-zinc-850">
+                {/* Practice with MIRA Primary Hub Button */}
                 <button
-                  onClick={() => handleWatchAndListen(song)}
-                  className="flex-1 flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-white text-xs font-bold shadow-xs transition-all cursor-pointer"
-                  title="Watch falling notes and listen on the visualizer stage"
+                  onClick={() => setSelectedPracticeSong(song)}
+                  className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-sky-600 hover:from-purple-500 hover:to-sky-500 text-white text-xs font-bold shadow-md shadow-indigo-500/20 transition-all cursor-pointer group"
+                  title="Open MIRA AI Practice Hub with mode selection, coaching tips, analysis, and asking MIRA"
                 >
-                  <Eye className="w-3.5 h-3.5" />
-                  <span>Watch & Listen</span>
+                  <Sparkles className="w-3.5 h-3.5 text-amber-300 group-hover:rotate-12 transition-transform" />
+                  <span>Practice with MIRA</span>
                 </button>
 
-                {/* Learn / Follow Button */}
-                <button
-                  onClick={() => selectSongAndLearn(song, 'follow')}
-                  className="flex-1 flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-xs transition-all cursor-pointer"
-                  title="Open in interactive Learn & Follow mode"
-                >
-                  <GraduationCap className="w-3.5 h-3.5" />
-                  <span>Learn</span>
-                </button>
-
-                {/* Practice Button */}
-                <button
-                  onClick={() => selectSongAndLearn(song, 'practice')}
-                  className="flex items-center justify-center gap-1 py-2 px-2.5 rounded-xl bg-slate-100 dark:bg-zinc-900 hover:bg-slate-200 dark:hover:bg-zinc-800 text-slate-700 dark:text-zinc-300 text-xs font-semibold border border-slate-200/80 dark:border-zinc-800 transition-all cursor-pointer"
-                  title="Open targeted drills & sub-tempo practice"
-                >
-                  <Activity className="w-3.5 h-3.5 text-sky-500" />
-                  <span>Drills</span>
-                </button>
-
-                {/* Delete button for local/imported songs */}
-                {isLocalOrImported && (
+                {/* Secondary Quick Actions */}
+                <div className="flex items-center gap-1.5">
+                  {/* Watch & Listen (Stage Preview) */}
                   <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (confirm(`Remove "${song.title}" from library?`)) {
-                        deleteMidiSong(song.id);
-                      }
-                    }}
-                    className="p-2 rounded-xl border border-rose-200/60 dark:border-rose-900/60 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-all cursor-pointer"
-                    title="Remove from Library"
+                    onClick={() => handleWatchAndListen(song)}
+                    className="flex-1 flex items-center justify-center gap-1 py-1.5 px-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-white text-xs font-bold shadow-xs transition-all cursor-pointer"
+                    title="Watch falling notes and listen on the visualizer stage"
                   >
-                    <Trash2 className="w-3.5 h-3.5" />
+                    <Eye className="w-3.5 h-3.5" />
+                    <span>Watch</span>
                   </button>
-                )}
+
+                  {/* Learn / Follow Button */}
+                  <button
+                    onClick={() => selectSongAndLearn(song, 'follow')}
+                    className="flex-1 flex items-center justify-center gap-1 py-1.5 px-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-xs transition-all cursor-pointer"
+                    title="Open in interactive Learn & Follow mode"
+                  >
+                    <GraduationCap className="w-3.5 h-3.5" />
+                    <span>Learn</span>
+                  </button>
+
+                  {/* Practice Button */}
+                  <button
+                    onClick={() => selectSongAndLearn(song, 'practice')}
+                    className="flex items-center justify-center gap-1 py-1.5 px-2.5 rounded-xl bg-slate-100 dark:bg-zinc-900 hover:bg-slate-200 dark:hover:bg-zinc-800 text-slate-700 dark:text-zinc-300 text-xs font-semibold border border-slate-200/80 dark:border-zinc-800 transition-all cursor-pointer"
+                    title="Open targeted drills & sub-tempo practice"
+                  >
+                    <Activity className="w-3.5 h-3.5 text-sky-500" />
+                    <span>Drills</span>
+                  </button>
+
+                  {/* Delete button for local/imported songs */}
+                  {isLocalOrImported && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (confirm(`Remove "${song.title}" from library?`)) {
+                          deleteMidiSong(song.id);
+                        }
+                      }}
+                      className="p-1.5 rounded-xl border border-rose-200/60 dark:border-rose-900/60 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-all cursor-pointer"
+                      title="Remove from Library"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
               </div>
 
             </div>
@@ -537,6 +565,12 @@ export const SongsWorkspace: React.FC = () => {
           <p className="text-xs mt-1">Try adjusting your filters, drop a .mid file here, or copy .mid files to your MIDI folder.</p>
         </div>
       )}
+
+      {/* Song Practice & MIRA Hub Modal */}
+      <SongPracticeHubModal 
+        song={selectedPracticeSong} 
+        onClose={() => setSelectedPracticeSong(null)} 
+      />
 
     </div>
   );
