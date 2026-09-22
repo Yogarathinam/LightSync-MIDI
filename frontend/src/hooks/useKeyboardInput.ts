@@ -54,6 +54,10 @@ export const useKeyboardInput = () => {
   const playbackTotalBeatsRef = useRef(playbackTotalBeats);
   playbackTotalBeatsRef.current = playbackTotalBeats;
 
+  const activeWorkspace = useLightSyncStore((s) => s.activeWorkspace);
+  const activeWorkspaceRef = useRef(activeWorkspace);
+  activeWorkspaceRef.current = activeWorkspace;
+
   useEffect(() => {
     // Map key string -> actual played pitch (so pitch changes don't orphan held keys)
     const activeKeysPitchMap = new Map<string, number>();
@@ -64,13 +68,15 @@ export const useKeyboardInput = () => {
         return;
       }
 
-      // Spacebar: Play / Pause toggle when song is loaded
+      const isSongContext = isSongPlayingRef.current || activeWorkspaceRef.current === 'songs' || activeWorkspaceRef.current === 'learn';
+
+      // Spacebar: Play / Pause toggle when song is playing or in song/learn workspace; otherwise toggles sustain in normal play mode
       if (e.code === 'Space' || e.key === ' ') {
         e.preventDefault();
         if (target && target.tagName === 'BUTTON') {
           target.blur();
         }
-        if (currentSongRef.current) {
+        if (isSongContext && currentSongRef.current) {
           if (isSongPlayingRef.current) {
             stopSongPlayback();
           } else {
@@ -82,33 +88,33 @@ export const useKeyboardInput = () => {
         return;
       }
 
-      // ArrowLeft: Step backward (4 beats / measure, or 1 beat with Shift)
+      // ArrowLeft: Step backward in song (only active in song/learn context)
       if (e.code === 'ArrowLeft' || e.key === 'ArrowLeft') {
-        e.preventDefault();
-        if (target && target.tagName === 'BUTTON') {
-          target.blur();
-        }
-        if (currentSongRef.current) {
+        if (isSongContext && currentSongRef.current) {
+          e.preventDefault();
+          if (target && target.tagName === 'BUTTON') {
+            target.blur();
+          }
           const step = e.shiftKey ? 1 : 4;
           const newBeat = Math.max(0, playbackBeatRef.current - step);
           seekToBeat(newBeat);
+          return;
         }
-        return;
       }
 
-      // ArrowRight: Step forward (4 beats / measure, or 1 beat with Shift)
+      // ArrowRight: Step forward in song (only active in song/learn context)
       if (e.code === 'ArrowRight' || e.key === 'ArrowRight') {
-        e.preventDefault();
-        if (target && target.tagName === 'BUTTON') {
-          target.blur();
-        }
-        if (currentSongRef.current) {
+        if (isSongContext && currentSongRef.current) {
+          e.preventDefault();
+          if (target && target.tagName === 'BUTTON') {
+            target.blur();
+          }
           const maxBeats = playbackTotalBeatsRef.current || 100;
           const step = e.shiftKey ? 1 : 4;
           const newBeat = Math.min(maxBeats, playbackBeatRef.current + step);
           seekToBeat(newBeat);
+          return;
         }
-        return;
       }
 
       if (e.repeat) return;

@@ -1880,8 +1880,8 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
           <div className="w-full h-[2px] opacity-0 group-hover:opacity-100 group-active:opacity-100 transition-opacity duration-150 bg-indigo-500/80 shadow-[0_0_8px_rgba(99,102,241,0.7)]" />
         </div>
 
-        {/* On-Stage Song Timeline Scrubber when Song is active on stage */}
-        {currentSong && (isSongPlaying || activeWorkspace === 'songs' || activeWorkspace === null) && activeWorkspace !== 'learn' && (
+        {/* On-Stage Song Timeline Scrubber: Only displays for songs, learning, or active song playback (Hidden in normal play mode) */}
+        {currentSong && (isSongPlaying || activeWorkspace === 'songs') && activeWorkspace !== 'learn' && (
           <div className="absolute top-3 left-1/2 -translate-x-1/2 z-30 max-w-lg w-[92%] pointer-events-auto animate-in fade-in slide-in-from-top-2 duration-200">
             <SongTimelineScrubber />
           </div>
