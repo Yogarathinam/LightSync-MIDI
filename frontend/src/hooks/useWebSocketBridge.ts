@@ -62,6 +62,13 @@ export const useWebSocketBridge = () => {
               isMidiConnected: data.connected
             });
             addConsoleLog(`MIDI Status: ${data.connected ? 'Connected' : 'Disconnected'} (${data.port || 'None'})`);
+          } else if (type === 'MIDI_PORTS_CHANGED') {
+            useLightSyncStore.setState({
+              midiPorts: data.ports || [],
+              activeMidiPort: data.active || null,
+              isMidiConnected: !!data.active
+            });
+            addConsoleLog(`MIDI Devices Updated: ${(data.ports || []).join(', ') || 'None'}`);
           } else if (type === 'SESSION_RESULT') {
             if (data.summary) addSessionResult(data.summary);
             if (data.coach) setAiCoachFeedback(data.coach);

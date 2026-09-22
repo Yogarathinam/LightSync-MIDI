@@ -95,5 +95,40 @@ class TestMidiSupport(unittest.TestCase):
         del_resp = delete_song("non_existent_song_id")
         self.assertEqual(del_resp["deleted"], False)
 
+    def test_midi_engine_ports_and_lifecycle(self):
+        from app.music.midi_engine import midi_engine
+        ports = midi_engine.get_available_ports()
+        self.assertIsInstance(ports, list)
+        
+        # Test start with DISCONNECT mode
+        res = midi_engine.start("DISCONNECT")
+        self.assertFalse(res)
+        self.assertIsNone(midi_engine.active_port_name)
+
+    def test_midi_engine_note_events(self):
+        from app.music.midi_engine import midi_engine
+        from app.core.event_bus import event_bus
+
+        received_events = []
+        def listener(data):
+            received_events.append(data)
+
+        event_bus.subscribe("NOTE_ON", listener)
+        event_bus.subscribe("NOTE_OFF", listener)
+
+        # Trigger physical MIDI note on
+        midi_engine.handle_note_on(60, 100, source="physical_midi")
+        self.assertIn(60, midi_engine.active_pitches)
+
+        # Trigger physical MIDI note off
+        midi_engine.handle_note_off(60, source="physical_midi")
+        self.assertNotIn(60, midi_engine.active_pitches)
+
+        self.assertGreaterEqual(len(received_events), 2)
+        note_on_ev = [e for e in received_events if e.get("pitch") == 60 and "velocity" in e]
+        self.assertTrue(len(note_on_ev) >= 1)
+        self.assertEqual(note_on_ev[0]["source"], "physical_midi")
+
 if __name__ == "__main__":
     unittest.main()
+

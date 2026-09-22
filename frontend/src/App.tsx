@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ThemeProvider } from './context/ThemeContext';
 import { useWebSocketBridge } from './hooks/useWebSocketBridge';
 import { useKeyboardInput } from './hooks/useKeyboardInput';
+import { useWebMidi } from './hooks/useWebMidi';
 import { useLightSyncStore } from './store/useLightSyncStore';
 
 import { AppHeader } from './components/layout/AppHeader';
@@ -15,6 +16,7 @@ const MainApp: React.FC = () => {
   // Real-time hooks
   useWebSocketBridge();
   useKeyboardInput();
+  useWebMidi();
 
   const [fps, setFps] = useState(60);
   const [showSplash, setShowSplash] = useState(true);

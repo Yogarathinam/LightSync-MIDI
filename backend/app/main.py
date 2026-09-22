@@ -1,7 +1,7 @@
 import asyncio
 import json
 import logging
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from contextlib import asynccontextmanager
 
 from pathlib import Path
@@ -33,26 +33,30 @@ logger = logging.getLogger("LightSync.API")
 
 # Connected WebSocket clients set
 active_websockets: List[WebSocket] = []
+main_loop: Optional[asyncio.AbstractEventLoop] = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup
+    global main_loop
+    main_loop = asyncio.get_running_loop()
     logger.info("Initializing LightSync v2 Backend Core...")
     init_db()
     midi_engine.start()
     serial_manager.connect("SIMULATED")
 
-    # Hook event bus to forward events to all active WebSocket clients
+    # Hook event bus to forward events to all active WebSocket clients thread-safely
     def forward_to_ws(event: Dict[str, Any]):
         if not active_websockets:
             return
         msg = json.dumps(event)
-        # Schedule sending to active sockets
         for ws in list(active_websockets):
             try:
-                asyncio.create_task(ws.send_text(msg))
-            except Exception:
-                pass
+                if main_loop and main_loop.is_running():
+                    asyncio.run_coroutine_threadsafe(ws.send_text(msg), main_loop)
+                else:
+                    asyncio.create_task(ws.send_text(msg))
+            except Exception as e:
+                logger.debug(f"WS broadcast error: {e}")
 
     event_bus.subscribe("*", forward_to_ws)
     yield
