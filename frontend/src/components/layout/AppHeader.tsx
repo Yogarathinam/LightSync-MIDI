@@ -53,6 +53,8 @@ export const AppHeader: React.FC<{
     setVolume, 
     isMuted, 
     toggleMute,
+    effectConfig,
+    setEffectParam,
     metronomeActive,
     setMetronomeActive,
     metronomeBpm,
@@ -62,22 +64,6 @@ export const AppHeader: React.FC<{
     incrementOctave,
     decrementOctave
   } = useLightSyncStore();
-
-  const [selectedModulePort, setSelectedModulePort] = React.useState(deviceStatus.port || 'SIMULATED');
-  const [selectedMidiPort, setSelectedMidiPort] = React.useState(activeMidiPort || '');
-
-  React.useEffect(() => {
-    fetchDevicePorts();
-    fetchMidiPorts();
-  }, []);
-
-  React.useEffect(() => {
-    if (deviceStatus.port) setSelectedModulePort(deviceStatus.port);
-  }, [deviceStatus.port]);
-
-  React.useEffect(() => {
-    if (activeMidiPort) setSelectedMidiPort(activeMidiPort);
-  }, [activeMidiPort]);
 
 
   const tabs: { id: TopNavTab; label: string; icon: React.ReactNode }[] = [
@@ -138,7 +124,7 @@ export const AppHeader: React.FC<{
         </div>
 
         {/* Center: Studio Tabs with Click-to-Open Overlay */}
-        <nav className="hidden md:flex items-center p-0.5 sm:p-1 rounded-xl bg-slate-100/90 dark:bg-zinc-900/80 border border-slate-200/80 dark:border-zinc-800 shrink-0 gap-0.5">
+        <nav className="hidden md:flex items-center p-1 sm:p-1.5 rounded-2xl bg-slate-100/90 dark:bg-zinc-900/80 border border-slate-200/80 dark:border-zinc-800 shrink-0 gap-1 sm:gap-1.5 shadow-sm">
           {tabs.map((tab) => {
             const isWorkspaceActive = activeWorkspace === tab.id;
             const isDefaultPlay = (tab.id === 'play' || tab.id === 'visualize') && activeWorkspace === null;
@@ -146,11 +132,11 @@ export const AppHeader: React.FC<{
               <button
                 key={tab.id}
                 onClick={() => handleTabClick(tab.id)}
-                className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1.2 rounded-lg text-xs font-medium transition-all select-none cursor-pointer whitespace-nowrap shrink-0 ${
+                className={`flex items-center gap-2 px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-xl text-xs sm:text-[13px] font-semibold transition-all select-none cursor-pointer whitespace-nowrap shrink-0 ${
                   isWorkspaceActive
-                    ? 'bg-indigo-600 text-white shadow-sm font-semibold'
+                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/20 font-bold'
                     : isDefaultPlay
-                    ? 'bg-indigo-50/90 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border border-indigo-200/70 dark:border-indigo-800/60 font-semibold'
+                    ? 'bg-indigo-50/90 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 border border-indigo-200/70 dark:border-indigo-800/60 font-bold'
                     : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200 hover:bg-slate-200/60 dark:hover:bg-zinc-800/60'
                 }`}
                 title={
@@ -164,10 +150,10 @@ export const AppHeader: React.FC<{
                 {tab.icon}
                 <span className="whitespace-nowrap">{tab.label}</span>
                 {isDefaultPlay && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
+                  <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
                 )}
                 {tab.id === 'learn' && currentSong && (
-                  <span className="hidden 2xl:inline text-[9px] font-mono px-1 py-0.2 rounded bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 truncate max-w-[70px]">
+                  <span className="hidden 2xl:inline text-[9px] font-mono px-1.5 py-0.2 rounded bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 truncate max-w-[80px]">
                     {currentSong.title}
                   </span>
                 )}
@@ -177,149 +163,22 @@ export const AppHeader: React.FC<{
         </nav>
 
         {/* Right Universal Actions Bar */}
-        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 select-none">
+        <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0 select-none">
           
-          {/* Dual Connection Status: Compact Pill on normal/laptop screens (< 1720px), Full selectors on 3xl (>= 1720px) */}
-          <button
-            onClick={() => {
-              if (activeWorkspace === 'hardware') closeWorkspace();
-              else openWorkspace('hardware');
-            }}
-            className="hidden sm:flex min-[1720px]:hidden items-center gap-1.5 h-8 px-2 rounded-lg bg-slate-100 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 hover:bg-slate-200/70 dark:hover:bg-zinc-800 transition-colors shadow-sm cursor-pointer select-none shrink-0"
-            title="Open Hardware Setup & Live MIDI Terminal Card"
-          >
-            <div className="flex items-center gap-1">
-              <Radio className={`w-3 h-3 ${deviceStatus.connected && !deviceStatus.simulated ? 'text-emerald-500' : 'text-indigo-400'}`} />
-              <span className="text-[10px] font-mono font-bold text-slate-700 dark:text-zinc-300">
-                {deviceStatus.connected && !deviceStatus.simulated ? 'M5' : 'Sim'}
-              </span>
-            </div>
-            <div className="h-3 w-px bg-slate-300 dark:bg-zinc-800" />
-            <div className="flex items-center gap-1">
-              <Cable className={`w-3 h-3 ${isMidiConnected ? 'text-emerald-500' : 'text-amber-500'}`} />
-              <span className="text-[10px] font-mono font-bold text-slate-700 dark:text-zinc-300">
-                {isMidiConnected ? 'MIDI' : 'Keyb'}
-              </span>
-            </div>
-          </button>
-
-          {/* Full Connection Selectors on wide screens (>= 1720px) */}
-          <div className="hidden min-[1720px]:flex items-center gap-1.5 p-1 rounded-xl bg-slate-100 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 shadow-sm shrink-0">
-            {/* LightSync Module COM Port */}
-            <div className="flex items-center gap-1 pl-1 pr-0.5">
-              <Radio className={`w-3.5 h-3.5 ${deviceStatus.connected && !deviceStatus.simulated ? 'text-emerald-500' : 'text-indigo-500'}`} />
-              <select
-                value={selectedModulePort}
-                onChange={(e) => setSelectedModulePort(e.target.value)}
-                onFocus={fetchDevicePorts}
-                className="bg-transparent text-xs font-mono font-bold text-slate-800 dark:text-zinc-200 max-w-[85px] focus:outline-none cursor-pointer"
-                title="Select LightSync Module Serial COM Port"
-              >
-                {devicePorts.length > 0 ? (
-                  devicePorts.map((p) => (
-                    <option key={p.port} value={p.port} className="bg-white dark:bg-zinc-900 text-slate-900 dark:text-white">
-                      {p.port} {p.port === 'SIMULATED' ? '(Sim)' : ''}
-                    </option>
-                  ))
-                ) : (
-                  <option value="SIMULATED" className="bg-white dark:bg-zinc-900">SIMULATED</option>
-                )}
-              </select>
-              {deviceStatus.connected && !deviceStatus.simulated ? (
-                <button
-                  onClick={disconnectDevicePort}
-                  className="px-1.5 py-0.5 rounded-md bg-rose-600 hover:bg-rose-700 text-white font-bold text-[9px] shadow-sm transition-all cursor-pointer"
-                  title="Disconnect LightSync Module Port"
-                >
-                  Disc
-                </button>
-              ) : (
-                <button
-                  onClick={() => connectDevicePort(selectedModulePort)}
-                  className="px-1.5 py-0.5 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[9px] shadow-sm transition-all cursor-pointer"
-                  title="Connect LightSync Module Port"
-                >
-                  Conn
-                </button>
-              )}
-            </div>
-
-            <div className="h-3.5 w-px bg-slate-300 dark:bg-zinc-800" />
-
-            {/* MIDI Input Port */}
-            <div className="flex items-center gap-1 pl-0.5 pr-1">
-              <Cable className={`w-3.5 h-3.5 ${isMidiConnected ? 'text-emerald-500' : 'text-amber-500'}`} />
-              <select
-                value={selectedMidiPort}
-                onChange={(e) => setSelectedMidiPort(e.target.value)}
-                onFocus={fetchMidiPorts}
-                className="bg-transparent text-xs font-mono font-bold text-slate-800 dark:text-zinc-200 max-w-[85px] focus:outline-none cursor-pointer"
-                title="Select Physical MIDI Keyboard Input Port"
-              >
-                <option value="" className="bg-white dark:bg-zinc-900 text-slate-900 dark:text-white">Virtual</option>
-                {midiPorts.map((mp) => (
-                  <option key={mp} value={mp} className="bg-white dark:bg-zinc-900 text-slate-900 dark:text-white">
-                    {mp}
-                  </option>
-                ))}
-              </select>
-              {isMidiConnected ? (
-                <button
-                  onClick={disconnectMidiPort}
-                  className="px-1.5 py-0.5 rounded-md bg-rose-600 hover:bg-rose-700 text-white font-bold text-[9px] shadow-sm transition-all cursor-pointer"
-                  title="Disconnect MIDI Input Port"
-                >
-                  Disc
-                </button>
-              ) : (
-                <button
-                  onClick={() => connectMidiPort(selectedMidiPort)}
-                  disabled={!selectedMidiPort}
-                  className={`px-1.5 py-0.5 rounded-md font-bold text-[9px] shadow-sm transition-all ${
-                    selectedMidiPort 
-                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer' 
-                      : 'bg-slate-300 dark:bg-zinc-800 text-slate-500 dark:text-zinc-500 cursor-not-allowed'
-                  }`}
-                  title="Connect Selected MIDI Input Port"
-                >
-                  Conn
-                </button>
-              )}
-            </div>
-
-            <div className="h-3.5 w-px bg-slate-300 dark:bg-zinc-800" />
-
-            {/* Hardware Workspace Card Shortcut */}
-            <button
-              onClick={() => {
-                if (activeWorkspace === 'hardware') closeWorkspace();
-                else openWorkspace('hardware');
-              }}
-              className={`p-1 rounded-lg transition-colors cursor-pointer ${
-                activeWorkspace === 'hardware'
-                  ? 'bg-cyan-600 text-white shadow-sm'
-                  : 'text-slate-500 dark:text-zinc-400 hover:text-cyan-500 dark:hover:text-cyan-400 hover:bg-slate-200/70 dark:hover:bg-zinc-800'
-              }`}
-              title="Open Full Hardware Setup & Live MIDI Terminal Card"
-            >
-              <Cpu className="w-3.5 h-3.5" />
-            </button>
-          </div>
-
-          {/* 1. Live Performance Output Capsule (Compact: Reduced width to leave room for nav) */}
-          <div className="hidden lg:flex items-center h-8 px-2 rounded-lg bg-slate-100 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 shadow-sm shrink-0 select-none">
+          {/* 1. Live Performance Output Capsule (Compact: Real-time Chord & Active Keys) */}
+          <div className="hidden lg:flex items-center h-8.5 px-2.5 rounded-xl bg-slate-100 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 shadow-sm shrink-0 select-none">
             {/* Live Chord / Pitch readout */}
-            <div className="min-w-[32px] max-w-[46px] text-center">
+            <div className="min-w-[34px] max-w-[50px] text-center">
               <span className="font-mono font-bold text-[11px] text-indigo-600 dark:text-indigo-400 truncate block" title={currentChord ? `Chord: ${currentChord.chord}` : 'No active chord'}>
                 {currentChord ? currentChord.chord : '--'}
               </span>
             </div>
             
             {/* Subtle divider */}
-            <div className="h-3 w-px bg-slate-300 dark:bg-zinc-800 mx-1.5" />
+            <div className="h-3.5 w-px bg-slate-300 dark:bg-zinc-800 mx-1.5" />
 
             {/* Active Keys indicator */}
-            <div className="flex items-center gap-1 min-w-[34px]">
+            <div className="flex items-center gap-1.5 min-w-[36px]">
               <span className="relative flex h-1.5 w-1.5 shrink-0">
                 {activeNotes.size > 0 && (
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75" />
@@ -335,26 +194,26 @@ export const AppHeader: React.FC<{
           {/* 2. Pitch Shift & Quick Settings Pod */}
           <div className="flex items-center gap-1.5 shrink-0">
             {/* Octave Switching: [-] [Oct 0] [+] */}
-            <div className="flex items-center h-8 bg-slate-100 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-lg p-0.5 shadow-sm">
+            <div className="flex items-center h-8.5 bg-slate-100 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-0.5 shadow-sm">
               <button
                 onClick={decrementOctave}
-                className="w-5.5 h-6.5 rounded-md flex items-center justify-center text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white hover:bg-white dark:hover:bg-zinc-800 active:scale-95 transition-all cursor-pointer"
+                className="w-6 h-7 rounded-lg flex items-center justify-center text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white hover:bg-white dark:hover:bg-zinc-800 active:scale-95 transition-all cursor-pointer"
                 title="Shift Octave Down (-12 st)"
               >
-                <Minus className="w-3 h-3" />
+                <Minus className="w-3.5 h-3.5" />
               </button>
               <div 
-                className="px-1.5 font-mono font-bold text-[11px] text-slate-800 dark:text-zinc-200 min-w-[42px] text-center select-none"
+                className="px-2 font-mono font-bold text-xs text-slate-800 dark:text-zinc-200 min-w-[46px] text-center select-none"
                 title={`Current Octave: ${octaveShift > 0 ? `+${octaveShift}` : octaveShift}`}
               >
                 {octaveShift === 0 ? 'Oct 0' : `Oct ${octaveShift > 0 ? `+${octaveShift}` : octaveShift}`}
               </div>
               <button
                 onClick={incrementOctave}
-                className="w-5.5 h-6.5 rounded-md flex items-center justify-center text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white hover:bg-white dark:hover:bg-zinc-800 active:scale-95 transition-all cursor-pointer"
+                className="w-6 h-7 rounded-lg flex items-center justify-center text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white hover:bg-white dark:hover:bg-zinc-800 active:scale-95 transition-all cursor-pointer"
                 title="Shift Octave Up (+12 st)"
               >
-                <Plus className="w-3 h-3" />
+                <Plus className="w-3.5 h-3.5" />
               </button>
             </div>
 
@@ -365,7 +224,7 @@ export const AppHeader: React.FC<{
                   if (activeUtilityOverlay === 'quick_settings') closeUtilityOverlay();
                   else openUtilityOverlay('quick_settings');
                 }}
-                className={`h-8 flex items-center gap-1.5 px-2 sm:px-2.5 rounded-lg border text-xs font-medium transition-all shadow-sm cursor-pointer ${
+                className={`h-8.5 flex items-center gap-1.5 px-2.5 sm:px-3 rounded-xl border text-xs font-medium transition-all shadow-sm cursor-pointer ${
                   activeUtilityOverlay === 'quick_settings'
                     ? 'bg-indigo-600 text-white border-indigo-600'
                     : 'bg-slate-100 dark:bg-zinc-900 text-slate-700 dark:text-zinc-300 hover:bg-slate-200 dark:hover:bg-zinc-800 border-slate-200 dark:border-zinc-800'
@@ -373,34 +232,43 @@ export const AppHeader: React.FC<{
                 title="Quick Settings (Keyboard, Transpose, Octave, Diffuser)"
               >
                 <SlidersHorizontal className="w-3.5 h-3.5" />
-                <span className="hidden xl:inline text-xs whitespace-nowrap">Settings</span>
+                <span className="hidden sm:inline text-xs whitespace-nowrap">Settings</span>
               </button>
             </div>
           </div>
 
-          {/* 3. Audio & System Toolbar Pod */}
-          <div className="flex items-center h-8 bg-slate-100 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-lg p-0.5 shadow-sm shrink-0">
-            {/* Metronome Quick Toggle */}
-            <button
-              onClick={() => setMetronomeActive(!metronomeActive)}
-              title={`Metronome (${metronomeBpm} BPM)`}
-              className={`w-6.5 h-6.5 rounded-md flex items-center justify-center transition-all cursor-pointer ${
-                metronomeActive
-                  ? 'bg-indigo-600 text-white shadow-sm'
-                  : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white hover:bg-white dark:hover:bg-zinc-800'
-              }`}
-            >
-              <Clock className="w-3 h-3" />
-            </button>
+          {/* 3. Audio, Brightness & System Toolbar Pod */}
+          <div className="flex items-center h-8.5 bg-slate-100 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-0.5 shadow-sm shrink-0">
+            
+            {/* Brightness Control Slider (Optical WS2812B & Visualizer) */}
+            <div className="flex items-center gap-1.5 px-1.5 sm:px-2" title={`Hardware & Visualizer Brightness: ${Math.round((effectConfig.brightness / 255) * 100)}% (${effectConfig.brightness}/255)`}>
+              <Sun className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+              <input
+                type="range"
+                min="10"
+                max="255"
+                step="5"
+                value={effectConfig.brightness}
+                onChange={(e) => setEffectParam('brightness', parseInt(e.target.value, 10))}
+                className="w-14 sm:w-16 h-1.5 accent-amber-500 cursor-pointer"
+                title={`Brightness: ${Math.round((effectConfig.brightness / 255) * 100)}%`}
+              />
+              <span className="text-[10px] font-mono font-semibold text-slate-600 dark:text-zinc-400 min-w-[28px] tabular-nums select-none">
+                {Math.round((effectConfig.brightness / 255) * 100)}%
+              </span>
+            </div>
 
-            {/* Volume / Mute Toggle with Mini Slider */}
-            <div className="hidden 2xl:flex items-center gap-1 px-1">
+            {/* Divider between Brightness and Sound */}
+            <div className="h-3.5 w-px bg-slate-300 dark:bg-zinc-800 mx-0.5" />
+
+            {/* Volume / Sound Control Slider */}
+            <div className="flex items-center gap-1.5 px-1.5 sm:px-2">
               <button
                 onClick={toggleMute}
                 className="p-0.5 rounded text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white cursor-pointer"
-                title={isMuted ? 'Unmute' : 'Mute'}
+                title={isMuted ? 'Unmute Audio' : 'Mute Audio'}
               >
-                {isMuted ? <VolumeX className="w-3 h-3 text-rose-500" /> : <Volume2 className="w-3 h-3" />}
+                {isMuted ? <VolumeX className="w-3.5 h-3.5 text-rose-500" /> : <Volume2 className="w-3.5 h-3.5 text-indigo-500" />}
               </button>
               <input
                 type="range"
@@ -409,13 +277,32 @@ export const AppHeader: React.FC<{
                 step="0.05"
                 value={isMuted ? 0 : volume}
                 onChange={(e) => setVolume(parseFloat(e.target.value))}
-                className="w-12 h-1 accent-indigo-600 cursor-pointer"
+                className="w-14 sm:w-16 h-1.5 accent-indigo-600 cursor-pointer"
                 title={`Volume: ${Math.round(volume * 100)}%`}
               />
+              <span className="text-[10px] font-mono font-semibold text-slate-600 dark:text-zinc-400 min-w-[28px] tabular-nums select-none">
+                {isMuted ? '0%' : `${Math.round(volume * 100)}%`}
+              </span>
             </div>
 
             {/* Divider */}
-            <div className="h-3 w-px bg-slate-300 dark:bg-zinc-800 mx-0.5" />
+            <div className="h-3.5 w-px bg-slate-300 dark:bg-zinc-800 mx-0.5" />
+
+            {/* Metronome Quick Toggle */}
+            <button
+              onClick={() => setMetronomeActive(!metronomeActive)}
+              title={`Metronome (${metronomeBpm} BPM)`}
+              className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all cursor-pointer ${
+                metronomeActive
+                  ? 'bg-indigo-600 text-white shadow-sm'
+                  : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white hover:bg-white dark:hover:bg-zinc-800'
+              }`}
+            >
+              <Clock className="w-3.5 h-3.5" />
+            </button>
+
+            {/* Divider */}
+            <div className="h-3.5 w-px bg-slate-300 dark:bg-zinc-800 mx-0.5" />
 
             {/* Full Settings Modal Button */}
             <button
@@ -423,26 +310,26 @@ export const AppHeader: React.FC<{
                 if (activeUtilityOverlay === 'settings') closeUtilityOverlay();
                 else openUtilityOverlay('settings');
               }}
-              className={`w-6.5 h-6.5 rounded-md flex items-center justify-center transition-all cursor-pointer ${
+              className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all cursor-pointer ${
                 activeUtilityOverlay === 'settings'
                   ? 'bg-indigo-600 text-white'
                   : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white hover:bg-white dark:hover:bg-zinc-800'
               }`}
               title="Studio Preferences & Configuration"
             >
-              <SettingsIcon className="w-3 h-3" />
+              <SettingsIcon className="w-3.5 h-3.5" />
             </button>
 
             {/* Application-Wide Light / Pure-Black Dark Toggle */}
             <button
               onClick={toggleTheme}
-              className="w-6.5 h-6.5 rounded-md flex items-center justify-center text-slate-700 dark:text-zinc-300 hover:text-slate-900 dark:hover:text-white hover:bg-white dark:hover:bg-zinc-800 transition-all cursor-pointer"
+              className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-700 dark:text-zinc-300 hover:text-slate-900 dark:hover:text-white hover:bg-white dark:hover:bg-zinc-800 transition-all cursor-pointer"
               title={`Switch whole application to ${theme === 'dark' ? 'Studio Daylight' : 'Pure Black OLED'} Theme`}
             >
               {theme === 'dark' ? (
-                <Sun className="w-3 h-3 text-amber-400 transition-transform hover:rotate-45" />
+                <Sun className="w-3.5 h-3.5 text-amber-400 transition-transform hover:rotate-45" />
               ) : (
-                <Moon className="w-3 h-3 text-indigo-600 transition-transform hover:-rotate-12" />
+                <Moon className="w-3.5 h-3.5 text-indigo-600 transition-transform hover:-rotate-12" />
               )}
             </button>
           </div>
