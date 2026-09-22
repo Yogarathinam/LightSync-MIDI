@@ -18,9 +18,17 @@ import {
   DeviceStatus,
   FlowKeyConfig,
   VisualizerBackgroundConfig,
-  ColorSyncPresetId
+  ColorSyncPresetId,
+  RawMidiLog
 } from '../types';
 import { synthEngine } from '../audio/synthEngine';
+
+const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+export const getMidiNoteName = (pitch: number) => {
+  const octave = Math.floor(pitch / 12) - 1;
+  const name = NOTE_NAMES[pitch % 12];
+  return `${name}${octave}`;
+};
 
 export const COLOR_SYNC_PRESETS: Record<ColorSyncPresetId, {
   name: string;
@@ -216,8 +224,8 @@ interface LightSyncState {
   // Active Key States & Chord
   activeNotes: Map<number, ActiveNoteState>;
   currentChord: ChordInfo | null;
-  triggerNoteOn: (pitch: number, velocity?: number, sendWs?: boolean) => void;
-  triggerNoteOff: (pitch: number, sendWs?: boolean) => void;
+  triggerNoteOn: (pitch: number, velocity?: number, sendWs?: boolean, source?: string) => void;
+  triggerNoteOff: (pitch: number, sendWs?: boolean, source?: string) => void;
   setCurrentChord: (chord: ChordInfo | null) => void;
 
   // Keyboard & Visualizer Settings
@@ -327,6 +335,9 @@ interface LightSyncState {
   setDeviceStatus: (status: Partial<DeviceStatus>) => void;
   consoleLogs: string[];
   addConsoleLog: (msg: string) => void;
+  rawMidiLogs: RawMidiLog[];
+  addRawMidiLog: (log: RawMidiLog) => void;
+  clearRawMidiLogs: () => void;
 
   // Outgoing WS message callback hook
   wsSender: ((msg: object) => void) | null;
@@ -425,8 +436,8 @@ export const useLightSyncStore = create<LightSyncState>((set, get) => ({
   currentChord: null,
   setCurrentChord: (chord) => set({ currentChord: chord }),
 
-  triggerNoteOn: (pitch, velocity = 100, sendWs = true) => {
-    const { activeNotes, keyboardSize, octaveShift, transpose, effectConfig, wsSender } = get();
+  triggerNoteOn: (pitch, velocity = 100, sendWs = true, source = 'Keyboard') => {
+    const { activeNotes, keyboardSize, octaveShift, transpose, wsSender, currentChord } = get();
     if (activeNotes.has(pitch)) return;
 
     // Calculate normalized LED center
@@ -446,7 +457,24 @@ export const useLightSyncStore = create<LightSyncState>((set, get) => ({
       startTime: performance.now()
     });
 
-    set({ activeNotes: newMap });
+    const now = new Date();
+    const timeStr = now.toTimeString().split(' ')[0] + '.' + String(now.getMilliseconds()).padStart(3, '0');
+    const logItem: RawMidiLog = {
+      id: Math.random().toString(36).substring(2, 9),
+      timestamp: timeStr,
+      type: 'NOTE_ON',
+      channel: 1,
+      pitch,
+      noteName: getMidiNoteName(pitch),
+      velocity,
+      chord: currentChord?.chord,
+      source: source || 'Keyboard'
+    };
+
+    set((state) => ({ 
+      activeNotes: newMap,
+      rawMidiLogs: [logItem, ...state.rawMidiLogs.slice(0, 199)]
+    }));
 
     // Send to backend via WS if connected
     if (sendWs && wsSender) {
@@ -458,7 +486,7 @@ export const useLightSyncStore = create<LightSyncState>((set, get) => ({
     }
   },
 
-  triggerNoteOff: (pitch, sendWs = true) => {
+  triggerNoteOff: (pitch, sendWs = true, source = 'Keyboard') => {
     const { activeNotes, wsSender } = get();
     if (!activeNotes.has(pitch)) return;
 
@@ -466,7 +494,24 @@ export const useLightSyncStore = create<LightSyncState>((set, get) => ({
 
     const newMap = new Map(activeNotes);
     newMap.delete(pitch);
-    set({ activeNotes: newMap });
+
+    const now = new Date();
+    const timeStr = now.toTimeString().split(' ')[0] + '.' + String(now.getMilliseconds()).padStart(3, '0');
+    const logItem: RawMidiLog = {
+      id: Math.random().toString(36).substring(2, 9),
+      timestamp: timeStr,
+      type: 'NOTE_OFF',
+      channel: 1,
+      pitch,
+      noteName: getMidiNoteName(pitch),
+      velocity: 0,
+      source: source || 'Keyboard'
+    };
+
+    set((state) => ({ 
+      activeNotes: newMap,
+      rawMidiLogs: [logItem, ...state.rawMidiLogs.slice(0, 199)]
+    }));
 
     if (sendWs && wsSender) {
       wsSender({
@@ -880,6 +925,9 @@ export const useLightSyncStore = create<LightSyncState>((set, get) => ({
       consoleLogs: [...state.consoleLogs.slice(-100), `[${timestamp}] ${msg}`]
     }));
   },
+  rawMidiLogs: [],
+  addRawMidiLog: (log) => set((state) => ({ rawMidiLogs: [log, ...state.rawMidiLogs.slice(0, 199)] })),
+  clearRawMidiLogs: () => set({ rawMidiLogs: [] }),
 
   // WS
   wsSender: null,

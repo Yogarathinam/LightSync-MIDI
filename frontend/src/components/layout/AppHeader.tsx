@@ -86,6 +86,7 @@ export const AppHeader: React.FC<{
     { id: 'play', label: 'Play', icon: <Play className="w-3.5 h-3.5 text-indigo-500" /> },
     { id: 'effects', label: 'Effect Studio', icon: <Sliders className="w-3.5 h-3.5 text-sky-500" /> },
     { id: 'aicoach', label: 'AI Coach', icon: <Sparkles className="w-3.5 h-3.5 text-purple-500" /> },
+    { id: 'hardware', label: 'Hardware', icon: <Radio className="w-3.5 h-3.5 text-cyan-500" /> },
   ];
 
   const handleTabClick = (tabId: TopNavTab) => {
@@ -261,6 +262,24 @@ export const AppHeader: React.FC<{
                 </button>
               )}
             </div>
+
+            <div className="h-4 w-px bg-slate-300 dark:bg-zinc-800" />
+
+            {/* Hardware Workspace Card Shortcut */}
+            <button
+              onClick={() => {
+                if (activeWorkspace === 'hardware') closeWorkspace();
+                else openWorkspace('hardware');
+              }}
+              className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                activeWorkspace === 'hardware'
+                  ? 'bg-cyan-600 text-white shadow-sm'
+                  : 'text-slate-500 dark:text-zinc-400 hover:text-cyan-500 dark:hover:text-cyan-400 hover:bg-slate-200/70 dark:hover:bg-zinc-800'
+              }`}
+              title="Open Full Hardware Setup & Live MIDI Terminal Card"
+            >
+              <Cpu className="w-3.5 h-3.5" />
+            </button>
           </div>
 
           {/* 1. Live Performance Output Capsule */}

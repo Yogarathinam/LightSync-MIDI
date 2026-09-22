@@ -44,10 +44,10 @@ export const useWebSocketBridge = () => {
           const type = data.type;
 
           if (type === 'NOTE_ON') {
-            triggerNoteOn(data.pitch, data.velocity, false);
+            triggerNoteOn(data.pitch, data.velocity, false, data.source || 'MIDI In (USB)');
             if (data.chord) setCurrentChord(data.chord);
           } else if (type === 'NOTE_OFF') {
-            triggerNoteOff(data.pitch, false);
+            triggerNoteOff(data.pitch, false, data.source || 'MIDI In (USB)');
             if (data.chord) setCurrentChord(data.chord);
           } else if (type === 'DEVICE_STATUS') {
             setDeviceStatus({
@@ -109,8 +109,8 @@ export const useWebSocketBridge = () => {
               const pitch = parseInt(parts[0], 10);
               const vel = parseInt(parts[1], 10) || 90;
               if (!isNaN(pitch)) {
-                triggerNoteOn(pitch, vel, false);
-                setTimeout(() => triggerNoteOff(pitch, false), 220);
+                triggerNoteOn(pitch, vel, false, 'M5Stack Core');
+                setTimeout(() => triggerNoteOff(pitch, false, 'M5Stack Core'), 220);
               }
             } else if (ev === 'DEMO_STARTED') {
               addConsoleLog('M5Stack Random Melodic Demo Started');
@@ -120,8 +120,8 @@ export const useWebSocketBridge = () => {
               const arpeggioNotes = [60, 64, 67, 72, 76, 79, 84];
               arpeggioNotes.forEach((pitch, i) => {
                 setTimeout(() => {
-                  triggerNoteOn(pitch, 90, false);
-                  setTimeout(() => triggerNoteOff(pitch, false), 180);
+                  triggerNoteOn(pitch, 90, false, 'M5 Arpeggio');
+                  setTimeout(() => triggerNoteOff(pitch, false, 'M5 Arpeggio'), 180);
                 }, i * 80);
               });
             }

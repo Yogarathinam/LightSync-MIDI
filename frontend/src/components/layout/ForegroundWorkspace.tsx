@@ -8,7 +8,8 @@ import {
   BarChart2, 
   Sparkles, 
   Cpu, 
-  ChevronDown 
+  ChevronDown,
+  Radio
 } from 'lucide-react';
 import { useLightSyncStore } from '../../store/useLightSyncStore';
 import { WorkspaceId } from '../../types';
@@ -18,25 +19,37 @@ import { LearnWorkspace } from '../learn/LearnWorkspace';
 import { EffectStudio } from '../effects/EffectStudio';
 import { AICoachStudio } from '../aicoach/AICoachStudio';
 import { PlayStudio } from '../play/PlayStudio';
-import { DeviceMonitor } from '../device/DeviceMonitor';
+import { HardwareWorkspace } from '../device/HardwareWorkspace';
 
 export const ForegroundWorkspace: React.FC = () => {
   const { activeWorkspace, closeWorkspace } = useLightSyncStore();
 
   const [displayedWorkspace, setDisplayedWorkspace] = useState<WorkspaceId | null>(activeWorkspace);
-  const [animPhase, setAnimPhase] = useState<'enter' | 'static' | 'exit'>('enter');
+  const [animPhase, setAnimPhase] = useState<'enter' | 'static' | 'exit'>('static');
+  const prevWorkspaceRef = useRef<WorkspaceId | null>(null);
   const exitTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
-    if (activeWorkspace) {
+    // 1. Opening workspace for the first time from live stage
+    if (activeWorkspace && !prevWorkspaceRef.current) {
       if (exitTimerRef.current) {
         clearTimeout(exitTimerRef.current);
         exitTimerRef.current = null;
       }
       setDisplayedWorkspace(activeWorkspace);
       setAnimPhase('enter');
-    } else if (displayedWorkspace) {
+      prevWorkspaceRef.current = activeWorkspace;
+    } 
+    // 2. Switching between already open workspaces (e.g. Songs -> Hardware): seamless swap, NO flash!
+    else if (activeWorkspace && prevWorkspaceRef.current && activeWorkspace !== prevWorkspaceRef.current) {
+      setDisplayedWorkspace(activeWorkspace);
+      setAnimPhase('static');
+      prevWorkspaceRef.current = activeWorkspace;
+    }
+    // 3. Dismissing workspace to return to live stage
+    else if (!activeWorkspace && prevWorkspaceRef.current) {
       setAnimPhase('exit');
+      prevWorkspaceRef.current = null;
       exitTimerRef.current = window.setTimeout(() => {
         setDisplayedWorkspace(null);
         exitTimerRef.current = null;
@@ -46,13 +59,7 @@ export const ForegroundWorkspace: React.FC = () => {
         window.focus();
       }, 190);
     }
-
-    return () => {
-      if (exitTimerRef.current) {
-        clearTimeout(exitTimerRef.current);
-      }
-    };
-  }, [activeWorkspace, displayedWorkspace]);
+  }, [activeWorkspace]);
 
   // Close on Escape key
   const handleRequestClose = useCallback(() => {
@@ -103,6 +110,12 @@ export const ForegroundWorkspace: React.FC = () => {
           badge: 'Live Harmonics & Synth',
           icon: <Music className="w-4 h-4 text-indigo-500" />
         };
+      case 'hardware':
+        return {
+          title: 'Hardware Setup & MIDI Stream',
+          badge: 'Physical I/O & Live Packets',
+          icon: <Radio className="w-4 h-4 text-cyan-500" />
+        };
       default:
         return {
           title: 'Studio Workspace',
@@ -123,8 +136,8 @@ export const ForegroundWorkspace: React.FC = () => {
     <div className="absolute inset-0 z-30 pointer-events-none flex items-center justify-center p-2 sm:p-4 md:p-5">
       <div 
         onClick={(e) => e.stopPropagation()}
-        onAnimationEnd={() => {
-          if (animPhase === 'enter') {
+        onAnimationEnd={(e) => {
+          if (e.target === e.currentTarget && animPhase === 'enter') {
             setAnimPhase('static');
           }
         }}
@@ -171,6 +184,7 @@ export const ForegroundWorkspace: React.FC = () => {
           {displayedWorkspace === 'effects' && <EffectStudio />}
           {displayedWorkspace === 'aicoach' && <AICoachStudio />}
           {displayedWorkspace === 'play' && <PlayStudio />}
+          {displayedWorkspace === 'hardware' && <HardwareWorkspace />}
         </div>
 
         {/* Workspace Footer */}

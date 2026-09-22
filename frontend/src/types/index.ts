@@ -1,13 +1,25 @@
 export type ThemeMode = 'light' | 'dark';
 
-export type TopNavTab = 'songs' | 'learn' | 'play' | 'visualize' | 'effects' | 'aicoach';
+export type TopNavTab = 'songs' | 'learn' | 'play' | 'visualize' | 'effects' | 'aicoach' | 'hardware';
 
-export type WorkspaceId = 'songs' | 'learn' | 'effects' | 'aicoach' | 'play';
+export type WorkspaceId = 'songs' | 'learn' | 'effects' | 'aicoach' | 'play' | 'hardware';
 export type UtilityOverlayId = 'quick_settings' | 'settings';
 
 export type LearnSubView = 'follow' | 'practice' | 'analyze' | 'progress';
 
-export type StudioTab = TopNavTab | 'play' | 'practice' | 'analyze' | 'device';
+export type StudioTab = TopNavTab | 'play' | 'practice' | 'analyze' | 'device' | 'hardware';
+
+export interface RawMidiLog {
+  id: string;
+  timestamp: string;
+  type: 'NOTE_ON' | 'NOTE_OFF';
+  channel: number;
+  pitch: number;
+  noteName: string;
+  velocity: number;
+  chord?: string;
+  source: string;
+}
 
 export type OverlayModalType = WorkspaceId | UtilityOverlayId | null;
 
