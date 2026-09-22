@@ -21,7 +21,7 @@ const MainApp: React.FC = () => {
   const isReceded = activeWorkspace !== null;
 
   return (
-    <div className="h-screen w-screen max-h-screen max-w-screen overflow-hidden flex flex-col relative bg-black text-slate-900 dark:text-zinc-100 antialiased selection:bg-indigo-500 selection:text-white select-none">
+    <div className="h-screen w-full max-h-screen max-w-full overflow-hidden flex flex-col relative bg-black text-slate-900 dark:text-zinc-100 antialiased selection:bg-indigo-500 selection:text-white select-none">
       
       {/* 1. TOP NAVIGATION BAR (Always stationary, sharp, and interactive) */}
       <AppHeader />
