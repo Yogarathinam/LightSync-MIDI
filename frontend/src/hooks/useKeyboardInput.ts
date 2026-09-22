@@ -54,6 +54,10 @@ export const useKeyboardInput = () => {
   const playbackTotalBeatsRef = useRef(playbackTotalBeats);
   playbackTotalBeatsRef.current = playbackTotalBeats;
 
+  const isSongActive = useLightSyncStore((s) => s.isSongActive);
+  const isSongActiveRef = useRef(isSongActive);
+  isSongActiveRef.current = isSongActive;
+
   const activeWorkspace = useLightSyncStore((s) => s.activeWorkspace);
   const activeWorkspaceRef = useRef(activeWorkspace);
   activeWorkspaceRef.current = activeWorkspace;
@@ -68,7 +72,7 @@ export const useKeyboardInput = () => {
         return;
       }
 
-      const isSongContext = isSongPlayingRef.current || activeWorkspaceRef.current === 'songs' || activeWorkspaceRef.current === 'learn';
+      const isSongContext = isSongActiveRef.current || isSongPlayingRef.current || activeWorkspaceRef.current === 'songs' || activeWorkspaceRef.current === 'learn';
 
       // Spacebar: Play / Pause toggle when song is playing or in song/learn workspace; otherwise toggles sustain in normal play mode
       if (e.code === 'Space' || e.key === ' ') {

@@ -316,12 +316,15 @@ interface LightSyncState {
   learnSubView: LearnSubView;
   setLearnSubView: (view: LearnSubView) => void;
   selectSongAndLearn: (song: SongItem, subView?: LearnSubView) => void;
+  isSongActive: boolean;
+  setIsSongActive: (active: boolean) => void;
   isSongPlaying: boolean;
   setIsSongPlaying: (playing: boolean) => void;
   songPlaybackId: number;
   startSongPlayback: (song?: SongItem, forceRestart?: boolean) => void;
   restartSongPlayback: (song?: SongItem) => void;
   stopSongPlayback: () => void;
+  closeSongSession: () => void;
   playbackBeat: number;
   playbackTotalBeats: number;
   seekEpoch: number;
@@ -922,12 +925,15 @@ export const useLightSyncStore = create<LightSyncState>((set, get) => ({
   selectSongAndLearn: (song, subView = 'follow') => {
     set({
       currentSong: song,
+      isSongActive: true,
       learnSubView: subView,
       activeWorkspace: 'learn',
       activeOverlay: 'learn',
       activeTab: 'learn'
     });
   },
+  isSongActive: false,
+  setIsSongActive: (active) => set({ isSongActive: active }),
   isSongPlaying: false,
   setIsSongPlaying: (playing) => set({ isSongPlaying: playing }),
   songPlaybackId: 0,
@@ -951,6 +957,7 @@ export const useLightSyncStore = create<LightSyncState>((set, get) => ({
 
     set((state) => ({
       currentSong: current,
+      isSongActive: true,
       isSongPlaying: true,
       playbackBeat: shouldRestart ? 0 : state.playbackBeat,
       targetSeekBeat: shouldRestart ? 0 : state.targetSeekBeat,
@@ -967,7 +974,23 @@ export const useLightSyncStore = create<LightSyncState>((set, get) => ({
     for (const pitch of activeNotes.keys()) {
       triggerNoteOff(pitch);
     }
+    // When paused, isSongActive stays true: notes freeze where they were, scrubber remains visible!
     set({ isSongPlaying: false, isWaitingAtHitline: false, waitingPitch: null });
+  },
+  closeSongSession: () => {
+    const { activeNotes, triggerNoteOff } = get();
+    for (const pitch of activeNotes.keys()) {
+      triggerNoteOff(pitch);
+    }
+    // Completely closes song mode and returns to clean Normal Play Mode
+    set({
+      isSongActive: false,
+      isSongPlaying: false,
+      playbackBeat: 0,
+      targetSeekBeat: 0,
+      isWaitingAtHitline: false,
+      waitingPitch: null
+    });
   },
   playbackBeat: 0,
   playbackTotalBeats: 100,

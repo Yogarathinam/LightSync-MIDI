@@ -179,10 +179,12 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
     expectedPitch,
     setExpectedPitch,
     currentSong,
+    isSongActive,
     isSongPlaying,
     songPlaybackId,
     startSongPlayback,
     stopSongPlayback,
+    closeSongSession,
     seekEpoch,
     targetSeekBeat,
     seekToBeat,
@@ -499,6 +501,8 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
   onFpsUpdateRef.current = onFpsUpdate;
   const currentSongRef = useRef(currentSong);
   currentSongRef.current = currentSong;
+  const isSongActiveRef = useRef(isSongActive);
+  isSongActiveRef.current = isSongActive;
   const isSongPlayingRef = useRef(isSongPlaying);
   isSongPlayingRef.current = isSongPlaying;
   const handFilterRef = useRef(handFilter);
@@ -856,7 +860,7 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
       // ==========================================
       const curSong = currentSongRef.current;
       const isSongOn = isSongPlayingRef.current;
-      const isSongMode = isSongOn || activeWorkspaceRef.current === 'songs' || activeWorkspaceRef.current === 'learn';
+      const isSongMode = isSongActiveRef.current || isSongOn || activeWorkspaceRef.current === 'songs' || activeWorkspaceRef.current === 'learn';
       const curLearnMode = learnModeRef.current;
       const hFilter = handFilterRef.current;
 
@@ -1881,7 +1885,7 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
         </div>
 
         {/* On-Stage Song Timeline Scrubber: Only displays for songs, learning, or active song playback (Hidden in normal play mode) */}
-        {currentSong && (isSongPlaying || activeWorkspace === 'songs') && activeWorkspace !== 'learn' && (
+        {currentSong && (isSongActive || isSongPlaying || activeWorkspace === 'songs') && activeWorkspace !== 'learn' && (
           <div className="absolute top-3 left-1/2 -translate-x-1/2 z-30 max-w-lg w-[92%] pointer-events-auto animate-in fade-in slide-in-from-top-2 duration-200">
             <SongTimelineScrubber />
           </div>

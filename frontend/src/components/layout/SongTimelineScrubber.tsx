@@ -7,6 +7,7 @@ import {
   SkipForward, 
   ChevronDown,
   ChevronUp,
+  X,
   Music, 
   Clock 
 } from 'lucide-react';
@@ -32,6 +33,7 @@ export const SongTimelineScrubber: React.FC<SongTimelineScrubberProps> = ({
     isSongPlaying,
     startSongPlayback,
     stopSongPlayback,
+    closeSongSession,
     playbackBeat,
     playbackTotalBeats,
     seekToBeat,
@@ -239,6 +241,18 @@ export const SongTimelineScrubber: React.FC<SongTimelineScrubberProps> = ({
         <div className="text-slate-400 group-hover:text-indigo-400 transition-colors">
           <ChevronUp className="w-3 h-3" />
         </div>
+
+        {/* Exit Song Mode */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            closeSongSession();
+          }}
+          className="p-1 rounded-full text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 transition-colors cursor-pointer ml-0.5"
+          title="Exit song mode & return to clean Normal Play"
+        >
+          <X className="w-2.5 h-2.5" />
+        </button>
       </div>
     );
   }
@@ -333,6 +347,18 @@ export const SongTimelineScrubber: React.FC<SongTimelineScrubberProps> = ({
               <ChevronDown className="w-3.5 h-3.5" />
             </button>
           )}
+
+          {/* Exit Song Mode */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              closeSongSession();
+            }}
+            className="p-1 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
+            title="Exit song mode & return to Normal Play Mode"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
         </div>
 
       </div>
