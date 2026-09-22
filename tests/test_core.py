@@ -11,7 +11,7 @@ from app.device.protocol import ProtocolBuilder
 from app.analytics.db import init_db, save_session, get_recent_sessions
 from app.analytics.tracker import performance_tracker
 from app.ai.coach import ai_coach
-from app.ai.copilot import visual_copilot
+from app.ai.mira import mira_assistant
 
 class TestLightSyncCore(unittest.TestCase):
     def setUp(self):
@@ -111,13 +111,51 @@ class TestLightSyncCore(unittest.TestCase):
         self.assertTrue(len(review["drills"]) >= 1)
         self.assertIn("anticipate", review["timing_diagnosis"].lower())
 
-    def test_visual_copilot(self):
-        preset = visual_copilot.generate_preset_from_prompt("Warm golden fire sparks")
-        self.assertEqual(preset["effect"], "spark")
-        self.assertEqual(preset["primary_color"], "#f59e0b")
+    def test_mira_assistant(self):
+        # 1. Performance analysis
+        review = mira_assistant.analyze_performance({
+            "accuracy_pct": 92.0,
+            "avg_deviation_ms": -18.5,
+            "songTitle": "Minuet in G",
+            "timingRatings": {"PERFECT": 20, "EARLY": 5, "MISS": 1}
+        })
+        self.assertIn("headline", review)
+        self.assertIn("drills", review)
+        self.assertEqual(review["coach_signature"], "MIRA — Musical Intelligence & Rhythm Assistant")
 
-        preset_wave = visual_copilot.generate_preset_from_prompt("Calm gentle ocean waves")
-        self.assertEqual(preset_wave["effect"], "wave")
+        # 2. Personalized course generation
+        course = mira_assistant.generate_personalized_course(
+            song={"title": "Minuet in G", "bpm": 110, "key": "G Major"},
+            telemetry={"accuracyPct": 88, "problemMeasures": [3, 4], "avgDeviationMs": 20}
+        )
+        self.assertIn("steps", course)
+        self.assertEqual(len(course["steps"]), 4)
+        self.assertEqual(course["songTitle"], "Minuet in G")
+
+        # 3. Interactive chat response
+        chat = mira_assistant.chat_response(
+            messages=[{"role": "user", "text": "How do I fix my rushing?"}],
+            telemetry={"accuracyPct": 85, "avgDeviationMs": -25, "problemMeasures": [2]},
+            current_song={"title": "Minuet in G"}
+        )
+        self.assertEqual(chat["role"], "assistant")
+        self.assertIn("text", chat)
+
+    def test_gemini_relay_endpoints(self):
+        from app.ai.mira import gemini_relay_server
+        # 1. Health
+        health = gemini_relay_server.get_health()
+        self.assertEqual(health["status"], "ok")
+
+        # 2. Submit prompt
+        sub = gemini_relay_server.submit_prompt("Write a Python program to check whether a number is prime.")
+        self.assertEqual(sub["status"], "accepted")
+        self.assertIn("request_id", sub)
+
+        # 3. Get response
+        resp = gemini_relay_server.get_response()
+        self.assertEqual(resp["state"], "ready")
+        self.assertIn("is_prime", resp["text"])
 
 if __name__ == "__main__":
     unittest.main()

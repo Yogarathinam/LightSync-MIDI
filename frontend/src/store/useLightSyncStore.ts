@@ -21,7 +21,10 @@ import {
   VisualizerBackgroundConfig,
   ColorSyncPresetId,
   RawMidiLog,
-  RecordedMidiEvent
+  RecordedMidiEvent,
+  SessionTelemetry,
+  MiraCurriculum,
+  MiraChatMessage
 } from '../types';
 import { synthEngine } from '../audio/synthEngine';
 import { createMidiFile, downloadMidiFile } from '../utils/midi_recorder';
@@ -369,9 +372,28 @@ interface LightSyncState {
   uploadMidiFile: (file: File) => Promise<SongItem | null>;
   deleteMidiSong: (songId: string) => Promise<boolean>;
 
-  // AI Coach Feedback
+  // AI Coach Feedback & MIRA System
   aiCoachFeedback: AICoachFeedback | null;
   setAiCoachFeedback: (feedback: AICoachFeedback | null) => void;
+  geminiRelayUrl: string;
+  setGeminiRelayUrl: (url: string) => void;
+  currentTelemetry: SessionTelemetry;
+  updateTelemetry: (partial: Partial<SessionTelemetry>) => void;
+  resetTelemetry: (songTitle?: string, songId?: string) => void;
+  recordNoteAttempt: (attempt: {
+    pitch: number;
+    expectedPitch: number;
+    timeOffsetMs: number;
+    velocity: number;
+    hand: 'left' | 'right';
+    measure: number;
+    hit: boolean;
+  }) => void;
+  miraChatMessages: MiraChatMessage[];
+  addMiraChatMessage: (msg: { role: 'user' | 'assistant'; text: string }) => void;
+  clearMiraChat: () => void;
+  miraCurriculum: MiraCurriculum | null;
+  setMiraCurriculum: (curriculum: MiraCurriculum | null) => void;
 
   // Ports & Hardware Connection State
   midiPorts: string[];
@@ -1362,9 +1384,135 @@ export const useLightSyncStore = create<LightSyncState>((set, get) => ({
     return true;
   },
 
-  // AI Coach Feedback
+  // AI Coach Feedback & MIRA System
   aiCoachFeedback: null,
   setAiCoachFeedback: (feedback) => set({ aiCoachFeedback: feedback }),
+  geminiRelayUrl: 'http://127.0.0.1:8000',
+  setGeminiRelayUrl: (url) => set({ geminiRelayUrl: url }),
+
+  currentTelemetry: {
+    songId: 'ode_to_joy',
+    songTitle: 'Ode to Joy',
+    totalNotes: 0,
+    hits: 0,
+    misses: 0,
+    streak: 0,
+    accuracyPct: 100,
+    avgDeviationMs: 0,
+    timingRatings: { PERFECT: 0, GOOD: 0, EARLY: 0, LATE: 0, MISS: 0 },
+    handAccuracy: { left: 100, right: 100 },
+    avgVelocity: 85,
+    problemMeasures: [],
+    durationSec: 0
+  },
+
+  updateTelemetry: (partial) =>
+    set((state) => ({ currentTelemetry: { ...state.currentTelemetry, ...partial } })),
+
+  resetTelemetry: (songTitle = 'Ode to Joy', songId = 'ode_to_joy') =>
+    set({
+      currentTelemetry: {
+        songId,
+        songTitle,
+        totalNotes: 0,
+        hits: 0,
+        misses: 0,
+        streak: 0,
+        accuracyPct: 100,
+        avgDeviationMs: 0,
+        timingRatings: { PERFECT: 0, GOOD: 0, EARLY: 0, LATE: 0, MISS: 0 },
+        handAccuracy: { left: 100, right: 100 },
+        avgVelocity: 85,
+        problemMeasures: [],
+        durationSec: 0
+      }
+    }),
+
+  recordNoteAttempt: ({ pitch: _pitch, expectedPitch: _expectedPitch, timeOffsetMs, velocity, hand: _hand, measure, hit }) =>
+    set((state) => {
+      const prev = state.currentTelemetry;
+      const totalNotes = prev.totalNotes + 1;
+      const hits = prev.hits + (hit ? 1 : 0);
+      const misses = prev.misses + (hit ? 0 : 1);
+      const streak = hit ? prev.streak + 1 : 0;
+      const accuracyPct = Math.round((hits / totalNotes) * 100);
+
+      const absOffset = Math.abs(timeOffsetMs);
+      const avgDeviationMs = hit
+        ? Math.round((prev.avgDeviationMs * prev.hits + timeOffsetMs) / hits)
+        : prev.avgDeviationMs;
+
+      const ratings = { ...prev.timingRatings };
+      if (!hit) {
+        ratings.MISS++;
+      } else if (absOffset <= 25) {
+        ratings.PERFECT++;
+      } else if (absOffset <= 60) {
+        ratings.GOOD++;
+      } else if (timeOffsetMs < 0) {
+        ratings.EARLY++;
+      } else {
+        ratings.LATE++;
+      }
+
+      const problemMeasures = !hit && !prev.problemMeasures.includes(measure)
+        ? [...prev.problemMeasures, measure].sort((a, b) => a - b)
+        : prev.problemMeasures;
+
+      const avgVelocity = Math.round((prev.avgVelocity * (totalNotes - 1) + velocity) / totalNotes);
+
+      return {
+        currentTelemetry: {
+          ...prev,
+          totalNotes,
+          hits,
+          misses,
+          streak,
+          accuracyPct,
+          avgDeviationMs,
+          timingRatings: ratings,
+          problemMeasures,
+          avgVelocity
+        }
+      };
+    }),
+
+  miraChatMessages: [
+    {
+      id: 'mira_welcome',
+      role: 'assistant',
+      text: 'Hello! I am MIRA — Musical Intelligence & Rhythm Assistant. I listen to your tempo, finger timing, and velocity in real time. Ask me anything about your playing, or click "Ask MIRA" to generate a personalized practice course for your song!',
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    }
+  ],
+
+  addMiraChatMessage: (msg) =>
+    set((state) => ({
+      miraChatMessages: [
+        ...state.miraChatMessages,
+        {
+          id: Math.random().toString(36).substring(2, 9),
+          role: msg.role,
+          text: msg.text,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        }
+      ]
+    })),
+
+  clearMiraChat: () =>
+    set({
+      miraChatMessages: [
+        {
+          id: 'mira_welcome',
+          role: 'assistant',
+          text: 'Chat history cleared. How can I help with your practice session?',
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        }
+      ]
+    }),
+
+  miraCurriculum: null,
+  setMiraCurriculum: (curriculum) => set({ miraCurriculum: curriculum }),
 
   // Device & Status
 

@@ -176,6 +176,7 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
     activeNotes,
     triggerNoteOn,
     triggerNoteOff,
+    recordNoteAttempt,
     expectedPitch,
     setExpectedPitch,
     currentSong,
@@ -295,6 +296,7 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
   // Pointer drag interaction
   const isPointerDownRef = useRef(false);
   const activePointerKeyRef = useRef<number | null>(null);
+  const struckNotesRef = useRef<Set<string>>(new Set());
 
   // Demo step timer
   const demoTimerRef = useRef<number>(0);
@@ -525,6 +527,7 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
     soundingSongNotesRef.current.forEach((pitch) => triggerNoteOff(pitch));
     soundingSongNotesRef.current.clear();
     fallingBarsRef.current = [];
+    struckNotesRef.current.clear();
   }, [songPlaybackId, currentSong?.id, triggerNoteOff]);
 
   // Handle interactive timeline seeking (scrub forward / reverse)
@@ -534,6 +537,7 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
       soundingSongNotesRef.current.forEach((pitch) => triggerNoteOff(pitch));
       soundingSongNotesRef.current.clear();
       fallingBarsRef.current = [];
+      struckNotesRef.current.clear();
     }
   }, [seekEpoch, targetSeekBeat, triggerNoteOff]);
 
@@ -890,16 +894,57 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
                 const chordNotes = curSong.notes.filter(
                   n => isMatchingHand(n.hand) && Math.abs(n.time - targetNote.time) < 0.05 && songBeatRef.current < (n.time + n.duration)
                 );
-                const allHeld = chordNotes.every(n => curActiveNotes.has(n.pitch));
 
-                if (!allHeld) {
+                // Detect newly struck keys in this chord
+                chordNotes.forEach((n) => {
+                  const keyId = `${n.pitch}_${n.time.toFixed(2)}`;
+                  if (curActiveNotes.has(n.pitch) && !struckNotesRef.current.has(keyId)) {
+                    struckNotesRef.current.add(keyId);
+
+                    // Impact visual burst on target note strike
+                    const geom = getKeyGeometry(n.pitch, width, keyAreaTop, keyAreaHeight);
+                    if (geom) {
+                      const noteColorHex = n.hand === 'left'
+                        ? (leftHandColorRef.current || '#38bdf8')
+                        : (rightHandColorRef.current || '#10b981');
+                      const col = hexToRgb(noteColorHex);
+                      const keyIdx = Math.max(0, Math.min(keyboardSize - 1, n.pitch - startMidi));
+                      const centerLed = Math.floor((keyIdx / (keyboardSize - 1)) * 143);
+                      for (let s = 0; s < 5; s++) spawnParticle('spark', centerLed, col);
+                      const keyCenterX = geom.x + geom.width / 2;
+                      spawnRunwayBursts(keyCenterX, ledBarTop, col, 14, true);
+                      spawnShockwaveRipple(keyCenterX, ledBarTop, col, geom.width * 2.8 + 48);
+                      spawnLensFlare(keyCenterX, ledBarTop, col, 260);
+                    }
+
+                    // Record performance telemetry
+                    const timeOffsetMs = Math.round((n.time - songBeatRef.current) * (60 / curSong.bpm) * 1000);
+                    recordNoteAttempt({
+                      pitch: n.pitch,
+                      expectedPitch: n.pitch,
+                      timeOffsetMs,
+                      velocity: 100,
+                      hand: (n.hand === 'left' ? 'left' : 'right'),
+                      measure: Math.floor(n.time / 4) + 1,
+                      hit: true
+                    });
+                  }
+                });
+
+                // Check if all chord notes have either been struck or are currently held
+                const allStruckOrHeld = chordNotes.every(n => {
+                  const keyId = `${n.pitch}_${n.time.toFixed(2)}`;
+                  return curActiveNotes.has(n.pitch) || struckNotesRef.current.has(keyId);
+                });
+
+                if (!allStruckOrHeld) {
                   // Freeze right at targetNote.time until user strikes key!
                   songBeatRef.current = Math.max(targetNote.time, songBeatRef.current);
                   canAdvance = false;
                   setWaitingState(true, targetNote.pitch);
                   setExpectedPitch(targetNote.pitch);
                 } else {
-                  // Key is actively held: let timeline progress through its duration!
+                  // Key is struck or actively held: let timeline progress through its duration!
                   canAdvance = true;
                   setWaitingState(false, null);
                   setExpectedPitch(null);

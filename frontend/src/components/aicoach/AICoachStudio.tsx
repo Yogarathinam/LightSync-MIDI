@@ -1,250 +1,561 @@
-import React, { useState } from 'react';
-import { Sparkles, Bot, Wand2, ArrowRight, CheckCircle2, Target, Check } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { 
+  Bot, 
+  Sparkles, 
+  Send, 
+  CheckCircle2, 
+  AlertCircle, 
+  RotateCcw, 
+  Radio, 
+  Award, 
+  Flame, 
+  Play, 
+  Clock, 
+  ArrowRight, 
+  Music, 
+  Trash2,
+  Cpu,
+  Layers,
+  Check,
+  Zap,
+  Gauge
+} from 'lucide-react';
 import { useLightSyncStore } from '../../store/useLightSyncStore';
-import { EffectType } from '../../types';
+import { MiraCurriculumStep } from '../../types';
 
 export const AICoachStudio: React.FC = () => {
   const { 
-    aiCoachFeedback, 
-    setFullEffectConfig, 
-    addConsoleLog,
-    setActiveTab 
+    currentSong,
+    currentTelemetry,
+    resetTelemetry,
+    geminiRelayUrl,
+    setGeminiRelayUrl,
+    miraChatMessages,
+    addMiraChatMessage,
+    clearMiraChat,
+    miraCurriculum,
+    setMiraCurriculum,
+    openWorkspace,
+    setLearnMode
   } = useLightSyncStore();
 
-  const [prompt, setPrompt] = useState('');
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [copilotResult, setCopilotResult] = useState<any>(null);
-  const [applied, setApplied] = useState(false);
+  // Relay status state
+  const [relayStatus, setRelayStatus] = useState<{
+    online: boolean;
+    status: string;
+    latency_ms: number;
+    url: string;
+  } | null>(null);
+  const [isCheckingRelay, setIsCheckingRelay] = useState(false);
+  const [customRelayInput, setCustomRelayInput] = useState(geminiRelayUrl);
 
-  // Default feedback if none generated yet
-  const feedback = aiCoachFeedback || {
-    headline: "Great Progress on Ode to Joy!",
-    tone: "Promising",
-    summary: "Your finger coordination across the C-D-E triad transitions is solid. However, the ascending leap towards G4 shows slight micro-timing variance (+22ms anticipation).",
-    timing_diagnosis: "You tend to anticipate ascending phrases slightly early. Relax your wrist and let the metronome beat lead your hand.",
-    accuracy_score: 93.3,
-    avg_deviation_ms: 18.2,
-    drills: [
-      {
-        title: "Sub-Tempo Articulation Drill",
-        action: "Lower the tempo to 70% in Practice Mode and isolate bars 4-8 using Right Hand only."
-      },
-      {
-        title: "Metronome Pocket Sync",
-        action: "Set the metronome to subdivide eighth notes and count '1-and-2-and' aloud to solidify downbeats."
-      }
-    ],
-    coach_signature: "LightSync AI Mentor"
-  };
+  // Chat state
+  const [chatInput, setChatInput] = useState('');
+  const [isChatLoading, setIsChatLoading] = useState(false);
+  const chatBottomRef = useRef<HTMLDivElement | null>(null);
 
-  const handleGenerateCopilot = async () => {
-    if (!prompt.trim()) return;
-    setIsGenerating(true);
-    setApplied(false);
+  // Course generation state
+  const [isCourseLoading, setIsCourseLoading] = useState(false);
+  const [courseGoal, setCourseGoal] = useState('');
+  const [appliedStep, setAppliedStep] = useState<number | null>(null);
 
+  // Auto-scroll chat to bottom
+  useEffect(() => {
+    chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [miraChatMessages, isChatLoading]);
+
+  // Check relay connection on mount
+  useEffect(() => {
+    checkRelay(geminiRelayUrl);
+  }, []);
+
+  const checkRelay = async (url: string) => {
+    setIsCheckingRelay(true);
     try {
-      const res = await fetch('/api/ai/copilot', {
+      const res = await fetch('/api/ai/mira/check-relay', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt })
+        body: JSON.stringify({ relay_url: url })
       });
-      const data = await res.json();
-      setCopilotResult(data);
-    } catch {
-      // Fallback local heuristic generator if backend not connected
-      const p = prompt.toLowerCase();
-      let eff: EffectType = 'ripple';
-      let col = '#00f0ff';
-      let sec = '#6366f1';
-      let spd = 1.2;
-
-      if (p.includes('fire') || p.includes('warm') || p.includes('sunset')) {
-        eff = 'spark';
-        col = '#f59e0b';
-        sec = '#ef4444';
-        spd = 1.6;
-      } else if (p.includes('rain') || p.includes('storm')) {
-        eff = 'rain';
-        col = '#38bdf8';
-        sec = '#0ea5e9';
-        spd = 1.5;
-      } else if (p.includes('pulse') || p.includes('breathe') || p.includes('calm')) {
-        eff = 'pulse';
-        col = '#a855f7';
-        sec = '#ec4899';
-        spd = 0.8;
+      if (res.ok) {
+        const data = await res.json();
+        setRelayStatus(data);
       }
-
-      setCopilotResult({
-        name: `AI: ${prompt}`,
-        effect: eff,
-        speed: spd,
-        decay: 0.86,
-        spread: 3.5,
-        brightness: 220,
-        rainbow: p.includes('rainbow'),
-        primary_color: col,
-        secondary_color: sec,
-        ai_reasoning: `Selected ${eff.toUpperCase()} with ${col} aesthetics for prompt: "${prompt}".`
-      });
+    } catch {
+      setRelayStatus({ online: false, status: 'offline', latency_ms: 0, url });
     } finally {
-      setIsGenerating(false);
+      setIsCheckingRelay(false);
     }
   };
 
-  const handleApplyCopilot = () => {
-    if (!copilotResult) return;
-    setFullEffectConfig({
-      effect: copilotResult.effect,
-      speed: copilotResult.speed,
-      decay: copilotResult.decay,
-      spread: copilotResult.spread,
-      brightness: copilotResult.brightness,
-      rainbow: copilotResult.rainbow || false,
-      primaryColor: copilotResult.primary_color || copilotResult.primaryColor,
-      secondaryColor: copilotResult.secondary_color || copilotResult.secondaryColor
-    });
-    setApplied(true);
-    addConsoleLog(`Applied AI Copilot Visual Configuration: [${copilotResult.name}]`);
+  const handleUpdateRelayUrl = (newUrl: string) => {
+    setGeminiRelayUrl(newUrl);
+    setCustomRelayInput(newUrl);
+    checkRelay(newUrl);
   };
 
-  const examplePrompts = [
-    "Warm fireplace sunset with gentle sparks",
-    "Deep space galaxy with purple pulsing nebula",
-    "Cyberpunk matrix glitch with green digital noise",
-    "Neon meteor shower with blue trailing rain"
+  // Generate Personalized Learning Course
+  const handleGenerateCourse = async () => {
+    setIsCourseLoading(true);
+    try {
+      const res = await fetch('/api/ai/mira/course', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          song: currentSong,
+          telemetry: currentTelemetry,
+          prompt: courseGoal,
+          relay_url: geminiRelayUrl
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setMiraCurriculum(data);
+        addMiraChatMessage({
+          role: 'assistant',
+          text: `I have generated your customized 4-phase learning course for "${data.songTitle}"! Each phase focuses on your specific timing offsets and difficult transitions. Check the curriculum on the left to launch each drill.`
+        });
+      }
+    } catch (e) {
+      console.warn('Failed to generate MIRA course:', e);
+    } finally {
+      setIsCourseLoading(false);
+    }
+  };
+
+  // Send message to MIRA Chatbot
+  const handleSendMessage = async (textToSend?: string) => {
+    const text = (textToSend || chatInput).trim();
+    if (!text || isChatLoading) return;
+
+    // Add user message
+    addMiraChatMessage({ role: 'user', text });
+    setChatInput('');
+    setIsChatLoading(true);
+
+    try {
+      const updatedMessages = [
+        ...miraChatMessages.map(m => ({ role: m.role, text: m.text })),
+        { role: 'user', text }
+      ];
+
+      const res = await fetch('/api/ai/mira/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: updatedMessages,
+          telemetry: currentTelemetry,
+          current_song: currentSong,
+          relay_url: geminiRelayUrl
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        addMiraChatMessage({
+          role: 'assistant',
+          text: data.text
+        });
+      } else {
+        addMiraChatMessage({
+          role: 'assistant',
+          text: "I experienced a brief connection hiccup reaching the Gemini Relay, but I am still actively analyzing your practice data! Feel free to ask about your timing tendencies or request practice drills."
+        });
+      }
+    } catch {
+      addMiraChatMessage({
+        role: 'assistant',
+        text: "I am currently using local music intelligence. Your note accuracy is logged and ready for review!"
+      });
+    } finally {
+      setIsChatLoading(false);
+    }
+  };
+
+  const handleApplyDrillToLearning = (step: MiraCurriculumStep) => {
+    setAppliedStep(step.step);
+    setLearnMode('wait_for_key');
+    openWorkspace('learn');
+  };
+
+  const quickPrompts = [
+    "Why am I anticipating the beat?",
+    "How can I balance my left hand volume?",
+    "Give me technique tips for difficult bars",
+    "Generate a 3-day practice plan for this piece"
   ];
 
+  const songTitle = currentSong ? currentSong.title : 'Selected Piece';
+
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+    <div className="flex flex-col gap-4 w-full h-full pb-4">
       
-      {/* Left Column: AI Performance Coach (7 Cols) */}
-      <div className="lg:col-span-7 bg-white dark:bg-black rounded-2xl border border-slate-200 dark:border-zinc-800 p-5 shadow-sm flex flex-col justify-between gap-4 transition-colors">
-        <div>
-          <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-zinc-800">
-            <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              <Bot className="w-4 h-4 text-indigo-500" />
-              AI Performance Coach
-            </h2>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-50 dark:bg-zinc-800 text-indigo-600 dark:text-indigo-400 font-semibold">
-              {feedback.tone}
-            </span>
+      {/* 1. MIRA Control & Gemini Relay Endpoint Banner */}
+      <div className="p-3.5 sm:px-4 sm:py-3 rounded-2xl bg-white dark:bg-[#0c0c0e] border border-slate-200 dark:border-zinc-800 shadow-sm flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5">
+          <div className="p-2 rounded-xl bg-gradient-to-tr from-purple-600 via-indigo-600 to-sky-500 text-white shadow-md shadow-indigo-500/25">
+            <Sparkles className="w-4 h-4" />
           </div>
-
-          <div className="my-4 p-4 rounded-2xl bg-indigo-50/50 dark:bg-zinc-950 border border-indigo-100 dark:border-zinc-800/80">
-            <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-indigo-500" />
-              {feedback.headline}
-            </h3>
-            <p className="text-xs text-slate-600 dark:text-zinc-300 mt-2 leading-relaxed">
-              {feedback.summary}
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-sm font-black text-slate-900 dark:text-white tracking-tight">
+                MIRA — Musical Intelligence & Rhythm Assistant
+              </h1>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-800/60 font-bold">
+                Live Piano Mentor
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5">
+              Real-time parameter analysis, customized song courses, and interactive AI chat
             </p>
-            <div className="mt-3 p-3 rounded-xl bg-white dark:bg-zinc-900 border border-indigo-100 dark:border-zinc-800 text-xs text-slate-700 dark:text-zinc-300">
-              <strong className="text-indigo-600 dark:text-indigo-400">Timing Diagnosis: </strong>
-              {feedback.timing_diagnosis}
-            </div>
-          </div>
-
-          <h4 className="text-xs font-bold text-slate-900 dark:text-white mb-2 flex items-center gap-1.5">
-            <Target className="w-3.5 h-3.5 text-emerald-500" /> Recommended Practice Drills
-          </h4>
-          <div className="flex flex-col gap-2">
-            {feedback.drills.map((drill: any, idx: number) => (
-              <div
-                key={idx}
-                className="p-3 rounded-xl bg-slate-50 dark:bg-zinc-950 border border-slate-200/80 dark:border-zinc-800/80 flex flex-col gap-1"
-              >
-                <span className="text-xs font-bold text-slate-800 dark:text-zinc-200 flex items-center gap-1.5">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-indigo-500" />
-                  {drill.title}
-                </span>
-                <span className="text-[11px] text-slate-500 dark:text-zinc-400 pl-5 leading-relaxed">
-                  {drill.action}
-                </span>
-              </div>
-            ))}
           </div>
         </div>
 
-        <div className="flex items-center justify-between text-[11px] text-slate-400 font-mono pt-3 border-t border-slate-100 dark:border-zinc-800">
-          <span>{feedback.coach_signature}</span>
-          <button
-            onClick={() => setActiveTab('practice')}
-            className="text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 font-semibold"
-          >
-            <span>Open in Practice Mode</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      </div>
-
-      {/* Right Column: Visual Copilot (5 Cols) */}
-      <div className="lg:col-span-5 bg-white dark:bg-black rounded-2xl border border-slate-200 dark:border-zinc-800 p-5 shadow-sm flex flex-col justify-between gap-4 transition-colors">
-        <div>
-          <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-zinc-800">
-            <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              <Wand2 className="w-4 h-4 text-indigo-500" />
-              AI Visual Copilot
-            </h2>
-            <span className="text-[10px] font-mono text-slate-400">Natural Language $\rightarrow$ LEDs</span>
-          </div>
-
-          <p className="text-xs text-slate-500 dark:text-zinc-400 my-3">
-            Describe the mood or aesthetic you want, and the AI will configure and tune the physical LED algorithms:
-          </p>
-
-          <div className="flex flex-col gap-2">
-            <textarea
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              placeholder="e.g. Warm amber fireplace with gentle flickering sparks..."
-              rows={3}
-              className="w-full p-3 rounded-xl bg-slate-50 dark:bg-zinc-950 text-slate-900 dark:text-white border border-slate-200 dark:border-zinc-800 text-xs focus:outline-none focus:border-indigo-500 resize-none"
+        {/* Gemini Relay Connection Config & Status */}
+        <div className="flex items-center gap-2 text-xs">
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800">
+            <Radio className="w-3 h-3 text-slate-400" />
+            <span className="text-[10px] font-mono text-slate-500">Relay URL:</span>
+            <input
+              type="text"
+              value={customRelayInput}
+              onChange={(e) => setCustomRelayInput(e.target.value)}
+              onBlur={() => handleUpdateRelayUrl(customRelayInput)}
+              onKeyDown={(e) => e.key === 'Enter' && handleUpdateRelayUrl(customRelayInput)}
+              className="w-36 sm:w-44 text-[10px] font-mono bg-transparent text-slate-800 dark:text-zinc-200 focus:outline-none border-b border-transparent focus:border-indigo-500"
+              placeholder="http://127.0.0.1:8000"
+              title="Configurable Gemini Relay endpoint (e.g. http://127.0.0.1:8000 or ngrok public URL)"
             />
-
-            <div className="flex flex-wrap gap-1.5 my-1">
-              {examplePrompts.map((ex) => (
-                <button
-                  key={ex}
-                  onClick={() => setPrompt(ex)}
-                  className="px-2 py-1 rounded-lg bg-slate-100 dark:bg-zinc-900 hover:bg-slate-200 dark:hover:bg-zinc-800 text-[10px] text-slate-600 dark:text-zinc-400 transition-colors"
-                >
-                  {ex}
-                </button>
-              ))}
-            </div>
-
             <button
-              onClick={handleGenerateCopilot}
-              disabled={isGenerating || !prompt.trim()}
-              className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-bold text-xs shadow-md shadow-indigo-600/20 flex items-center justify-center gap-2 transition-all"
+              onClick={() => handleUpdateRelayUrl(customRelayInput)}
+              disabled={isCheckingRelay}
+              className="p-1 rounded-lg text-slate-400 hover:text-indigo-500 cursor-pointer transition-colors"
+              title="Test connection to Gemini Relay"
             >
-              <Wand2 className="w-3.5 h-3.5" />
-              <span>{isGenerating ? 'Generating...' : 'Synthesize Visual Configuration'}</span>
+              <RotateCcw className={`w-3 h-3 ${isCheckingRelay ? 'animate-spin' : ''}`} />
             </button>
           </div>
 
-          {copilotResult && (
-            <div className="mt-4 p-4 rounded-xl bg-slate-50 dark:bg-zinc-950 border border-slate-200/80 dark:border-zinc-800/80 flex flex-col gap-2">
-              <div className="flex justify-between items-center text-xs font-bold text-slate-800 dark:text-zinc-200">
-                <span>{copilotResult.name}</span>
-                <span className="font-mono text-indigo-500 uppercase">{copilotResult.effect}</span>
-              </div>
-              <p className="text-[11px] text-slate-500 dark:text-zinc-400">{copilotResult.ai_reasoning}</p>
+          {/* Online / Offline status badge */}
+          <div 
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-xl text-[10px] font-mono font-bold border transition-colors ${
+              relayStatus?.online
+                ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/60'
+                : 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800/60'
+            }`}
+            title={relayStatus?.online ? `Gemini Relay is online (${relayStatus.latency_ms}ms latency)` : 'Using local heuristic music engine'}
+          >
+            <span className={`w-1.5 h-1.5 rounded-full ${relayStatus?.online ? 'bg-emerald-500 animate-pulse' : 'bg-indigo-500'}`} />
+            <span>{relayStatus?.online ? `Relay Online (${relayStatus.latency_ms}ms)` : 'Local MIRA Engine'}</span>
+          </div>
+        </div>
+      </div>
 
-              <div className="flex items-center gap-2 pt-2">
+      {/* 2. Main Two-Column Studio Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 flex-1 min-h-0">
+        
+        {/* Left Column: Live Telemetry & Personalized Course (7 Cols) */}
+        <div className="lg:col-span-6 xl:col-span-6 flex flex-col gap-4">
+          
+          {/* A. Live Practice Run Telemetry Card */}
+          <div className="p-4 rounded-2xl bg-white dark:bg-[#0c0c0e] border border-slate-200 dark:border-zinc-800 shadow-sm flex flex-col gap-3">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-zinc-850">
+              <div className="flex items-center gap-2">
+                <Gauge className="w-4 h-4 text-indigo-500" />
+                <h2 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider font-mono">
+                  Recorded Performance Telemetry
+                </h2>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-mono text-indigo-600 dark:text-indigo-400 font-bold bg-indigo-50 dark:bg-indigo-950/60 px-2 py-0.5 rounded-md border border-indigo-200 dark:border-indigo-800/60">
+                  {songTitle}
+                </span>
                 <button
-                  onClick={handleApplyCopilot}
-                  disabled={applied}
-                  className="flex-1 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-sm"
+                  onClick={() => resetTelemetry(currentSong?.title, currentSong?.id)}
+                  className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 cursor-pointer"
+                  title="Reset recorded session parameters"
                 >
-                  {applied ? <Check className="w-3.5 h-3.5" /> : <Sparkles className="w-3.5 h-3.5" />}
-                  <span>{applied ? 'Applied to LEDs!' : 'Apply to Strip & Canvas'}</span>
+                  <RotateCcw className="w-3 h-3" />
                 </button>
               </div>
             </div>
-          )}
+
+            {/* Quick Metrics Grid */}
+            <div className="grid grid-cols-4 gap-2">
+              <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-zinc-950 border border-slate-200/70 dark:border-zinc-800/70 flex flex-col items-center">
+                <span className="text-[9px] font-mono text-slate-400 uppercase font-semibold">Accuracy</span>
+                <span className="text-base font-black font-mono text-emerald-600 dark:text-emerald-400 mt-0.5">
+                  {currentTelemetry.accuracyPct}%
+                </span>
+              </div>
+              <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-zinc-950 border border-slate-200/70 dark:border-zinc-800/70 flex flex-col items-center">
+                <span className="text-[9px] font-mono text-slate-400 uppercase font-semibold">Deviation</span>
+                <span className="text-base font-black font-mono text-indigo-600 dark:text-indigo-400 mt-0.5">
+                  {currentTelemetry.avgDeviationMs > 0 ? `+${currentTelemetry.avgDeviationMs}` : currentTelemetry.avgDeviationMs}ms
+                </span>
+              </div>
+              <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-zinc-950 border border-slate-200/70 dark:border-zinc-800/70 flex flex-col items-center">
+                <span className="text-[9px] font-mono text-slate-400 uppercase font-semibold">Hits / Miss</span>
+                <span className="text-base font-black font-mono text-slate-800 dark:text-zinc-200 mt-0.5">
+                  {currentTelemetry.hits}/{currentTelemetry.misses}
+                </span>
+              </div>
+              <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-zinc-950 border border-slate-200/70 dark:border-zinc-800/70 flex flex-col items-center">
+                <span className="text-[9px] font-mono text-slate-400 uppercase font-semibold">Streak</span>
+                <span className="text-base font-black font-mono text-amber-500 mt-0.5 flex items-center gap-0.5">
+                  <Flame className="w-3.5 h-3.5 fill-current" />
+                  {currentTelemetry.streak}
+                </span>
+              </div>
+            </div>
+
+            {/* Timing Breakdown Badges */}
+            <div className="flex items-center justify-between text-[10px] font-mono p-2 rounded-xl bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-900/40">
+              <span className="text-slate-500 dark:text-zinc-400">Timing Distribution:</span>
+              <div className="flex items-center gap-2">
+                <span className="text-emerald-600 dark:text-emerald-400 font-bold">
+                  {currentTelemetry.timingRatings.PERFECT} Perfect (&lt;25ms)
+                </span>
+                <span className="text-sky-600 dark:text-sky-400 font-bold">
+                  {currentTelemetry.timingRatings.GOOD} Good
+                </span>
+                <span className="text-amber-600 dark:text-amber-400 font-bold">
+                  {currentTelemetry.timingRatings.EARLY} Early
+                </span>
+                <span className="text-rose-500 font-bold">
+                  {currentTelemetry.timingRatings.LATE} Late
+                </span>
+              </div>
+            </div>
+
+            {/* Problematic Measures Flag */}
+            {currentTelemetry.problemMeasures.length > 0 && (
+              <div className="flex items-center gap-1.5 text-[11px] text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-3 py-1.5 rounded-xl border border-amber-200 dark:border-amber-800/60">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                <span>
+                  Attention needed on measures: <strong>{currentTelemetry.problemMeasures.join(', ')}</strong>
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* B. MIRA Personalized Learning Course Generator */}
+          <div className="p-4 rounded-2xl bg-white dark:bg-[#0c0c0e] border border-slate-200 dark:border-zinc-800 shadow-sm flex flex-col gap-3.5 flex-1">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-zinc-850">
+              <div className="flex items-center gap-2">
+                <Layers className="w-4 h-4 text-purple-500" />
+                <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider font-mono">
+                  Personalized Learning Course for {songTitle}
+                </h3>
+              </div>
+              <button
+                onClick={handleGenerateCourse}
+                disabled={isCourseLoading}
+                className="flex items-center gap-1 px-3 py-1 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-bold shadow-sm cursor-pointer transition-all disabled:opacity-50"
+              >
+                <Sparkles className={`w-3 h-3 ${isCourseLoading ? 'animate-spin' : ''}`} />
+                <span>{isCourseLoading ? 'Synthesizing...' : 'Generate Plan'}</span>
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-500 dark:text-zinc-400 leading-relaxed">
+              MIRA analyzes your exact tempo drifts, problematic measures, and velocity spread to create a step-by-step custom curriculum:
+            </p>
+
+            {/* Custom focus input */}
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={courseGoal}
+                onChange={(e) => setCourseGoal(e.target.value)}
+                placeholder="Optional goal: e.g. Smooth out measure 4 transition & relax right hand..."
+                className="flex-1 p-2 rounded-xl bg-slate-50 dark:bg-zinc-950 text-slate-900 dark:text-white border border-slate-200 dark:border-zinc-800 text-xs focus:outline-none focus:border-indigo-500"
+              />
+            </div>
+
+            {/* Generated Course Cards */}
+            {miraCurriculum ? (
+              <div className="flex flex-col gap-2.5 overflow-y-auto max-h-[360px] pr-1">
+                <div className="p-2.5 rounded-xl bg-gradient-to-br from-purple-50/80 to-indigo-50/80 dark:from-purple-950/30 dark:to-indigo-950/30 border border-purple-200 dark:border-purple-800/50">
+                  <h4 className="text-xs font-bold text-purple-900 dark:text-purple-200 flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-purple-500" />
+                    {miraCurriculum.headline}
+                  </h4>
+                  <p className="text-[11px] text-slate-600 dark:text-zinc-300 mt-1 leading-snug">
+                    {miraCurriculum.summary}
+                  </p>
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  {miraCurriculum.steps.map((step) => (
+                    <div
+                      key={step.step}
+                      className="p-3 rounded-xl bg-slate-50 dark:bg-zinc-950 border border-slate-200/80 dark:border-zinc-800/80 flex items-center justify-between gap-3 text-xs hover:border-indigo-400 transition-colors"
+                    >
+                      <div className="flex flex-col gap-0.5">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 font-bold">
+                            Phase {step.step}
+                          </span>
+                          <span className="font-bold text-slate-800 dark:text-zinc-200">
+                            {step.title}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5">
+                          {step.description}
+                        </p>
+                        <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 mt-0.5">
+                          Goal: {step.targetGoal}
+                        </span>
+                      </div>
+
+                      <button
+                        onClick={() => handleApplyDrillToLearning(step)}
+                        className={`px-3 py-1.5 rounded-xl font-bold text-xs shrink-0 flex items-center gap-1 transition-all shadow-xs cursor-pointer ${
+                          appliedStep === step.step
+                            ? 'bg-emerald-600 text-white'
+                            : 'bg-indigo-600 hover:bg-indigo-500 text-white'
+                        }`}
+                        title="Load drill parameters and launch in Interactive Learning Studio"
+                      >
+                        {appliedStep === step.step ? <Check className="w-3 h-3" /> : <Play className="w-3 h-3 fill-current" />}
+                        <span>{appliedStep === step.step ? 'Loaded' : 'Launch Drill'}</span>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="p-6 rounded-2xl border border-dashed border-slate-200 dark:border-zinc-800 text-center flex flex-col items-center justify-center gap-2 text-slate-400 my-auto">
+                <Sparkles className="w-6 h-6 text-purple-400" />
+                <p className="text-xs">Click "Generate Plan" above to create an AI-tailored course for {songTitle}.</p>
+              </div>
+            )}
+          </div>
+
         </div>
+
+        {/* Right Column: Interactive MIRA AI Chatbot (6 Cols) */}
+        <div className="lg:col-span-6 xl:col-span-6 p-4 rounded-2xl bg-white dark:bg-[#0c0c0e] border border-slate-200 dark:border-zinc-800 shadow-sm flex flex-col justify-between h-full min-h-[540px]">
+          
+          {/* Chat Header */}
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-zinc-850 shrink-0">
+            <div className="flex items-center gap-2">
+              <Bot className="w-4 h-4 text-purple-500" />
+              <div>
+                <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider font-mono">
+                  MIRA Interactive Chat
+                </h3>
+                <span className="text-[10px] text-slate-400 font-mono">
+                  Context: {songTitle} • {currentTelemetry.accuracyPct}% Acc • {currentTelemetry.avgDeviationMs}ms Dev
+                </span>
+              </div>
+            </div>
+
+            <button
+              onClick={clearMiraChat}
+              className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 cursor-pointer"
+              title="Clear chat history"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          {/* Chat Message Thread */}
+          <div className="flex-1 overflow-y-auto py-3 flex flex-col gap-3 pr-1 min-h-[300px]">
+            {miraChatMessages.map((msg) => (
+              <div
+                key={msg.id}
+                className={`flex gap-2.5 max-w-[88%] ${
+                  msg.role === 'user' ? 'ml-auto flex-row-reverse' : 'mr-auto'
+                }`}
+              >
+                {/* Avatar */}
+                <div
+                  className={`w-7 h-7 rounded-xl flex items-center justify-center shrink-0 text-white shadow-xs ${
+                    msg.role === 'user'
+                      ? 'bg-slate-700 dark:bg-zinc-700'
+                      : 'bg-gradient-to-tr from-purple-600 to-indigo-600'
+                  }`}
+                >
+                  {msg.role === 'user' ? 'U' : <Sparkles className="w-3.5 h-3.5" />}
+                </div>
+
+                {/* Message Bubble */}
+                <div
+                  className={`p-3 rounded-2xl text-xs leading-relaxed ${
+                    msg.role === 'user'
+                      ? 'bg-indigo-600 text-white rounded-tr-xs'
+                      : 'bg-slate-100 dark:bg-zinc-900 text-slate-800 dark:text-zinc-200 rounded-tl-xs border border-slate-200/80 dark:border-zinc-800/80'
+                  }`}
+                >
+                  <p className="whitespace-pre-wrap">{msg.text}</p>
+                  <span
+                    className={`text-[9px] font-mono mt-1 block opacity-70 ${
+                      msg.role === 'user' ? 'text-indigo-200 text-right' : 'text-slate-400'
+                    }`}
+                  >
+                    {msg.timestamp}
+                  </span>
+                </div>
+              </div>
+            ))}
+
+            {isChatLoading && (
+              <div className="flex gap-2.5 mr-auto max-w-[88%]">
+                <div className="w-7 h-7 rounded-xl flex items-center justify-center shrink-0 text-white bg-gradient-to-tr from-purple-600 to-indigo-600 animate-pulse">
+                  <Sparkles className="w-3.5 h-3.5" />
+                </div>
+                <div className="p-3 rounded-2xl rounded-tl-xs bg-slate-100 dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800/80 text-xs text-slate-500 flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-purple-500 animate-ping" />
+                  <span>MIRA is analyzing your parameters...</span>
+                </div>
+              </div>
+            )}
+
+            <div ref={chatBottomRef} />
+          </div>
+
+          {/* Quick Prompt Chips */}
+          <div className="flex flex-wrap gap-1.5 py-2 border-t border-slate-100 dark:border-zinc-850 shrink-0">
+            {quickPrompts.map((qp, idx) => (
+              <button
+                key={idx}
+                onClick={() => handleSendMessage(qp)}
+                className="px-2.5 py-1 rounded-full bg-slate-100 dark:bg-zinc-900 hover:bg-indigo-50 dark:hover:bg-indigo-950/60 hover:text-indigo-600 dark:hover:text-indigo-400 text-slate-600 dark:text-zinc-400 text-[10px] font-medium transition-all cursor-pointer border border-slate-200/70 dark:border-zinc-800/70"
+              >
+                {qp}
+              </button>
+            ))}
+          </div>
+
+          {/* Chat Input Bar */}
+          <div className="flex items-center gap-2 pt-2 shrink-0">
+            <input
+              type="text"
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSendMessage();
+                }
+              }}
+              placeholder={`Ask MIRA about technique, tempo, or ${songTitle}...`}
+              className="flex-1 p-2.5 rounded-xl bg-slate-50 dark:bg-zinc-950 text-slate-900 dark:text-white border border-slate-200 dark:border-zinc-800 text-xs focus:outline-none focus:border-indigo-500 transition-colors"
+            />
+            <button
+              onClick={() => handleSendMessage()}
+              disabled={!chatInput.trim() || isChatLoading}
+              className="p-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white cursor-pointer shadow-md shadow-indigo-600/20 transition-all"
+              title="Send message to MIRA"
+            >
+              <Send className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+        </div>
+
       </div>
 
     </div>

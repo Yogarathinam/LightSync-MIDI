@@ -181,6 +181,54 @@ export interface AICoachFeedback {
   coach_signature: string;
 }
 
+export interface SessionTelemetry {
+  songId: string;
+  songTitle: string;
+  totalNotes: number;
+  hits: number;
+  misses: number;
+  streak: number;
+  accuracyPct: number;
+  avgDeviationMs: number;
+  timingRatings: {
+    PERFECT: number;
+    GOOD: number;
+    EARLY: number;
+    LATE: number;
+    MISS: number;
+  };
+  handAccuracy: { left: number; right: number };
+  avgVelocity: number;
+  problemMeasures: number[];
+  durationSec: number;
+}
+
+export interface MiraCurriculumStep {
+  step: number;
+  title: string;
+  description: string;
+  tempoScale: number;
+  hand: 'both' | 'left' | 'right';
+  loopSection: 'all' | 'm1_4' | 'm5_8';
+  targetGoal: string;
+}
+
+export interface MiraCurriculum {
+  songTitle: string;
+  headline: string;
+  summary: string;
+  steps: MiraCurriculumStep[];
+  aiReasoning: string;
+  generatedAt: string;
+}
+
+export interface MiraChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  text: string;
+  timestamp: string;
+}
+
 export interface DeviceStatus {
   connected: boolean;
   port: string | null;

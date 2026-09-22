@@ -65,7 +65,13 @@ export const LearnWorkspace: React.FC = () => {
     stopRecording,
     downloadRecording,
     playRecording,
-    isPlayingRecording 
+    isPlayingRecording,
+    openWorkspace,
+    currentTelemetry,
+    resetTelemetry,
+    geminiRelayUrl,
+    miraCurriculum,
+    setMiraCurriculum
   } = useLightSyncStore();
 
   // If no song is selected, default to the first song in library (e.g. Ode to Joy)
@@ -90,6 +96,7 @@ export const LearnWorkspace: React.FC = () => {
   // Practice settings
   const [tempoScale, setTempoScale] = useState(100);
   const [loopSection, setLoopSection] = useState<'all' | 'm1_4' | 'm5_8'>('all');
+  const [isMiraLoading, setIsMiraLoading] = useState(false);
 
   const sessionStartTimeRef = useRef<number>(0);
   const flowTimerRef = useRef<number | null>(null);
@@ -228,7 +235,32 @@ export const LearnWorkspace: React.FC = () => {
   const handleSelectSong = (newSong: SongItem) => {
     handleStop();
     setCurrentSong(newSong);
+    resetTelemetry(newSong.title, newSong.id);
     setShowSongPicker(false);
+  };
+
+  const handleAskMira = async () => {
+    setIsMiraLoading(true);
+    try {
+      const res = await fetch('/api/ai/mira/course', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          song,
+          telemetry: currentTelemetry,
+          relay_url: geminiRelayUrl
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setMiraCurriculum(data);
+        setShowDrawer(true);
+      }
+    } catch (err) {
+      console.warn('MIRA course request error:', err);
+    } finally {
+      setIsMiraLoading(false);
+    }
   };
 
   const totalNotes = song?.notes.length || 1;
@@ -302,6 +334,7 @@ export const LearnWorkspace: React.FC = () => {
               onClick={() => {
                 setMode('wait_for_key');
                 setLearnMode('wait_for_key');
+                setIsPlaying(true);
                 if (song) startSongPlayback(song);
               }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
@@ -453,6 +486,17 @@ export const LearnWorkspace: React.FC = () => {
                 </button>
               </>
             )}
+            
+            {/* Ask MIRA AI Coach Button */}
+            <button
+              onClick={handleAskMira}
+              disabled={isMiraLoading}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-sky-600 hover:from-purple-500 hover:to-sky-500 text-white text-xs font-bold shadow-md shadow-indigo-500/25 transition-all cursor-pointer group disabled:opacity-50"
+              title="Ask MIRA — Musical Intelligence & Rhythm Assistant for personalized advice and course generation"
+            >
+              <Sparkles className={`w-3.5 h-3.5 ${isMiraLoading ? 'animate-spin' : 'group-hover:rotate-12 transition-transform'}`} />
+              <span>{isMiraLoading ? 'MIRA Thinking...' : 'Ask MIRA'}</span>
+            </button>
           </div>
 
           {/* F. Transport Controls & Drawer Toggle */}
@@ -504,6 +548,11 @@ export const LearnWorkspace: React.FC = () => {
             </button>
           </div>
 
+        </div>
+
+        {/* Floating Sub-HUD Timeline Scrubber (Docked neatly under top bar, 100% free keyboard runway) */}
+        <div className="w-full max-w-2xl mx-auto pointer-events-auto">
+          <SongTimelineScrubber showPieceTitle={false} compact={true} autoHide={true} className="w-full shadow-lg" />
         </div>
 
       </div>
@@ -584,11 +633,9 @@ export const LearnWorkspace: React.FC = () => {
       </div>
 
       {/* ============================================================ */}
-      {/* 3. INTERACTIVE SONG TIMELINE SCRUBBER (SCROLLABLE & SEEKABLE) */}
+      {/* 3. ZERO OBSTRUCTION BOTTOM RUNWAY (Unobstructed Piano Keys) */}
       {/* ============================================================ */}
-      <div className="w-full max-w-4xl mx-auto pointer-events-auto z-30 mb-1">
-        <SongTimelineScrubber showPieceTitle={true} className="w-full shadow-2xl" />
-      </div>
+      <div className="pointer-events-none h-4" />
 
       {/* ============================================================ */}
       {/* 4. SLIDE-OUT DRILLS & DEEP ANALYSIS DRAWER */}
@@ -650,6 +697,53 @@ export const LearnWorkspace: React.FC = () => {
                 ))}
               </div>
             </div>
+
+            {/* MIRA Personalized Learning Course */}
+            {miraCurriculum && (
+              <div className="p-3.5 rounded-xl bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-950/40 dark:to-purple-950/40 border border-indigo-200 dark:border-indigo-800/60 flex flex-col gap-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black text-indigo-900 dark:text-indigo-200 flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
+                    MIRA Course: {miraCurriculum.songTitle}
+                  </span>
+                  <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-indigo-200/60 dark:bg-indigo-900/60 text-indigo-800 dark:text-indigo-300 font-bold">
+                    Custom Plan
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-600 dark:text-zinc-300 leading-tight">
+                  {miraCurriculum.summary}
+                </p>
+
+                <div className="flex flex-col gap-1.5 mt-1">
+                  {miraCurriculum.steps.map((st) => (
+                    <div
+                      key={st.step}
+                      className="p-2 rounded-lg bg-white/90 dark:bg-zinc-900/90 border border-indigo-100 dark:border-zinc-800 flex items-center justify-between text-xs"
+                    >
+                      <div className="flex flex-col pr-2">
+                        <span className="font-bold text-slate-800 dark:text-zinc-200 text-[11px]">
+                          Phase {st.step}: {st.title}
+                        </span>
+                        <span className="text-[10px] text-slate-500 dark:text-zinc-400">
+                          {st.tempoScale}% • {st.hand} hand • {st.loopSection === 'all' ? 'Full piece' : st.loopSection === 'm1_4' ? 'Bars 1-4' : 'Bars 5-8'}
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setTempoScale(st.tempoScale);
+                          setLoopSection(st.loopSection);
+                          setHandFilter(st.hand);
+                        }}
+                        className="px-2 py-1 rounded bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-[10px] shrink-0 cursor-pointer shadow-xs transition-colors"
+                        title="Load tempo, loop, and hand filter for this phase"
+                      >
+                        Apply Drill
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Session History Stats */}
             <div className="flex flex-col gap-2">

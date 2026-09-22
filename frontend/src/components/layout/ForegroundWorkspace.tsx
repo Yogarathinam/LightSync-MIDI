@@ -100,8 +100,8 @@ export const ForegroundWorkspace: React.FC = () => {
         };
       case 'aicoach':
         return {
-          title: 'LightSync AI Coach',
-          badge: 'Offline Heuristic Copilot',
+          title: 'MIRA — Musical Intelligence & Rhythm Assistant',
+          badge: 'AI Piano Mentor',
           icon: <Sparkles className="w-4 h-4 text-purple-500" />
         };
       case 'play':

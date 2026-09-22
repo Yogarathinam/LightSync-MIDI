@@ -5,7 +5,7 @@ from typing import List, Dict, Any, Optional
 from contextlib import asynccontextmanager
 
 from pathlib import Path
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File, HTTPException
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -25,8 +25,7 @@ from app.music.chord_detector import ChordDetector
 from app.device.serial_manager import serial_manager
 from app.analytics.db import init_db, get_recent_sessions, get_all_presets, save_preset
 from app.analytics.tracker import performance_tracker
-from app.ai.coach import ai_coach
-from app.ai.copilot import visual_copilot
+from app.ai.mira import mira_assistant, gemini_relay_server
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger("LightSync.API")
@@ -88,8 +87,23 @@ class PresetModel(BaseModel):
     primary_color: str = "#00f0ff"
     secondary_color: str = "#ff007f"
 
-class CopilotPromptModel(BaseModel):
-    prompt: str
+class MiraCourseModel(BaseModel):
+    song: Optional[Dict[str, Any]] = None
+    telemetry: Dict[str, Any] = {}
+    prompt: str = ""
+    relay_url: Optional[str] = None
+
+class MiraChatModel(BaseModel):
+    messages: List[Dict[str, str]]
+    telemetry: Dict[str, Any] = {}
+    current_song: Optional[Dict[str, Any]] = None
+    relay_url: Optional[str] = None
+
+class MiraRelayCheckModel(BaseModel):
+    relay_url: Optional[str] = None
+
+class PromptRequestModel(BaseModel):
+    prompt: Optional[str] = ""
 
 class ConnectDeviceModel(BaseModel):
     port: str
@@ -273,13 +287,80 @@ def post_preset(preset: PresetModel):
 def get_sessions():
     return {"sessions": get_recent_sessions(30)}
 
-@app.post("/api/ai/coach")
-def analyze_session(session_data: Dict[str, Any]):
-    return ai_coach.analyze_performance(session_data)
+@app.post("/api/ai/mira/feedback")
+def mira_feedback(session_data: Dict[str, Any]):
+    relay_url = session_data.get("relay_url")
+    return mira_assistant.analyze_performance(session_data, relay_url=relay_url)
 
-@app.post("/api/ai/copilot")
-def copilot_generate(req: CopilotPromptModel):
-    return visual_copilot.generate_preset_from_prompt(req.prompt)
+@app.post("/api/ai/coach")
+def legacy_coach_feedback(session_data: Dict[str, Any]):
+    return mira_assistant.analyze_performance(session_data)
+
+@app.post("/api/ai/mira/course")
+def mira_course(req: MiraCourseModel):
+    return mira_assistant.generate_personalized_course(
+        song=req.song,
+        telemetry=req.telemetry,
+        prompt=req.prompt,
+        relay_url=req.relay_url
+    )
+
+@app.post("/api/ai/mira/chat")
+def mira_chat(req: MiraChatModel):
+    return mira_assistant.chat_response(
+        messages=req.messages,
+        telemetry=req.telemetry,
+        current_song=req.current_song,
+        relay_url=req.relay_url
+    )
+
+@app.post("/api/ai/mira/check-relay")
+def mira_check_relay(req: MiraRelayCheckModel):
+    return mira_assistant.check_relay_health(req.relay_url)
+
+# Gemini Relay API Implementation (Matching documentation)
+@app.get("/api/health")
+def get_relay_health():
+    return gemini_relay_server.get_health()
+
+@app.post("/api/prompt")
+async def post_prompt(request: Request):
+    content_type = request.headers.get("content-type", "").lower()
+    text_prompt = ""
+    has_image = False
+
+    if "application/json" in content_type:
+        try:
+            body = await request.json()
+            text_prompt = str(body.get("prompt", ""))
+        except Exception:
+            pass
+    elif "multipart/form-data" in content_type:
+        try:
+            form = await request.form()
+            text_prompt = str(form.get("prompt", ""))
+            if "image" in form and form["image"]:
+                has_image = True
+        except Exception:
+            pass
+    else:
+        try:
+            body = await request.json()
+            text_prompt = str(body.get("prompt", ""))
+        except Exception:
+            try:
+                form = await request.form()
+                text_prompt = str(form.get("prompt", ""))
+                if "image" in form and form["image"]:
+                    has_image = True
+            except Exception:
+                pass
+
+    return gemini_relay_server.submit_prompt(text_prompt, has_image=has_image)
+
+@app.get("/api/response")
+def get_relay_response():
+    return gemini_relay_server.get_response()
 
 # WebSocket Real-Time Bidirectional Channel
 @app.websocket("/ws")
@@ -350,7 +431,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 elif msg_type == "END_SESSION":
                     summary = performance_tracker.end_session()
                     if summary:
-                        coach_feedback = ai_coach.analyze_performance(summary)
+                        coach_feedback = mira_assistant.analyze_performance(summary)
                         await websocket.send_text(json.dumps({
                             "type": "SESSION_RESULT",
                             "summary": summary,
