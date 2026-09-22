@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   GraduationCap, 
   Activity, 
@@ -71,7 +71,8 @@ export const LearnWorkspace: React.FC = () => {
     resetTelemetry,
     geminiRelayUrl,
     miraCurriculum,
-    setMiraCurriculum
+    setMiraCurriculum,
+    playbackBeat
   } = useLightSyncStore();
 
   // If no song is selected, default to the first song in library (e.g. Ode to Joy)
@@ -85,7 +86,6 @@ export const LearnWorkspace: React.FC = () => {
 
   // Play & Learning State
   const [isPlaying, setIsPlaying] = useState(false);
-  const [currentNoteIndex, setCurrentNoteIndex] = useState(0);
   const [mode, setMode] = useState<'watch_listen' | 'wait_for_key' | 'flow'>('watch_listen');
   const [lastFeedback, setLastFeedback] = useState<string | null>(null);
   const [score, setScore] = useState({ hits: 0, misses: 0, streak: 0 });
@@ -101,47 +101,32 @@ export const LearnWorkspace: React.FC = () => {
   const sessionStartTimeRef = useRef<number>(0);
   const flowTimerRef = useRef<number | null>(null);
 
+  const [flowNoteIndex, setFlowNoteIndex] = useState(0);
+
+  // Synchronize currentNoteIndex with actual playback beat from StudioCanvas
+  const currentNoteIndex = useMemo(() => {
+    if (mode === 'flow') return flowNoteIndex;
+    if (!song || !song.notes || song.notes.length === 0) return 0;
+    const idx = song.notes.findIndex(n => (n.time + n.duration) > playbackBeat);
+    return idx === -1 ? song.notes.length - 1 : idx;
+  }, [mode, flowNoteIndex, song, playbackBeat]);
+
   const currentNote: SongNote | undefined = song?.notes[currentNoteIndex];
 
-  // Set expected pitch in visualizer for target key highlight
+  // Listen to telemetry updates from StudioCanvas for real-time rating flash
   useEffect(() => {
-    if (isPlaying && currentNote && mode !== 'watch_listen') {
-      setExpectedPitch(currentNote.pitch);
-    } else {
-      setExpectedPitch(null);
+    if (currentTelemetry.lastRating) {
+      setLastFeedback(currentTelemetry.lastRating);
+      const timer = window.setTimeout(() => setLastFeedback(null), 800);
+      return () => clearTimeout(timer);
     }
-  }, [isPlaying, currentNoteIndex, currentNote, mode, setExpectedPitch]);
-
-  // Note matching logic for Wait For Key mode
-  useEffect(() => {
-    if (!isPlaying || !currentNote || mode === 'watch_listen') return;
-
-    if (activeNotes.has(currentNote.pitch)) {
-      setScore(prev => ({
-        hits: prev.hits + 1,
-        misses: prev.misses,
-        streak: prev.streak + 1
-      }));
-      setLastFeedback('PERFECT');
-
-      // Clear feedback after 900ms
-      const fbTimer = window.setTimeout(() => setLastFeedback(null), 900);
-
-      if (currentNoteIndex + 1 < (song?.notes.length || 0)) {
-        setCurrentNoteIndex(prev => prev + 1);
-      } else {
-        handleSongComplete();
-      }
-
-      return () => clearTimeout(fbTimer);
-    }
-  }, [activeNotes, isPlaying, currentNote, currentNoteIndex, song, mode]);
+  }, [currentTelemetry.lastRating, currentTelemetry.hits]);
 
   // Real-time Flow mode timer
   useEffect(() => {
     if (!isPlaying || mode !== 'flow' || !song) return;
 
-    const note = song.notes[currentNoteIndex];
+    const note = song.notes[flowNoteIndex];
     if (!note) {
       handleSongComplete();
       return;
@@ -161,8 +146,8 @@ export const LearnWorkspace: React.FC = () => {
         setLastFeedback('MISS');
       }
 
-      if (currentNoteIndex + 1 < song.notes.length) {
-        setCurrentNoteIndex(prev => prev + 1);
+      if (flowNoteIndex + 1 < song.notes.length) {
+        setFlowNoteIndex(prev => prev + 1);
       } else {
         handleSongComplete();
       }
@@ -171,11 +156,11 @@ export const LearnWorkspace: React.FC = () => {
     return () => {
       if (flowTimerRef.current) clearTimeout(flowTimerRef.current);
     };
-  }, [isPlaying, mode, currentNoteIndex, song, tempoScale, activeNotes]);
+  }, [isPlaying, mode, flowNoteIndex, song, tempoScale, activeNotes]);
 
   const handleStart = () => {
     setIsPlaying(true);
-    setCurrentNoteIndex(0);
+    setFlowNoteIndex(0);
     setScore({ hits: 0, misses: 0, streak: 0 });
     setSessionCompleted(false);
     setLastFeedback(null);

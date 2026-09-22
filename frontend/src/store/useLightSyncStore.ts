@@ -1442,17 +1442,23 @@ export const useLightSyncStore = create<LightSyncState>((set, get) => ({
         ? Math.round((prev.avgDeviationMs * prev.hits + timeOffsetMs) / hits)
         : prev.avgDeviationMs;
 
+      let lastRating: 'PERFECT' | 'GOOD' | 'EARLY' | 'LATE' | 'MISS' = 'PERFECT';
       const ratings = { ...prev.timingRatings };
       if (!hit) {
         ratings.MISS++;
+        lastRating = 'MISS';
       } else if (absOffset <= 25) {
         ratings.PERFECT++;
+        lastRating = 'PERFECT';
       } else if (absOffset <= 60) {
         ratings.GOOD++;
+        lastRating = 'GOOD';
       } else if (timeOffsetMs < 0) {
         ratings.EARLY++;
+        lastRating = 'EARLY';
       } else {
         ratings.LATE++;
+        lastRating = 'LATE';
       }
 
       const problemMeasures = !hit && !prev.problemMeasures.includes(measure)
@@ -1472,7 +1478,8 @@ export const useLightSyncStore = create<LightSyncState>((set, get) => ({
           avgDeviationMs,
           timingRatings: ratings,
           problemMeasures,
-          avgVelocity
+          avgVelocity,
+          lastRating
         }
       };
     }),

@@ -201,6 +201,7 @@ export interface SessionTelemetry {
   avgVelocity: number;
   problemMeasures: number[];
   durationSec: number;
+  lastRating?: 'PERFECT' | 'GOOD' | 'EARLY' | 'LATE' | 'MISS' | null;
 }
 
 export interface MiraCurriculumStep {

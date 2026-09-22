@@ -538,6 +538,13 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
       soundingSongNotesRef.current.clear();
       fallingBarsRef.current = [];
       struckNotesRef.current.clear();
+      if (currentSongRef.current?.notes) {
+        currentSongRef.current.notes.forEach((n) => {
+          if (n.time < targetSeekBeat - 0.01) {
+            struckNotesRef.current.add(`${n.pitch}_${n.time.toFixed(2)}`);
+          }
+        });
+      }
     }
   }, [seekEpoch, targetSeekBeat, triggerNoteOff]);
 
@@ -889,86 +896,102 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
               .filter(n => isMatchingHand(n.hand))
               .sort((a, b) => a.time - b.time || a.pitch - b.pitch);
 
-            // 2. Identify notes whose start has arrived at the hitline (n.time <= currentBeat + 0.02)
-            // AND whose duration has not yet completed (currentBeat < n.time + n.duration)
-            const activeDurationNotes = matchingNotes.filter(
-              n => n.time <= currentBeat + 0.02 && currentBeat < (n.time + n.duration)
+            // 2. Find any notes at or before the hitline that have not been struck yet
+            const pendingAtHitline = matchingNotes.filter(
+              n => n.time <= currentBeat + 0.001 && !struckNotesRef.current.has(`${n.pitch}_${n.time.toFixed(2)}`)
             );
 
-            // 3. Find newly struck notes to trigger VFX & Telemetry
-            activeDurationNotes.forEach((n) => {
-              const noteKey = `${n.pitch}_${n.time.toFixed(2)}`;
-              if (curActiveNotes.has(n.pitch) && !struckNotesRef.current.has(noteKey)) {
-                struckNotesRef.current.add(noteKey);
+            if (pendingAtHitline.length > 0) {
+              // The hitline has notes waiting to be struck!
+              const earliestPendingTime = Math.min(...pendingAtHitline.map(n => n.time));
+              songBeatRef.current = earliestPendingTime;
 
-                // Spawn impact visual burst on target note strike
-                const geom = getKeyGeometry(n.pitch, width, keyAreaTop, keyAreaHeight);
-                if (geom) {
-                  const noteColorHex = n.hand === 'left'
-                    ? (leftHandColorRef.current || '#38bdf8')
-                    : (rightHandColorRef.current || '#10b981');
-                  const col = hexToRgb(noteColorHex);
-                  const keyIdx = Math.max(0, Math.min(keyboardSize - 1, n.pitch - startMidi));
-                  const centerLed = Math.floor((keyIdx / (keyboardSize - 1)) * 143);
-                  for (let s = 0; s < 5; s++) spawnParticle('spark', centerLed, col);
-                  const keyCenterX = geom.x + geom.width / 2;
-                  spawnRunwayBursts(keyCenterX, ledBarTop, col, 14, true);
-                  spawnShockwaveRipple(keyCenterX, ledBarTop, col, geom.width * 2.8 + 48);
-                  spawnLensFlare(keyCenterX, ledBarTop, col, 260);
+              // Check if user is striking / holding any of the pending notes right now
+              let anyNewlyStruck = false;
+              pendingAtHitline.forEach((n) => {
+                const keyId = `${n.pitch}_${n.time.toFixed(2)}`;
+                if (curActiveNotes.has(n.pitch) && !struckNotesRef.current.has(keyId)) {
+                  struckNotesRef.current.add(keyId);
+                  anyNewlyStruck = true;
+
+                  // Impact visual burst on target note strike
+                  const geom = getKeyGeometry(n.pitch, width, keyAreaTop, keyAreaHeight);
+                  if (geom) {
+                    const noteColorHex = n.hand === 'left'
+                      ? (leftHandColorRef.current || '#38bdf8')
+                      : (rightHandColorRef.current || '#10b981');
+                    const col = hexToRgb(noteColorHex);
+                    const keyIdx = Math.max(0, Math.min(keyboardSize - 1, n.pitch - startMidi));
+                    const centerLed = Math.floor((keyIdx / (keyboardSize - 1)) * 143);
+                    for (let s = 0; s < 5; s++) spawnParticle('spark', centerLed, col);
+                    const keyCenterX = geom.x + geom.width / 2;
+                    spawnRunwayBursts(keyCenterX, ledBarTop, col, 14, true);
+                    spawnShockwaveRipple(keyCenterX, ledBarTop, col, geom.width * 2.8 + 48);
+                    spawnLensFlare(keyCenterX, ledBarTop, col, 260);
+                  }
+
+                  // Record performance telemetry
+                  const timeOffsetMs = Math.round((n.time - currentBeat) * (60 / curSong.bpm) * 1000);
+                  recordNoteAttempt({
+                    pitch: n.pitch,
+                    expectedPitch: n.pitch,
+                    timeOffsetMs,
+                    velocity: 100,
+                    hand: (n.hand === 'left' ? 'left' : 'right'),
+                    measure: Math.floor(n.time / 4) + 1,
+                    hit: true
+                  });
                 }
+              });
 
-                // Record performance telemetry
-                const timeOffsetMs = Math.round((n.time - currentBeat) * (60 / curSong.bpm) * 1000);
-                recordNoteAttempt({
-                  pitch: n.pitch,
-                  expectedPitch: n.pitch,
-                  timeOffsetMs,
-                  velocity: 100,
-                  hand: (n.hand === 'left' ? 'left' : 'right'),
-                  measure: Math.floor(n.time / 4) + 1,
-                  hit: true
-                });
-              }
-            });
+              // Check remaining pending notes after strike
+              const remainingPending = pendingAtHitline.filter(
+                n => !struckNotesRef.current.has(`${n.pitch}_${n.time.toFixed(2)}`)
+              );
 
-            if (activeDurationNotes.length > 0) {
-              // The flowkey duration is currently crossing the hitline!
-              // Rule: The key MUST be actively held for the full duration of the flowkey!
-              // Until the duration ends, do not move to the next key.
-              const unheldNote = activeDurationNotes.find(n => !curActiveNotes.has(n.pitch));
-
-              if (unheldNote) {
-                // Key was released early or hasn't been pressed: freeze playback right here!
-                canAdvance = false;
-                setWaitingState(true, unheldNote.pitch);
-                setExpectedPitch(unheldNote.pitch);
-              } else {
-                // All active notes are currently being held: advance through the duration!
+              if (remainingPending.length === 0 || anyNewlyStruck) {
+                // Struck! Let it advance through note duration!
                 canAdvance = true;
                 setWaitingState(false, null);
                 setExpectedPitch(null);
+              } else {
+                // Still waiting for user to strike the expected key
+                canAdvance = false;
+                setWaitingState(true, remainingPending[0].pitch);
+                setExpectedPitch(remainingPending[0].pitch);
               }
             } else {
-              // No notes are active right now (e.g. between notes or at start)
-              // Find the next upcoming note
-              const upcomingNotes = matchingNotes.filter(n => n.time > currentBeat);
-              const nextUpcoming = upcomingNotes[0] || null;
+              // 3. No pending notes at the hitline right now.
+              // Find the next upcoming unstruck note
+              const nextUpcoming = matchingNotes.find(
+                n => !struckNotesRef.current.has(`${n.pitch}_${n.time.toFixed(2)}`)
+              );
 
               if (nextUpcoming) {
-                // If the next upcoming note is within this frame's step, clamp right to its start!
                 const step = dt * (curSong.bpm / 60);
                 if (currentBeat + step >= nextUpcoming.time) {
-                  songBeatRef.current = nextUpcoming.time;
-                  canAdvance = false;
-                  setWaitingState(true, nextUpcoming.pitch);
-                  setExpectedPitch(nextUpcoming.pitch);
+                  // Approaching next note: check if already being held
+                  if (curActiveNotes.has(nextUpcoming.pitch)) {
+                    const keyId = `${nextUpcoming.pitch}_${nextUpcoming.time.toFixed(2)}`;
+                    struckNotesRef.current.add(keyId);
+                    canAdvance = true;
+                    setWaitingState(false, null);
+                    setExpectedPitch(null);
+                  } else {
+                    // Clamp to start of next note and wait
+                    songBeatRef.current = nextUpcoming.time;
+                    canAdvance = false;
+                    setWaitingState(true, nextUpcoming.pitch);
+                    setExpectedPitch(nextUpcoming.pitch);
+                  }
                 } else {
+                  // Freely stream falling notes forward (including held note durations)
                   canAdvance = true;
                   setWaitingState(false, null);
                   setExpectedPitch(nextUpcoming.pitch);
                 }
               } else {
-                // End of song reached
+                // All notes struck: allow piece to play to conclusion
                 canAdvance = true;
                 setWaitingState(false, null);
                 setExpectedPitch(null);
