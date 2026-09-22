@@ -238,8 +238,17 @@ export const AppHeader: React.FC<{
           {/* 3. Audio, Brightness & System Toolbar Pod */}
           <div className="flex items-center h-8.5 bg-slate-100 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-0.5 shadow-sm shrink-0">
             
-            {/* Brightness Control Slider (Optical WS2812B & Visualizer, Default 15) */}
-            <div className="flex items-center gap-1 sm:gap-1.5 px-1.5" title={`Hardware & Visualizer Brightness: ${effectConfig.brightness}/255 (${Math.round((effectConfig.brightness / 255) * 100)}%)`}>
+            {/* Brightness Control Slider (Optical WS2812B & Visualizer, Default 15, Scroll Wheel Enabled) */}
+            <div 
+              onWheel={(e) => {
+                e.preventDefault();
+                const delta = e.deltaY < 0 ? 5 : -5;
+                const nextBrt = Math.max(5, Math.min(255, effectConfig.brightness + delta));
+                setEffectParam('brightness', nextBrt);
+              }}
+              className="flex items-center gap-1 sm:gap-1.5 px-1.5 cursor-ew-resize select-none" 
+              title={`Hardware & Visualizer Brightness: ${effectConfig.brightness}/255 (${Math.round((effectConfig.brightness / 255) * 100)}%) — Scroll wheel adjusts`}
+            >
               <Sun className="w-3.5 h-3.5 text-amber-500 shrink-0" />
               <input
                 type="range"
@@ -249,7 +258,7 @@ export const AppHeader: React.FC<{
                 value={effectConfig.brightness}
                 onChange={(e) => setEffectParam('brightness', parseInt(e.target.value, 10))}
                 className="w-11 sm:w-13 md:w-16 h-1.5 accent-amber-500 cursor-pointer"
-                title={`Brightness: ${effectConfig.brightness}/255 (${Math.round((effectConfig.brightness / 255) * 100)}%)`}
+                title={`Brightness: ${effectConfig.brightness}/255 (${Math.round((effectConfig.brightness / 255) * 100)}%) — Scroll wheel adjusts`}
               />
               <span className="text-[10px] font-mono font-semibold text-slate-600 dark:text-zinc-400 min-w-[24px] sm:min-w-[28px] tabular-nums select-none">
                 {Math.round((effectConfig.brightness / 255) * 100)}%
@@ -259,8 +268,17 @@ export const AppHeader: React.FC<{
             {/* Divider between Brightness and Sound */}
             <div className="h-3.5 w-px bg-slate-300 dark:bg-zinc-800 mx-0.5" />
 
-            {/* Volume / Sound Control Slider */}
-            <div className="flex items-center gap-1 sm:gap-1.5 px-1.5">
+            {/* Volume / Sound Control Slider (Scroll Wheel Enabled) */}
+            <div 
+              onWheel={(e) => {
+                e.preventDefault();
+                const delta = e.deltaY < 0 ? 0.05 : -0.05;
+                const nextVol = Math.max(0, Math.min(1, Math.round((volume + delta) * 100) / 100));
+                setVolume(nextVol);
+              }}
+              className="flex items-center gap-1 sm:gap-1.5 px-1.5 cursor-ew-resize select-none"
+              title={`Volume: ${Math.round(volume * 100)}% — Scroll wheel adjusts`}
+            >
               <button
                 onClick={toggleMute}
                 className="p-0.5 rounded text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white cursor-pointer"
@@ -276,7 +294,7 @@ export const AppHeader: React.FC<{
                 value={isMuted ? 0 : volume}
                 onChange={(e) => setVolume(parseFloat(e.target.value))}
                 className="w-11 sm:w-13 md:w-16 h-1.5 accent-indigo-600 cursor-pointer"
-                title={`Volume: ${Math.round(volume * 100)}%`}
+                title={`Volume: ${Math.round(volume * 100)}% — Scroll wheel adjusts`}
               />
               <span className="text-[10px] font-mono font-semibold text-slate-600 dark:text-zinc-400 min-w-[24px] sm:min-w-[28px] tabular-nums select-none">
                 {isMuted ? '0%' : `${Math.round(volume * 100)}%`}

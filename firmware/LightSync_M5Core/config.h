@@ -58,7 +58,7 @@ enum ScreenMode {
     SCREEN_COUNT
 };
 
-// 9 Visual Effects matching Web Studio
+// 10 Visual Effects matching Web Studio
 enum EffectType {
     EFFECT_BOUNCE = 0,
     EFFECT_RIPPLE,
@@ -69,6 +69,7 @@ enum EffectType {
     EFFECT_SPRINKLE,
     EFFECT_RAIN,
     EFFECT_WAVE,
+    EFFECT_BLINK,
     EFFECT_COUNT
 };
 

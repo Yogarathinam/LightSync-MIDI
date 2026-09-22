@@ -357,6 +357,19 @@ public:
                 }
                 break;
             }
+
+            case EFFECT_BLINK: {
+                int pIdx = allocateParticle();
+                if (pIdx >= 0) {
+                    particles[pIdx].active = true;
+                    particles[pIdx].type = EFFECT_BLINK;
+                    particles[pIdx].pos = centerLed;
+                    particles[pIdx].color = col;
+                    particles[pIdx].life = 1.0f;
+                    particles[pIdx].spread = max(1.0f, config.spread * 0.8f);
+                }
+                break;
+            }
             default: break;
         }
     }
@@ -530,6 +543,16 @@ public:
                             float waveVal = sinf(dist * 0.5f - p.phase) * 0.5f + 0.5f;
                             addSpreadLuminance(idx, 1.0f, p.color, waveVal * p.life);
                         }
+                    }
+                    break;
+                }
+
+                case EFFECT_BLINK: {
+                    // Instantaneous flash with smooth, snappy quadratic decay
+                    p.life -= dt * (2.8f * config.speed);
+                    if (p.life > 0.0f) {
+                        float fadeCurve = p.life * p.life;
+                        addSpreadLuminance(p.pos, p.spread, p.color, fadeCurve * 1.25f);
                     }
                     break;
                 }

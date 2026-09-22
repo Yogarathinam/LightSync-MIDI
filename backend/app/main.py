@@ -140,6 +140,30 @@ def disconnect_device():
     serial_manager.disconnect()
     return {"success": True, "port": None, "simulated": True}
 
+# User Settings Persistence File
+SETTINGS_FILE = Path("data/user_settings.json")
+
+@app.get("/api/settings")
+def get_user_settings():
+    if SETTINGS_FILE.exists():
+        try:
+            with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception as e:
+            logger.error(f"Error loading user settings: {e}")
+    return {}
+
+@app.post("/api/settings")
+def save_user_settings(payload: Dict[str, Any]):
+    try:
+        SETTINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
+        with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
+            json.dump(payload, f, indent=2)
+        return {"status": "ok", "saved": True}
+    except Exception as e:
+        logger.error(f"Error saving user settings: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.get("/api/songs")
 def get_songs():

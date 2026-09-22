@@ -4,7 +4,6 @@ import {
   Send, 
   Copy, 
   Check, 
-  Bookmark, 
   Palette, 
   Gauge, 
   Flame, 
@@ -21,6 +20,7 @@ import { useLightSyncStore, COLOR_SYNC_PRESETS } from '../../store/useLightSyncS
 import { EffectType, ColorSyncPresetId, FlowKeyTrailStyle } from '../../types';
 
 const EFFECTS_CATALOG: { id: EffectType; name: string; desc: string }[] = [
+  { id: 'blink', name: 'Blink & Fade', desc: 'Instantaneous key flash with smooth subtle decay' },
   { id: 'bounce', name: 'Bounce', desc: 'Damped ballistic particle motion' },
   { id: 'ripple', name: 'Ripple', desc: 'Expanding sinusoidal ring crest' },
   { id: 'pulse', name: 'Pulse', desc: 'Radial breathing heart rhythm' },
@@ -48,13 +48,12 @@ export const EffectStudio: React.FC = () => {
     bgConfig,
     setBgConfigParam,
     applyColorPreset,
-    presets, 
-    loadPreset, 
     addConsoleLog,
     wsSender 
   } = useLightSyncStore();
 
-  const [activeSection, setActiveSection] = useState<'flow' | 'background' | 'led'>('flow');
+  // Natural structured order: 1. LED Effects -> 2. FlowKey -> 3. Grid & Background
+  const [activeSection, setActiveSection] = useState<'led' | 'flow' | 'background'>('led');
   const [protocolFormat, setProtocolFormat] = useState<'cli' | 'json'>('cli');
   const [copied, setCopied] = useState(false);
   const [sending, setSending] = useState(false);
@@ -104,57 +103,245 @@ export const EffectStudio: React.FC = () => {
     setTimeout(() => setSending(false), 800);
   };
 
-  const quickColors = ['#00f0ff', '#6366f1', '#ec4899', '#f59e0b', '#10b981', '#38bdf8', '#8b5cf6'];
+  const quickColors = ['#00f0ff', '#6366f1', '#ec4899', '#f59e0b', '#10b981', '#38bdf8', '#8b5cf6', '#ef4444', '#ffffff'];
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
       
-      {/* Left Column: Visualizer & Engine Controls (8 Cols) */}
+      {/* Left Column: Reimagined Hierarchical Controls (8 Cols) */}
       <div className="lg:col-span-8 flex flex-col gap-4">
         
-        {/* Navigation Tabs for Studio Sub-Sections */}
-        <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-zinc-900/90 rounded-2xl border border-slate-200 dark:border-zinc-800 shrink-0">
+        {/* Navigation Tabs for Studio Sub-Sections (Ordered 1. LED -> 2. FlowKey -> 3. Grid) */}
+        <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-zinc-900/90 rounded-2xl border border-slate-200 dark:border-zinc-800 shrink-0 shadow-sm">
+          <button
+            onClick={() => setActiveSection('led')}
+            className={`flex-1 py-2 px-3 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+              activeSection === 'led'
+                ? 'bg-white dark:bg-zinc-800 text-amber-500 dark:text-amber-400 shadow-sm border border-slate-200/80 dark:border-zinc-700 font-bold'
+                : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <Zap className="w-3.5 h-3.5 text-amber-500" />
+            <span>1. LED Strip Effects</span>
+          </button>
+
           <button
             onClick={() => setActiveSection('flow')}
-            className={`flex-1 py-2 px-3 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-all ${
+            className={`flex-1 py-2 px-3 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer ${
               activeSection === 'flow'
-                ? 'bg-white dark:bg-zinc-800 text-indigo-600 dark:text-white shadow-sm border border-slate-200/80 dark:border-zinc-700'
+                ? 'bg-white dark:bg-zinc-800 text-indigo-600 dark:text-white shadow-sm border border-slate-200/80 dark:border-zinc-700 font-bold'
                 : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
             <Activity className="w-3.5 h-3.5 text-indigo-500" />
-            <span>Flow Key Trails</span>
+            <span>2. FlowKey Waterfall</span>
           </button>
 
           <button
             onClick={() => setActiveSection('background')}
-            className={`flex-1 py-2 px-3 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-all ${
+            className={`flex-1 py-2 px-3 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer ${
               activeSection === 'background'
-                ? 'bg-white dark:bg-zinc-800 text-indigo-600 dark:text-white shadow-sm border border-slate-200/80 dark:border-zinc-700'
+                ? 'bg-white dark:bg-zinc-800 text-sky-500 dark:text-sky-400 shadow-sm border border-slate-200/80 dark:border-zinc-700 font-bold'
                 : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
-            <Grid className="w-3.5 h-3.5 text-cyan-500" />
-            <span>Runway & Grid FX</span>
-          </button>
-
-          <button
-            onClick={() => setActiveSection('led')}
-            className={`flex-1 py-2 px-3 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-all ${
-              activeSection === 'led'
-                ? 'bg-white dark:bg-zinc-800 text-indigo-600 dark:text-white shadow-sm border border-slate-200/80 dark:border-zinc-700'
-                : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white'
-            }`}
-          >
-            <Layers className="w-3.5 h-3.5 text-emerald-500" />
-            <span>WS2812B Hardware LED</span>
+            <Grid className="w-3.5 h-3.5 text-sky-500" />
+            <span>3. Grid & 3D Runway</span>
           </button>
         </div>
 
-        {/* SECTION 1: Flow Key Visualizer & Trails */}
+        {/* SECTION 1: LED Strip Effects (Displayed First) */}
+        {activeSection === 'led' && (
+          <div className="flex flex-col gap-4">
+            {/* Catalog Grid of 10 Effects */}
+            <div className="bg-white dark:bg-black rounded-2xl border border-slate-200 dark:border-zinc-800 p-5 shadow-sm transition-colors">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-zinc-800 mb-4">
+                <div>
+                  <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    <Zap className="w-4 h-4 text-amber-500" />
+                    WS2812B Hardware Strip Effects
+                  </h2>
+                  <p className="text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5">
+                    Select active optical animation running on physical strip and visualizer
+                  </p>
+                </div>
+                <span className="text-[11px] font-mono text-amber-600 dark:text-amber-400 font-bold bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded border border-amber-200 dark:border-amber-800/60">
+                  {EFFECTS_CATALOG.length} EFFECTS
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+                {EFFECTS_CATALOG.map((eff) => {
+                  const isActive = effectConfig.effect === eff.id;
+                  return (
+                    <button
+                      key={eff.id}
+                      onClick={() => setEffectParam('effect', eff.id)}
+                      className={`p-3 rounded-xl border text-left transition-all flex flex-col justify-between gap-1 cursor-pointer ${
+                        isActive
+                          ? 'bg-amber-50/80 dark:bg-zinc-800 border-amber-500 dark:border-amber-400 shadow-sm'
+                          : 'bg-slate-50/50 dark:bg-zinc-950 border-slate-200/80 dark:border-zinc-800/80 hover:bg-slate-100 dark:hover:bg-zinc-900'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className={`text-xs font-bold ${isActive ? 'text-amber-600 dark:text-amber-300' : 'text-slate-800 dark:text-zinc-200'}`}>
+                          {eff.name}
+                        </span>
+                        {isActive && <CheckCircle2 className="w-3.5 h-3.5 text-amber-500 shrink-0" />}
+                      </div>
+                      <span className="text-[10px] text-slate-500 dark:text-zinc-400 line-clamp-2 leading-tight">
+                        {eff.desc}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* LED Physics & Hardware Sliders */}
+            <div className="bg-white dark:bg-black rounded-2xl border border-slate-200 dark:border-zinc-800 p-5 shadow-sm transition-colors">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-zinc-800 mb-4">
+                <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                  <Gauge className="w-4 h-4 text-amber-500" />
+                  LED Strip Physics & Optical Dynamics
+                </h2>
+                <span className="text-[11px] font-mono text-slate-400">FastLED Parameters</span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Speed */}
+                <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-zinc-950 border border-slate-200/80 dark:border-zinc-800/80 flex flex-col gap-2">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-slate-700 dark:text-zinc-300 font-semibold flex items-center gap-1.5">
+                      <Gauge className="w-3.5 h-3.5 text-indigo-500" /> Animation Speed
+                    </span>
+                    <span className="font-mono text-indigo-600 dark:text-indigo-400 font-bold">{effectConfig.speed.toFixed(2)}x</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0.1"
+                    max="4.0"
+                    step="0.05"
+                    value={effectConfig.speed}
+                    onChange={(e) => setEffectParam('speed', parseFloat(e.target.value))}
+                    className="w-full accent-indigo-600 h-1.5 bg-slate-200 dark:bg-zinc-800 rounded-lg cursor-pointer"
+                  />
+                </div>
+
+                {/* Decay / Fade */}
+                <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-zinc-950 border border-slate-200/80 dark:border-zinc-800/80 flex flex-col gap-2">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-slate-700 dark:text-zinc-300 font-semibold flex items-center gap-1.5">
+                      <Flame className="w-3.5 h-3.5 text-amber-500" /> Decay Rate / Fade Trail
+                    </span>
+                    <span className="font-mono text-amber-600 dark:text-amber-400 font-bold">{effectConfig.decay.toFixed(2)}</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0.50"
+                    max="0.98"
+                    step="0.01"
+                    value={effectConfig.decay}
+                    onChange={(e) => setEffectParam('decay', parseFloat(e.target.value))}
+                    className="w-full accent-amber-500 h-1.5 bg-slate-200 dark:bg-zinc-800 rounded-lg cursor-pointer"
+                  />
+                </div>
+
+                {/* Spread Width */}
+                <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-zinc-950 border border-slate-200/80 dark:border-zinc-800/80 flex flex-col gap-2">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-slate-700 dark:text-zinc-300 font-semibold flex items-center gap-1.5">
+                      <Maximize2 className="w-3.5 h-3.5 text-emerald-500" /> Spatial Key Spread
+                    </span>
+                    <span className="font-mono text-emerald-600 dark:text-emerald-400 font-bold">{effectConfig.spread.toFixed(1)} LEDs</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="1.0"
+                    max="12.0"
+                    step="0.5"
+                    value={effectConfig.spread}
+                    onChange={(e) => setEffectParam('spread', parseFloat(e.target.value))}
+                    className="w-full accent-emerald-500 h-1.5 bg-slate-200 dark:bg-zinc-800 rounded-lg cursor-pointer"
+                  />
+                </div>
+
+                {/* Brightness */}
+                <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-zinc-950 border border-slate-200/80 dark:border-zinc-800/80 flex flex-col gap-2">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-slate-700 dark:text-zinc-300 font-semibold flex items-center gap-1.5">
+                      <Sun className="w-3.5 h-3.5 text-yellow-500" /> FastLED Strip Brightness
+                    </span>
+                    <span className="font-mono text-yellow-600 dark:text-yellow-400 font-bold">{effectConfig.brightness} / 255</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="5"
+                    max="255"
+                    step="5"
+                    value={effectConfig.brightness}
+                    onChange={(e) => setEffectParam('brightness', parseInt(e.target.value, 10))}
+                    className="w-full accent-yellow-500 h-1.5 bg-slate-200 dark:bg-zinc-800 rounded-lg cursor-pointer"
+                  />
+                </div>
+
+                {/* Manual Palette Controls */}
+                <div className="sm:col-span-2 p-3.5 rounded-xl bg-slate-50 dark:bg-zinc-950 border border-slate-200/80 dark:border-zinc-800/80 flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
+                      <Palette className="w-3.5 h-3.5 text-indigo-500" />
+                      <span className="text-xs font-semibold text-slate-700 dark:text-zinc-300">Primary Color:</span>
+                      <input
+                        type="color"
+                        value={effectConfig.primaryColor}
+                        onChange={(e) => setEffectParam('primaryColor', e.target.value)}
+                        className="w-7 h-7 rounded border-0 bg-transparent cursor-pointer"
+                      />
+                    </div>
+
+                    <div className="flex items-center gap-2 pl-3 border-l border-slate-200 dark:border-zinc-800">
+                      <span className="text-xs font-semibold text-slate-700 dark:text-zinc-300">Secondary:</span>
+                      <input
+                        type="color"
+                        value={effectConfig.secondaryColor}
+                        onChange={(e) => setEffectParam('secondaryColor', e.target.value)}
+                        className="w-7 h-7 rounded border-0 bg-transparent cursor-pointer"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-1.5">
+                      {quickColors.map((hex) => (
+                        <button
+                          key={hex}
+                          onClick={() => setEffectParam('primaryColor', hex)}
+                          style={{ backgroundColor: hex }}
+                          className="w-5 h-5 rounded-full border border-white/20 hover:scale-110 transition-transform cursor-pointer"
+                          title={hex}
+                        />
+                      ))}
+                    </div>
+
+                    <label className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-zinc-300 cursor-pointer pl-3 border-l border-slate-200 dark:border-zinc-800">
+                      <input
+                        type="checkbox"
+                        checked={effectConfig.rainbow}
+                        onChange={(e) => setEffectParam('rainbow', e.target.checked)}
+                        className="accent-indigo-600 rounded cursor-pointer"
+                      />
+                      <span>Rainbow Spectrum</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* SECTION 2: Flow Key Visualizer & Trails (Displayed Second) */}
         {activeSection === 'flow' && (
           <div className="flex flex-col gap-4">
-            
             {/* Trail Styles Selector */}
             <div className="bg-white dark:bg-black rounded-2xl border border-slate-200 dark:border-zinc-800 p-5 shadow-sm transition-colors">
               <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-zinc-800 mb-4">
@@ -172,7 +359,7 @@ export const EffectStudio: React.FC = () => {
                     <button
                       key={st.id}
                       onClick={() => setFlowKeyParam('trailStyle', st.id)}
-                      className={`p-3 rounded-xl border text-left transition-all flex flex-col gap-1 ${
+                      className={`p-3 rounded-xl border text-left transition-all flex flex-col gap-1 cursor-pointer ${
                         isActive
                           ? 'bg-indigo-50/70 dark:bg-zinc-800 border-indigo-500 dark:border-zinc-600 elevation-1'
                           : 'bg-slate-50/50 dark:bg-zinc-950 border-slate-200/80 dark:border-zinc-800/80 hover:bg-slate-100 dark:hover:bg-zinc-900'
@@ -256,7 +443,7 @@ export const EffectStudio: React.FC = () => {
                     max="100"
                     step="5"
                     value={flowKeyConfig.glowIntensity}
-                    onChange={(e) => setFlowKeyParam('glowIntensity', parseInt(e.target.value))}
+                    onChange={(e) => setFlowKeyParam('glowIntensity', parseInt(e.target.value, 10))}
                     className="w-full accent-amber-500 h-1.5 bg-slate-200 dark:bg-zinc-800 rounded-lg cursor-pointer"
                   />
                 </div>
@@ -288,12 +475,49 @@ export const EffectStudio: React.FC = () => {
                   </label>
                 </div>
               </div>
-            </div>
 
+              {/* NEW: Custom FlowKey Color Controls */}
+              <div className="mt-4 p-3.5 rounded-xl bg-slate-50 dark:bg-zinc-950 border border-slate-200/80 dark:border-zinc-800/80 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <Palette className="w-3.5 h-3.5 text-indigo-500" />
+                    <span className="text-xs font-semibold text-slate-700 dark:text-zinc-300">Flow Note Primary:</span>
+                    <input
+                      type="color"
+                      value={flowKeyConfig.customColor || '#00f0ff'}
+                      onChange={(e) => setFlowKeyParam('customColor', e.target.value)}
+                      className="w-7 h-7 rounded border-0 bg-transparent cursor-pointer"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-2 pl-3 border-l border-slate-200 dark:border-zinc-800">
+                    <span className="text-xs font-semibold text-slate-700 dark:text-zinc-300">Flow Secondary / Glow:</span>
+                    <input
+                      type="color"
+                      value={flowKeyConfig.customSecondaryColor || '#ec4899'}
+                      onChange={(e) => setFlowKeyParam('customSecondaryColor', e.target.value)}
+                      className="w-7 h-7 rounded border-0 bg-transparent cursor-pointer"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  {quickColors.map((hex) => (
+                    <button
+                      key={hex}
+                      onClick={() => setFlowKeyParam('customColor', hex)}
+                      style={{ backgroundColor: hex }}
+                      className="w-5 h-5 rounded-full border border-white/20 hover:scale-110 transition-transform cursor-pointer"
+                      title={hex}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
-        {/* SECTION 2: Runway Space & Grid FX */}
+        {/* SECTION 3: Runway Space & Grid FX (Displayed Third) */}
         {activeSection === 'background' && (
           <div className="bg-white dark:bg-black rounded-2xl border border-slate-200 dark:border-zinc-800 p-5 shadow-sm transition-colors flex flex-col gap-4">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-zinc-800">
@@ -320,7 +544,7 @@ export const EffectStudio: React.FC = () => {
                   type="checkbox"
                   checked={bgConfig.showVerticalPitchLanes}
                   onChange={(e) => setBgConfigParam('showVerticalPitchLanes', e.target.checked)}
-                  className="accent-indigo-600 w-4 h-4 rounded cursor-pointer"
+                  className="accent-cyan-500 w-4 h-4 rounded cursor-pointer"
                 />
               </div>
 
@@ -328,256 +552,124 @@ export const EffectStudio: React.FC = () => {
               <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-zinc-950 border border-slate-200/80 dark:border-zinc-800/80 flex items-center justify-between">
                 <div>
                   <h4 className="text-xs font-bold text-slate-800 dark:text-zinc-200">Key Region Zebra Tinting</h4>
-                  <p className="text-[10px] text-slate-500 dark:text-zinc-400">Distinct column tinting for black vs white keys</p>
+                  <p className="text-[10px] text-slate-500 dark:text-zinc-400">Darker obsidian lanes behind black keys</p>
                 </div>
                 <input
                   type="checkbox"
                   checked={bgConfig.showKeyRegions}
                   onChange={(e) => setBgConfigParam('showKeyRegions', e.target.checked)}
-                  className="accent-indigo-600 w-4 h-4 rounded cursor-pointer"
+                  className="accent-cyan-500 w-4 h-4 rounded cursor-pointer"
                 />
               </div>
 
-              {/* Octave Dividers & C-Markers */}
+              {/* Octave Boundary Dividers */}
               <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-zinc-950 border border-slate-200/80 dark:border-zinc-800/80 flex items-center justify-between">
                 <div>
-                  <h4 className="text-xs font-bold text-slate-800 dark:text-zinc-200">Octave Boundaries & Markers</h4>
-                  <p className="text-[10px] text-slate-500 dark:text-zinc-400">Prominent dividers & C1, C2, C3 badges</p>
+                  <h4 className="text-xs font-bold text-slate-800 dark:text-zinc-200">Octave Boundary Dividers</h4>
+                  <p className="text-[10px] text-slate-500 dark:text-zinc-400">Vivid boundary laser columns at every C note</p>
                 </div>
                 <input
                   type="checkbox"
                   checked={bgConfig.showOctaveDividers}
                   onChange={(e) => setBgConfigParam('showOctaveDividers', e.target.checked)}
-                  className="accent-indigo-600 w-4 h-4 rounded cursor-pointer"
+                  className="accent-cyan-500 w-4 h-4 rounded cursor-pointer"
                 />
               </div>
 
-              {/* Horizontal Time & Measure Divisions */}
+              {/* Horizontal Measure Lines */}
               <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-zinc-950 border border-slate-200/80 dark:border-zinc-800/80 flex items-center justify-between">
                 <div>
-                  <h4 className="text-xs font-bold text-slate-800 dark:text-zinc-200">Horizontal Time & Measure Bars</h4>
-                  <p className="text-[10px] text-slate-500 dark:text-zinc-400">Horizontal lines giving sense of distance/time</p>
+                  <h4 className="text-xs font-bold text-slate-800 dark:text-zinc-200">Horizontal Beat & Measure Lines</h4>
+                  <p className="text-[10px] text-slate-500 dark:text-zinc-400">Horizontal distance lines moving into perspective</p>
                 </div>
                 <input
                   type="checkbox"
                   checked={bgConfig.showHorizontalBeatLines}
                   onChange={(e) => setBgConfigParam('showHorizontalBeatLines', e.target.checked)}
-                  className="accent-indigo-600 w-4 h-4 rounded cursor-pointer"
+                  className="accent-cyan-500 w-4 h-4 rounded cursor-pointer"
                 />
               </div>
 
-              {/* Subtle Intermediate Beat Grid */}
+              {/* Subtle Grid Subdivisions */}
               <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-zinc-950 border border-slate-200/80 dark:border-zinc-800/80 flex items-center justify-between">
                 <div>
-                  <h4 className="text-xs font-bold text-slate-800 dark:text-zinc-200">Subtle Beat Grid Lines</h4>
-                  <p className="text-[10px] text-slate-500 dark:text-zinc-400">Fine sub-measure rhythm grid lines</p>
+                  <h4 className="text-xs font-bold text-slate-800 dark:text-zinc-200">Subtle Intermediate Grid</h4>
+                  <p className="text-[10px] text-slate-500 dark:text-zinc-400">Subdivisions between measure bars</p>
                 </div>
                 <input
                   type="checkbox"
                   checked={bgConfig.showSubtleGrid}
                   onChange={(e) => setBgConfigParam('showSubtleGrid', e.target.checked)}
-                  className="accent-indigo-600 w-4 h-4 rounded cursor-pointer"
+                  className="accent-cyan-500 w-4 h-4 rounded cursor-pointer"
                 />
               </div>
 
-              {/* Animated Moving Time Grid */}
+              {/* Animated Scrolling Grid */}
               <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-zinc-950 border border-slate-200/80 dark:border-zinc-800/80 flex items-center justify-between">
                 <div>
-                  <h4 className="text-xs font-bold text-slate-800 dark:text-zinc-200">Flowing Time-Space Motion</h4>
-                  <p className="text-[10px] text-slate-500 dark:text-zinc-400">Moving grid synchronized to music tempo</p>
+                  <h4 className="text-xs font-bold text-slate-800 dark:text-zinc-200">Animated Scrolling Grid</h4>
+                  <p className="text-[10px] text-slate-500 dark:text-zinc-400">Syncs perspective grid velocity with tempo</p>
                 </div>
                 <input
                   type="checkbox"
                   checked={bgConfig.scrollGrid}
                   onChange={(e) => setBgConfigParam('scrollGrid', e.target.checked)}
-                  className="accent-indigo-600 w-4 h-4 rounded cursor-pointer"
+                  className="accent-cyan-500 w-4 h-4 rounded cursor-pointer"
                 />
               </div>
             </div>
-          </div>
-        )}
 
-        {/* SECTION 3: FastLED Strip Engine */}
-        {activeSection === 'led' && (
-          <div className="flex flex-col gap-4">
-            
-            {/* Effect Selector Grid */}
-            <div className="bg-white dark:bg-black rounded-2xl border border-slate-200 dark:border-zinc-800 p-5 shadow-sm transition-colors">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-zinc-800 mb-4">
-                <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-indigo-500" />
-                  Effect Engine Selection
-                </h2>
-                <span className="text-[11px] font-mono text-slate-400">9 FastLED Renderers</span>
-              </div>
+            {/* NEW: Custom Grid & Runway Color Palette Pickers */}
+            <div className="p-4 rounded-xl bg-slate-50 dark:bg-zinc-950 border border-slate-200/80 dark:border-zinc-800/80 flex flex-col gap-3">
+              <h3 className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                <Palette className="w-3.5 h-3.5 text-sky-500" />
+                Custom Runway & Grid Color Themes
+              </h3>
 
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 gap-2.5">
-                {EFFECTS_CATALOG.map((eff) => {
-                  const isActive = effectConfig.effect === eff.id;
-                  return (
-                    <button
-                      key={eff.id}
-                      onClick={() => setEffectParam('effect', eff.id)}
-                      className={`p-3 rounded-xl border text-left transition-all flex flex-col gap-1 ${
-                        isActive
-                          ? 'bg-indigo-50/70 dark:bg-zinc-800 border-indigo-500 dark:border-zinc-600 elevation-1'
-                          : 'bg-slate-50/50 dark:bg-zinc-950 border-slate-200/80 dark:border-zinc-800/80 hover:bg-slate-100 dark:hover:bg-zinc-900'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className={`text-xs font-bold ${isActive ? 'text-indigo-600 dark:text-white' : 'text-slate-700 dark:text-zinc-300'}`}>
-                          {eff.name}
-                        </span>
-                        {isActive && <span className="w-2 h-2 rounded-full bg-indigo-500" />}
-                      </div>
-                      <span className="text-[10px] text-slate-500 dark:text-zinc-400 leading-tight">
-                        {eff.desc}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Dynamic Parameter Sliders */}
-            <div className="bg-white dark:bg-black rounded-2xl border border-slate-200 dark:border-zinc-800 p-5 shadow-sm transition-colors">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-zinc-800 mb-4">
-                <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                  <Layers className="w-4 h-4 text-indigo-500" />
-                  Hardware Parameter Sliders
-                </h2>
-                <span className="text-[11px] font-mono text-slate-400">Target: WS2812B 144/m</span>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Speed */}
-                <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-zinc-950 border border-slate-200/80 dark:border-zinc-800/80 flex flex-col gap-2">
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="text-slate-700 dark:text-zinc-300 font-semibold flex items-center gap-1.5">
-                      <Gauge className="w-3.5 h-3.5 text-indigo-500" /> Speed
-                    </span>
-                    <span className="font-mono text-indigo-600 dark:text-indigo-400 font-bold">{effectConfig.speed.toFixed(2)}x</span>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+                {/* Grid Lines Color */}
+                <div className="flex items-center justify-between p-2.5 rounded-lg bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800">
+                  <span className="text-xs font-medium text-slate-700 dark:text-zinc-300">Grid Lines:</span>
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="color"
+                      value={bgConfig.gridColor || '#6366f1'}
+                      onChange={(e) => setBgConfigParam('gridColor', e.target.value)}
+                      className="w-6 h-6 rounded border-0 bg-transparent cursor-pointer"
+                    />
+                    <span className="text-[10px] font-mono text-slate-500">{bgConfig.gridColor || '#6366f1'}</span>
                   </div>
-                  <input
-                    type="range"
-                    min="0.1"
-                    max="4.0"
-                    step="0.05"
-                    value={effectConfig.speed}
-                    onChange={(e) => setEffectParam('speed', parseFloat(e.target.value))}
-                    className="w-full accent-indigo-600 h-1.5 bg-slate-200 dark:bg-zinc-800 rounded-lg cursor-pointer"
-                  />
                 </div>
 
-                {/* Decay / Fade */}
-                <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-zinc-950 border border-slate-200/80 dark:border-zinc-800/80 flex flex-col gap-2">
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="text-slate-700 dark:text-zinc-300 font-semibold flex items-center gap-1.5">
-                      <Flame className="w-3.5 h-3.5 text-amber-500" /> Decay / Fade
-                    </span>
-                    <span className="font-mono text-amber-600 dark:text-amber-400 font-bold">{effectConfig.decay.toFixed(2)}</span>
+                {/* Pitch Lanes Color */}
+                <div className="flex items-center justify-between p-2.5 rounded-lg bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800">
+                  <span className="text-xs font-medium text-slate-700 dark:text-zinc-300">Pitch Lanes:</span>
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="color"
+                      value={bgConfig.laneColor || '#38bdf8'}
+                      onChange={(e) => setBgConfigParam('laneColor', e.target.value)}
+                      className="w-6 h-6 rounded border-0 bg-transparent cursor-pointer"
+                    />
+                    <span className="text-[10px] font-mono text-slate-500">{bgConfig.laneColor || '#38bdf8'}</span>
                   </div>
-                  <input
-                    type="range"
-                    min="0.50"
-                    max="0.98"
-                    step="0.01"
-                    value={effectConfig.decay}
-                    onChange={(e) => setEffectParam('decay', parseFloat(e.target.value))}
-                    className="w-full accent-amber-500 h-1.5 bg-slate-200 dark:bg-zinc-800 rounded-lg cursor-pointer"
-                  />
                 </div>
 
-                {/* Spread Width */}
-                <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-zinc-950 border border-slate-200/80 dark:border-zinc-800/80 flex flex-col gap-2">
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="text-slate-700 dark:text-zinc-300 font-semibold flex items-center gap-1.5">
-                      <Maximize2 className="w-3.5 h-3.5 text-emerald-500" /> Spread Width
-                    </span>
-                    <span className="font-mono text-emerald-600 dark:text-emerald-400 font-bold">{effectConfig.spread.toFixed(1)} LEDs</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="1.0"
-                    max="12.0"
-                    step="0.5"
-                    value={effectConfig.spread}
-                    onChange={(e) => setEffectParam('spread', parseFloat(e.target.value))}
-                    className="w-full accent-emerald-500 h-1.5 bg-slate-200 dark:bg-zinc-800 rounded-lg cursor-pointer"
-                  />
-                </div>
-
-                {/* Brightness */}
-                <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-zinc-950 border border-slate-200/80 dark:border-zinc-800/80 flex flex-col gap-2">
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="text-slate-700 dark:text-zinc-300 font-semibold flex items-center gap-1.5">
-                      <Sun className="w-3.5 h-3.5 text-yellow-500" /> Strip Brightness
-                    </span>
-                    <span className="font-mono text-yellow-600 dark:text-yellow-400 font-bold">{effectConfig.brightness} / 255</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="20"
-                    max="255"
-                    step="5"
-                    value={effectConfig.brightness}
-                    onChange={(e) => setEffectParam('brightness', parseInt(e.target.value))}
-                    className="w-full accent-yellow-500 h-1.5 bg-slate-200 dark:bg-zinc-800 rounded-lg cursor-pointer"
-                  />
-                </div>
-
-                {/* Manual Palette Controls */}
-                <div className="sm:col-span-2 p-3.5 rounded-xl bg-slate-50 dark:bg-zinc-950 border border-slate-200/80 dark:border-zinc-800/80 flex flex-wrap items-center justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-2">
-                      <Palette className="w-3.5 h-3.5 text-indigo-500" />
-                      <span className="text-xs font-semibold text-slate-700 dark:text-zinc-300">Primary Color:</span>
-                      <input
-                        type="color"
-                        value={effectConfig.primaryColor}
-                        onChange={(e) => setEffectParam('primaryColor', e.target.value)}
-                        className="w-7 h-7 rounded border-0 bg-transparent cursor-pointer"
-                      />
-                    </div>
-
-                    <div className="flex items-center gap-2 pl-3 border-l border-slate-200 dark:border-zinc-800">
-                      <span className="text-xs font-semibold text-slate-700 dark:text-zinc-300">Secondary:</span>
-                      <input
-                        type="color"
-                        value={effectConfig.secondaryColor}
-                        onChange={(e) => setEffectParam('secondaryColor', e.target.value)}
-                        className="w-7 h-7 rounded border-0 bg-transparent cursor-pointer"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-1.5">
-                      {quickColors.map((hex) => (
-                        <button
-                          key={hex}
-                          onClick={() => setEffectParam('primaryColor', hex)}
-                          style={{ backgroundColor: hex }}
-                          className="w-5 h-5 rounded-full border border-white/20 hover:scale-110 transition-transform"
-                          title={hex}
-                        />
-                      ))}
-                    </div>
-
-                    <label className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-zinc-300 cursor-pointer pl-3 border-l border-slate-200 dark:border-zinc-800">
-                      <input
-                        type="checkbox"
-                        checked={effectConfig.rainbow}
-                        onChange={(e) => setEffectParam('rainbow', e.target.checked)}
-                        className="accent-indigo-600 rounded"
-                      />
-                      <span>Rainbow</span>
-                    </label>
+                {/* Atmospheric Haze Glow */}
+                <div className="flex items-center justify-between p-2.5 rounded-lg bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800">
+                  <span className="text-xs font-medium text-slate-700 dark:text-zinc-300">Runway Haze:</span>
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="color"
+                      value={bgConfig.hazeColor || '#a855f7'}
+                      onChange={(e) => setBgConfigParam('hazeColor', e.target.value)}
+                      className="w-6 h-6 rounded border-0 bg-transparent cursor-pointer"
+                    />
+                    <span className="text-[10px] font-mono text-slate-500">{bgConfig.hazeColor || '#a855f7'}</span>
                   </div>
                 </div>
               </div>
             </div>
-
           </div>
         )}
 
@@ -611,7 +703,7 @@ export const EffectStudio: React.FC = () => {
                 <button
                   key={presetId}
                   onClick={() => applyColorPreset(presetId)}
-                  className={`w-full p-2.5 rounded-xl border text-left transition-all flex items-center justify-between group ${
+                  className={`w-full p-2.5 rounded-xl border text-left transition-all flex items-center justify-between group cursor-pointer ${
                     isSelected
                       ? 'bg-indigo-50/80 dark:bg-zinc-800/90 border-indigo-500 dark:border-indigo-400 shadow-sm'
                       : 'bg-slate-50/50 dark:bg-zinc-950 border-slate-200/80 dark:border-zinc-800/80 hover:bg-slate-100 dark:hover:bg-zinc-900'
@@ -649,36 +741,23 @@ export const EffectStudio: React.FC = () => {
               <Send className="w-3.5 h-3.5 text-emerald-500" />
               M5Stack Hardware Sync
             </h2>
-            <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 font-bold">
-              READY
-            </span>
-          </div>
-
-          <button
-            onClick={handleSendToDevice}
-            disabled={sending}
-            className="w-full py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-sky-600 hover:from-indigo-500 hover:to-sky-500 text-white font-bold text-xs shadow-md shadow-indigo-600/20 flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
-          >
-            {sending ? <Check className="w-4 h-4 text-emerald-300" /> : <Send className="w-3.5 h-3.5" />}
-            <span>{sending ? 'Parameters Synced!' : 'Apply to M5Stack Strip'}</span>
-          </button>
-
-          {/* Protocol Format Switcher */}
-          <div className="flex items-center justify-between text-xs bg-slate-100 dark:bg-zinc-900 p-1 rounded-xl border border-slate-200 dark:border-zinc-800">
-            <span className="text-slate-500 dark:text-zinc-400 px-1.5 text-[11px] font-medium">Format:</span>
-            <div className="flex gap-1">
+            <div className="flex items-center gap-1 bg-slate-100 dark:bg-zinc-900 p-0.5 rounded-lg border border-slate-200 dark:border-zinc-800">
               <button
                 onClick={() => setProtocolFormat('cli')}
-                className={`px-2 py-0.5 rounded-lg font-mono text-[10px] transition-all ${
-                  protocolFormat === 'cli' ? 'bg-white dark:bg-zinc-800 text-indigo-600 dark:text-white font-bold elevation-1' : 'text-slate-500 dark:text-zinc-400'
+                className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold cursor-pointer ${
+                  protocolFormat === 'cli'
+                    ? 'bg-white dark:bg-zinc-800 text-slate-900 dark:text-white shadow-xs'
+                    : 'text-slate-500 dark:text-zinc-400'
                 }`}
               >
-                CLI Text
+                CLI
               </button>
               <button
                 onClick={() => setProtocolFormat('json')}
-                className={`px-2 py-0.5 rounded-lg font-mono text-[10px] transition-all ${
-                  protocolFormat === 'json' ? 'bg-white dark:bg-zinc-800 text-indigo-600 dark:text-white font-bold elevation-1' : 'text-slate-500 dark:text-zinc-400'
+                className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold cursor-pointer ${
+                  protocolFormat === 'json'
+                    ? 'bg-white dark:bg-zinc-800 text-slate-900 dark:text-white shadow-xs'
+                    : 'text-slate-500 dark:text-zinc-400'
                 }`}
               >
                 JSON
@@ -686,23 +765,26 @@ export const EffectStudio: React.FC = () => {
             </div>
           </div>
 
-          {/* Command Payload Area */}
-          <div className="flex flex-col gap-1">
-            <div className="flex justify-between items-center text-[10px] text-slate-500 dark:text-zinc-400">
-              <span className="font-mono">Payload:</span>
-              <button
-                onClick={handleCopy}
-                className="text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-0.5"
-              >
-                {copied ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
-                <span>{copied ? 'Copied' : 'Copy'}</span>
-              </button>
-            </div>
-            <textarea
-              readOnly
-              value={getPayloadString()}
-              className="w-full h-24 bg-slate-50 dark:bg-zinc-950 text-slate-800 dark:text-emerald-400 font-mono text-[10px] p-2.5 rounded-xl border border-slate-200 dark:border-zinc-800 resize-none focus:outline-none select-all leading-tight"
-            />
+          <pre className="p-3 rounded-xl bg-slate-950 text-emerald-400 font-mono text-[11px] leading-relaxed overflow-x-auto border border-slate-800">
+            {getPayloadString()}
+          </pre>
+
+          <div className="flex gap-2">
+            <button
+              onClick={handleCopy}
+              className="flex-1 py-2 px-3 rounded-xl border border-slate-200 dark:border-zinc-800 text-xs font-medium text-slate-700 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-900 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+            >
+              {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+              <span>{copied ? 'Copied!' : 'Copy Code'}</span>
+            </button>
+            <button
+              onClick={handleSendToDevice}
+              disabled={sending}
+              className="flex-1 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-sm shadow-emerald-500/20 active:scale-98 cursor-pointer disabled:opacity-50"
+            >
+              <Send className="w-3.5 h-3.5" />
+              <span>{sending ? 'Pushing...' : 'Push to Strip'}</span>
+            </button>
           </div>
         </div>
 

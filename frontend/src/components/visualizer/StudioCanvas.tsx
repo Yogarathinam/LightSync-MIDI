@@ -145,8 +145,12 @@ function getNoteColors(pitch: number, effectConfig: EffectConfig, flowKeyConfig:
     return { primary: p, secondary: s };
   }
 
-  const p = hexToRgb(effectConfig.primaryColor);
-  const s = hexToRgb(effectConfig.secondaryColor || effectConfig.primaryColor);
+  // Use custom FlowKey colors if present, otherwise fallback to effectConfig primary/secondary
+  const pColor = flowKeyConfig.customColor || effectConfig.primaryColor;
+  const sColor = flowKeyConfig.customSecondaryColor || effectConfig.secondaryColor || pColor;
+
+  const p = hexToRgb(pColor);
+  const s = hexToRgb(sColor);
   return { primary: p, secondary: s };
 }
 
@@ -335,6 +339,11 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
         p.phase = 0;
         p.speed = effectConfig.speed * 0.2;
         p.spread = effectConfig.spread * 4.0;
+        break;
+      case 'blink':
+        p.pos = centerLed;
+        p.spread = Math.max(1.0, effectConfig.spread * 0.8);
+        p.life = 1.0;
         break;
     }
   }, [effectConfig, ledCount]);
@@ -605,10 +614,15 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
       const beatPulse = Math.pow(Math.sin((now * 0.002) * Math.PI), 6);
       const totalPulse = Math.max(beatPulse * 0.35, reactiveEnergy);
 
+      // Custom Color resolution for runway background and grid
+      const customHazeRgb = curBg.hazeColor ? hexToRgb(curBg.hazeColor) : { r: 99, g: 102, b: 241 };
+      const customLaneRgb = curBg.laneColor ? hexToRgb(curBg.laneColor) : (isDark ? { r: 71, g: 85, b: 105 } : { r: 148, g: 163, b: 184 });
+      const customGridRgb = curBg.gridColor ? hexToRgb(curBg.gridColor) : (isDark ? { r: 148, g: 163, b: 184 } : { r: 100, g: 116, b: 139 });
+
       const hazeGrad = ctx.createLinearGradient(0, ledBarTop, 0, waterfallTop);
       const hazeAlpha = (isDark ? 0.12 : 0.06) + totalPulse * 0.14;
-      hazeGrad.addColorStop(0, `rgba(99, 102, 241, ${hazeAlpha})`);
-      hazeGrad.addColorStop(0.5, `rgba(168, 85, 247, ${hazeAlpha * 0.45})`);
+      hazeGrad.addColorStop(0, `rgba(${customHazeRgb.r}, ${customHazeRgb.g}, ${customHazeRgb.b}, ${hazeAlpha})`);
+      hazeGrad.addColorStop(0.5, `rgba(${customHazeRgb.r}, ${customHazeRgb.g}, ${customHazeRgb.b}, ${hazeAlpha * 0.45})`);
       hazeGrad.addColorStop(1, 'transparent');
       ctx.fillStyle = hazeGrad;
       ctx.fillRect(16, waterfallTop, width - 32, waterfallHeight);
@@ -665,7 +679,7 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
           const geom = getKeyGeometry(key.midi, width, keyAreaTop, keyAreaHeight);
           if (!geom) return;
 
-          ctx.strokeStyle = isDark ? 'rgba(39, 39, 42, 0.45)' : 'rgba(71, 85, 105, 0.45)';
+          ctx.strokeStyle = `rgba(${customLaneRgb.r}, ${customLaneRgb.g}, ${customLaneRgb.b}, ${isDark ? 0.45 : 0.35})`;
           ctx.beginPath();
           ctx.moveTo(geom.x, waterfallTop);
           ctx.lineTo(geom.x, ledBarTop);
@@ -698,11 +712,11 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
           ctx.lineTo(width - 16, y);
 
           if (isMeasureBar) {
-            ctx.strokeStyle = isDark ? 'rgba(148, 163, 184, 0.25)' : 'rgba(100, 116, 139, 0.38)';
+            ctx.strokeStyle = `rgba(${customGridRgb.r}, ${customGridRgb.g}, ${customGridRgb.b}, ${isDark ? 0.35 : 0.45})`;
             ctx.lineWidth = 1.5;
             ctx.stroke();
           } else if (curBg.showSubtleGrid) {
-            ctx.strokeStyle = isDark ? 'rgba(148, 163, 184, 0.08)' : 'rgba(100, 116, 139, 0.14)';
+            ctx.strokeStyle = `rgba(${customGridRgb.r}, ${customGridRgb.g}, ${customGridRgb.b}, ${isDark ? 0.12 : 0.18})`;
             ctx.lineWidth = 1;
             ctx.stroke();
           }
@@ -1219,6 +1233,13 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
             p.phase += dt * 8;
             const wavePos = p.pos + Math.sin(p.phase) * (p.spread * 3);
             if (wavePos >= 0 && wavePos < ledCount) addSpreadLuminance(wavePos, 2.5, p.color, p.life);
+            break;
+          case 'blink':
+            p.life -= dt * (2.8 * p.speed);
+            if (p.life > 0) {
+              const fadeCurve = p.life * p.life;
+              addSpreadLuminance(p.pos, p.spread, p.color, fadeCurve * 1.25);
+            }
             break;
         }
       }

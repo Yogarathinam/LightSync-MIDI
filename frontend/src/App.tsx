@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ThemeProvider } from './context/ThemeContext';
 import { useWebSocketBridge } from './hooks/useWebSocketBridge';
 import { useKeyboardInput } from './hooks/useKeyboardInput';
@@ -9,6 +9,7 @@ import { StatusBar } from './components/layout/StatusBar';
 import { ForegroundWorkspace } from './components/layout/ForegroundWorkspace';
 import { OverlayContainer } from './components/layout/OverlayContainer';
 import { StudioCanvas } from './components/visualizer/StudioCanvas';
+import { StartupSplash } from './components/layout/StartupSplash';
 
 const MainApp: React.FC = () => {
   // Real-time hooks
@@ -16,13 +17,23 @@ const MainApp: React.FC = () => {
   useKeyboardInput();
 
   const [fps, setFps] = useState(60);
-  const { activeWorkspace, closeWorkspace } = useLightSyncStore();
+  const [showSplash, setShowSplash] = useState(true);
+  const { activeWorkspace, closeWorkspace, loadSettingsFromFile } = useLightSyncStore();
+
+  useEffect(() => {
+    loadSettingsFromFile();
+  }, [loadSettingsFromFile]);
 
   const isReceded = activeWorkspace !== null;
 
   return (
     <div className="h-screen w-full max-h-screen max-w-full overflow-hidden flex flex-col relative bg-black text-slate-900 dark:text-zinc-100 antialiased selection:bg-indigo-500 selection:text-white select-none">
       
+      {/* 0. STARTUP BOOT ANIMATION SPLASH */}
+      {showSplash && (
+        <StartupSplash onComplete={() => setShowSplash(false)} />
+      )}
+
       {/* 1. TOP NAVIGATION BAR (Always stationary, sharp, and interactive) */}
       <AppHeader />
 

@@ -34,7 +34,8 @@ export type EffectType =
   | 'spark' 
   | 'sprinkle' 
   | 'rain' 
-  | 'wave';
+  | 'wave'
+  | 'blink';
 
 export interface EffectConfig {
   effect: EffectType;
@@ -66,6 +67,8 @@ export interface FlowKeyConfig {
   glowIntensity: number;          // 0 to 100
   showParticles: boolean;         // Sparks at impact/head
   bloomGlow: boolean;             // Outer glow aura
+  customColor?: string;           // Custom FlowKey Primary Color (hex)
+  customSecondaryColor?: string;  // Custom FlowKey Secondary Color (hex)
 }
 
 export interface VisualizerBackgroundConfig {
@@ -75,6 +78,9 @@ export interface VisualizerBackgroundConfig {
   showHorizontalBeatLines: boolean;   // Horizontal divisions giving sense of distance/time
   showSubtleGrid: boolean;            // Subtle intermediate grid lines
   scrollGrid: boolean;                // Animated moving time grid
+  gridColor?: string;                 // Custom Horizon & Beat Grid Line Color (hex)
+  laneColor?: string;                 // Custom Vertical Pitch Lane Divider Color (hex)
+  hazeColor?: string;                 // Custom Volumetric Atmosphere Glow Color (hex)
 }
 
 export interface PresetItem extends EffectConfig {

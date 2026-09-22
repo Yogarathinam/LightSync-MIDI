@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Cpu, Radio, RefreshCw, Terminal, CheckCircle2, AlertTriangle, Copy, Check } from 'lucide-react';
 import { useLightSyncStore } from '../../store/useLightSyncStore';
+import { EffectType } from '../../types';
 
 export const DeviceMonitor: React.FC = () => {
   const { 
@@ -83,8 +84,8 @@ export const DeviceMonitor: React.FC = () => {
 
   // M5Stack Simulated Button Handlers
   const handleBtnA = () => {
-    // Cycle effect
-    const effects = ['bounce', 'ripple', 'pulse', 'hold_beam', 'glitch', 'spark', 'sprinkle', 'rain', 'wave'] as const;
+    // Cycle effect across all 10 effects
+    const effects: EffectType[] = ['blink', 'bounce', 'ripple', 'pulse', 'hold_beam', 'glitch', 'spark', 'sprinkle', 'rain', 'wave'];
     const currIdx = effects.indexOf(effectConfig.effect);
     const nextEff = effects[(currIdx + 1) % effects.length];
     setEffectParam('effect', nextEff);
@@ -92,8 +93,16 @@ export const DeviceMonitor: React.FC = () => {
   };
 
   const handleBtnB = () => {
-    // Cycle brightness: 50 -> 100 -> 150 -> 200 -> 255 -> 50
-    const nextBrt = effectConfig.brightness >= 240 ? 50 : effectConfig.brightness + 50;
+    // Cycle brightness: 15 -> 50 -> 100 -> 160 -> 210 -> 255 -> 15
+    const brightnessSteps = [15, 50, 100, 160, 210, 255];
+    let nextIdx = 0;
+    for (let i = 0; i < brightnessSteps.length; i++) {
+      if (effectConfig.brightness < brightnessSteps[i]) {
+        nextIdx = i;
+        break;
+      }
+    }
+    const nextBrt = brightnessSteps[nextIdx];
     setEffectParam('brightness', nextBrt);
     addConsoleLog(`[M5Stack BtnB Pressed] Cycled brightness to ${nextBrt}/255`);
   };

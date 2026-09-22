@@ -339,11 +339,65 @@ interface LightSyncState {
   addRawMidiLog: (log: RawMidiLog) => void;
   clearRawMidiLogs: () => void;
 
+  // Settings File & Local Storage Persistence
+  loadSettingsFromFile: () => Promise<void>;
+
   // Outgoing WS message callback hook
   wsSender: ((msg: object) => void) | null;
   setWsSender: (sender: (msg: object) => void) => void;
 }
 
+const SETTINGS_STORAGE_KEY = 'LIGHTSYNC_USER_PREFERENCES_V2';
+
+interface PersistedSettingsSnapshot {
+  effectConfig?: Partial<EffectConfig>;
+  flowKeyConfig?: Partial<FlowKeyConfig>;
+  bgConfig?: Partial<VisualizerBackgroundConfig>;
+  volume?: number;
+  keyboardSize?: 25 | 49 | 61 | 88;
+  octaveShift?: number;
+  transpose?: number;
+}
+
+function getInitialPersistedSettings(): PersistedSettingsSnapshot | null {
+  try {
+    const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch (e) {}
+  return null;
+}
+
+const savedSettings = getInitialPersistedSettings();
+
+let saveTimer: any = null;
+function persistSettings(snapshot: PersistedSettingsSnapshot) {
+  try {
+    localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(snapshot));
+  } catch (e) {}
+
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = setTimeout(async () => {
+    try {
+      await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(snapshot)
+      });
+    } catch (e) {}
+  }, 500);
+}
+
+function triggerPersist(state: any) {
+  persistSettings({
+    effectConfig: state.effectConfig,
+    flowKeyConfig: state.flowKeyConfig,
+    bgConfig: state.bgConfig,
+    volume: state.volume,
+    keyboardSize: state.keyboardSize,
+    octaveShift: state.octaveShift,
+    transpose: state.transpose
+  });
+}
 
 let overlayTimer: number | null = null;
 
@@ -522,10 +576,10 @@ export const useLightSyncStore = create<LightSyncState>((set, get) => ({
   },
 
   // Keyboard Viewport
-  keyboardSize: 61,
+  keyboardSize: savedSettings?.keyboardSize ?? 61,
   keyboardHeight: 220,
-  octaveShift: 0,
-  transpose: 0,
+  octaveShift: savedSettings?.octaveShift ?? 0,
+  transpose: savedSettings?.transpose ?? 0,
   keyLabels: 'notes',
   diffuseBlur: true,
   fallingNotes: true,
@@ -533,18 +587,37 @@ export const useLightSyncStore = create<LightSyncState>((set, get) => ({
   isAutoDemo: false,
   setKeyboardSize: (size) => {
     set({ keyboardSize: size });
+    triggerPersist(get());
     const { wsSender } = get();
     if (wsSender) {
       wsSender({ type: 'KEY_COUNT_CHANGED', key_count: size });
     }
   },
   setKeyboardHeight: (height) => set({ keyboardHeight: Math.max(100, Math.min(420, height)) }),
-  setOctaveShift: (shift) => set({ octaveShift: Math.max(-4, Math.min(4, shift)) }),
-  incrementOctave: () => set((state) => ({ octaveShift: Math.max(-4, Math.min(4, state.octaveShift + 1)) })),
-  decrementOctave: () => set((state) => ({ octaveShift: Math.max(-4, Math.min(4, state.octaveShift - 1)) })),
-  setTranspose: (semitones) => set({ transpose: Math.max(-12, Math.min(12, semitones)) }),
-  incrementTranspose: () => set((state) => ({ transpose: Math.max(-12, Math.min(12, state.transpose + 1)) })),
-  decrementTranspose: () => set((state) => ({ transpose: Math.max(-12, Math.min(12, state.transpose - 1)) })),
+  setOctaveShift: (shift) => {
+    set({ octaveShift: Math.max(-4, Math.min(4, shift)) });
+    triggerPersist(get());
+  },
+  incrementOctave: () => {
+    set((state) => ({ octaveShift: Math.max(-4, Math.min(4, state.octaveShift + 1)) }));
+    triggerPersist(get());
+  },
+  decrementOctave: () => {
+    set((state) => ({ octaveShift: Math.max(-4, Math.min(4, state.octaveShift - 1)) }));
+    triggerPersist(get());
+  },
+  setTranspose: (semitones) => {
+    set({ transpose: Math.max(-12, Math.min(12, semitones)) });
+    triggerPersist(get());
+  },
+  incrementTranspose: () => {
+    set((state) => ({ transpose: Math.max(-12, Math.min(12, state.transpose + 1)) }));
+    triggerPersist(get());
+  },
+  decrementTranspose: () => {
+    set((state) => ({ transpose: Math.max(-12, Math.min(12, state.transpose - 1)) }));
+    triggerPersist(get());
+  },
   setKeyLabels: (labels) => set({ keyLabels: labels }),
   setDiffuseBlur: (enabled) => set({ diffuseBlur: enabled }),
   setFallingNotes: (enabled) => set({ fallingNotes: enabled }),
@@ -553,13 +626,14 @@ export const useLightSyncStore = create<LightSyncState>((set, get) => ({
   toggleAutoDemo: () => set((state) => ({ isAutoDemo: !state.isAutoDemo })),
 
   // Audio Controls
-  volume: 0.7,
+  volume: savedSettings?.volume ?? 0.7,
   isMuted: false,
   instrument: 'acoustic_grand',
   isSustained: false,
   setVolume: (vol) => {
     synthEngine.setVolume(vol);
     set({ volume: vol });
+    triggerPersist(get());
   },
   toggleMute: () => {
     const newMute = !get().isMuted;
@@ -587,18 +661,19 @@ export const useLightSyncStore = create<LightSyncState>((set, get) => ({
 
   // Effect Studio
   effectConfig: {
-    effect: 'bounce',
-    speed: 1.2,
-    decay: 0.85,
-    spread: 3.0,
-    brightness: 15,
-    rainbow: false,
-    primaryColor: '#00f0ff',
-    secondaryColor: '#6366f1'
+    effect: (savedSettings?.effectConfig?.effect as EffectType) || 'bounce',
+    speed: savedSettings?.effectConfig?.speed ?? 1.2,
+    decay: savedSettings?.effectConfig?.decay ?? 0.85,
+    spread: savedSettings?.effectConfig?.spread ?? 3.0,
+    brightness: savedSettings?.effectConfig?.brightness ?? 15,
+    rainbow: savedSettings?.effectConfig?.rainbow ?? false,
+    primaryColor: savedSettings?.effectConfig?.primaryColor || '#00f0ff',
+    secondaryColor: savedSettings?.effectConfig?.secondaryColor || '#6366f1'
   },
   setEffectParam: (param, value) => {
     const newConfig = { ...get().effectConfig, [param]: value };
     set({ effectConfig: newConfig });
+    triggerPersist(get());
     const { wsSender } = get();
     if (wsSender) {
       if (param === 'effect') {
@@ -610,6 +685,7 @@ export const useLightSyncStore = create<LightSyncState>((set, get) => ({
   },
   setFullEffectConfig: (config) => {
     set({ effectConfig: config });
+    triggerPersist(get());
     const { wsSender } = get();
     if (wsSender) {
       wsSender({ type: 'EFFECT_CHANGED', effect: config.effect });
@@ -637,37 +713,71 @@ export const useLightSyncStore = create<LightSyncState>((set, get) => ({
 
   // Flow Key Visualizer & Background FX
   flowKeyConfig: {
-    trailDuration: 1.8,
-    flowSpeed: 1.2,
-    trailStyle: 'neon_bar',
-    colorPreset: 'cyberpunk',
-    glowIntensity: 85,
-    showParticles: true,
-    bloomGlow: true
+    trailDuration: savedSettings?.flowKeyConfig?.trailDuration ?? 1.8,
+    flowSpeed: savedSettings?.flowKeyConfig?.flowSpeed ?? 1.2,
+    trailStyle: savedSettings?.flowKeyConfig?.trailStyle || 'neon_bar',
+    colorPreset: savedSettings?.flowKeyConfig?.colorPreset || 'cyberpunk',
+    glowIntensity: savedSettings?.flowKeyConfig?.glowIntensity ?? 85,
+    showParticles: savedSettings?.flowKeyConfig?.showParticles ?? true,
+    bloomGlow: savedSettings?.flowKeyConfig?.bloomGlow ?? true,
+    customColor: savedSettings?.flowKeyConfig?.customColor || '#00f0ff',
+    customSecondaryColor: savedSettings?.flowKeyConfig?.customSecondaryColor || '#ec4899'
   },
   setFlowKeyParam: (param, value) => {
     set((state) => ({
       flowKeyConfig: { ...state.flowKeyConfig, [param]: value }
     }));
+    triggerPersist(get());
   },
   bgConfig: {
-    showVerticalPitchLanes: true,
-    showKeyRegions: true,
-    showOctaveDividers: true,
-    showHorizontalBeatLines: true,
-    showSubtleGrid: true,
-    scrollGrid: true
+    showVerticalPitchLanes: savedSettings?.bgConfig?.showVerticalPitchLanes ?? true,
+    showKeyRegions: savedSettings?.bgConfig?.showKeyRegions ?? true,
+    showOctaveDividers: savedSettings?.bgConfig?.showOctaveDividers ?? true,
+    showHorizontalBeatLines: savedSettings?.bgConfig?.showHorizontalBeatLines ?? true,
+    showSubtleGrid: savedSettings?.bgConfig?.showSubtleGrid ?? true,
+    scrollGrid: savedSettings?.bgConfig?.scrollGrid ?? true,
+    gridColor: savedSettings?.bgConfig?.gridColor || '#6366f1',
+    laneColor: savedSettings?.bgConfig?.laneColor || '#38bdf8',
+    hazeColor: savedSettings?.bgConfig?.hazeColor || '#a855f7'
   },
   setBgConfigParam: (param, value) => {
     set((state) => ({
       bgConfig: { ...state.bgConfig, [param]: value }
     }));
+    triggerPersist(get());
+  },
+  loadSettingsFromFile: async () => {
+    try {
+      const res = await fetch('/api/settings');
+      if (res.ok) {
+        const data = await res.json();
+        if (data && Object.keys(data).length > 0) {
+          const updates: any = {};
+          if (data.effectConfig) updates.effectConfig = { ...get().effectConfig, ...data.effectConfig };
+          if (data.flowKeyConfig) updates.flowKeyConfig = { ...get().flowKeyConfig, ...data.flowKeyConfig };
+          if (data.bgConfig) updates.bgConfig = { ...get().bgConfig, ...data.bgConfig };
+          if (typeof data.volume === 'number') updates.volume = data.volume;
+          if (data.keyboardSize) updates.keyboardSize = data.keyboardSize;
+          if (typeof data.octaveShift === 'number') updates.octaveShift = data.octaveShift;
+          if (typeof data.transpose === 'number') updates.transpose = data.transpose;
+          set(updates);
+          try {
+            localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(data));
+          } catch (e) {}
+        }
+      }
+    } catch (e) {}
   },
   applyColorPreset: (presetId) => {
     const preset = COLOR_SYNC_PRESETS[presetId];
     if (!preset) return;
     set((state) => ({
-      flowKeyConfig: { ...state.flowKeyConfig, colorPreset: presetId },
+      flowKeyConfig: { 
+        ...state.flowKeyConfig, 
+        colorPreset: presetId,
+        customColor: preset.primary,
+        customSecondaryColor: preset.secondary
+      },
       effectConfig: {
         ...state.effectConfig,
         primaryColor: preset.primary,
@@ -676,6 +786,7 @@ export const useLightSyncStore = create<LightSyncState>((set, get) => ({
         effect: preset.effect
       }
     }));
+    triggerPersist(get());
     const { wsSender } = get();
     if (wsSender) {
       wsSender({ type: 'COLOR_PRESET_CHANGED', preset: preset.name });
