@@ -321,6 +321,15 @@ interface LightSyncState {
   songPlaybackId: number;
   startSongPlayback: (song?: SongItem) => void;
   stopSongPlayback: () => void;
+  playbackBeat: number;
+  playbackTotalBeats: number;
+  seekEpoch: number;
+  targetSeekBeat: number;
+  seekToBeat: (beat: number) => void;
+  setPlaybackBeat: (beat: number, totalBeats?: number) => void;
+  isWaitingAtHitline: boolean;
+  waitingPitch: number | null;
+  setWaitingState: (waiting: boolean, pitch: number | null) => void;
   practiceMode: 'wait_for_key' | 'flow';
   setPracticeMode: (mode: 'wait_for_key' | 'flow') => void;
   handFilter: 'both' | 'right' | 'left';
@@ -943,8 +952,28 @@ export const useLightSyncStore = create<LightSyncState>((set, get) => ({
     for (const pitch of activeNotes.keys()) {
       triggerNoteOff(pitch);
     }
-    set({ isSongPlaying: false });
+    set({ isSongPlaying: false, isWaitingAtHitline: false, waitingPitch: null });
   },
+  playbackBeat: 0,
+  playbackTotalBeats: 100,
+  seekEpoch: 0,
+  targetSeekBeat: 0,
+  seekToBeat: (beat) => {
+    set((state) => ({
+      targetSeekBeat: Math.max(0, beat),
+      playbackBeat: Math.max(0, beat),
+      seekEpoch: state.seekEpoch + 1
+    }));
+  },
+  setPlaybackBeat: (beat, totalBeats) => {
+    set((state) => ({
+      playbackBeat: beat,
+      playbackTotalBeats: totalBeats !== undefined ? totalBeats : state.playbackTotalBeats
+    }));
+  },
+  isWaitingAtHitline: false,
+  waitingPitch: null,
+  setWaitingState: (waiting, pitch) => set({ isWaitingAtHitline: waiting, waitingPitch: pitch }),
   practiceMode: 'wait_for_key',
   setPracticeMode: (mode) => set({ practiceMode: mode }),
   handFilter: 'both',

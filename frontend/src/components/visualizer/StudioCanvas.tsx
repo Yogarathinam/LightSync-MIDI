@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useCallback, useMemo } from 'react';
 import { useLightSyncStore } from '../../store/useLightSyncStore';
 import { useTheme } from '../../context/ThemeContext';
 import { EffectType, EffectConfig, FlowKeyConfig } from '../../types';
+import { SongTimelineScrubber } from '../layout/SongTimelineScrubber';
 
 interface Particle {
   active: boolean;
@@ -176,10 +177,19 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
     triggerNoteOn,
     triggerNoteOff,
     expectedPitch,
+    setExpectedPitch,
     currentSong,
     isSongPlaying,
     songPlaybackId,
+    startSongPlayback,
     stopSongPlayback,
+    seekEpoch,
+    targetSeekBeat,
+    seekToBeat,
+    setPlaybackBeat,
+    learnMode,
+    isWaitingAtHitline,
+    setWaitingState,
     handFilter,
     leftHandColor,
     rightHandColor,
@@ -501,6 +511,9 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
   activeWorkspaceRef.current = activeWorkspace;
   const songBeatRef = useRef<number>(0);
   const spawnedSongNoteIdsRef = useRef<Set<number>>(new Set());
+  const learnModeRef = useRef(learnMode);
+  learnModeRef.current = learnMode;
+  const playbackPublishTimerRef = useRef<number>(0);
 
   // Cleanly synchronize song playback: whenever songPlaybackId or currentSong changes, reset notes
   useEffect(() => {
@@ -508,6 +521,15 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
     spawnedSongNoteIdsRef.current.clear();
     fallingBarsRef.current = [];
   }, [songPlaybackId, currentSong?.id]);
+
+  // Handle interactive timeline seeking (scrub forward / reverse)
+  useEffect(() => {
+    if (seekEpoch > 0) {
+      songBeatRef.current = targetSeekBeat;
+      spawnedSongNoteIdsRef.current.clear();
+      fallingBarsRef.current = [];
+    }
+  }, [seekEpoch, targetSeekBeat]);
 
   // Listen for newly pressed keys to trigger LED strip effects & 2D Runway VFX
   const prevPitchesRef = useRef<Set<number>>(new Set());
@@ -823,20 +845,70 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
       const isSongOn = isSongPlayingRef.current;
 
       if (isSongOn && curSong && curSong.notes && curSong.notes.length > 0) {
-        // Song time progression in beats
-        songBeatRef.current += dt * (curSong.bpm / 60);
+        const curLearnMode = learnModeRef.current;
+        const hFilter = handFilterRef.current;
+
+        const isMatchingHand = (hand?: string) => {
+          if (hFilter === 'right' && hand === 'left') return false;
+          if (hFilter === 'left' && hand === 'right') return false;
+          return true;
+        };
+
+        let canAdvance = true;
+        if (curLearnMode === 'wait_for_key') {
+          // Find next target note that matches hand filter and has not finished its duration
+          const targetNote = curSong.notes.find(
+            n => isMatchingHand(n.hand) && songBeatRef.current < (n.time + n.duration)
+          );
+
+          if (targetNote) {
+            // Check if note has arrived at hitline (ledBarTop)
+            if (songBeatRef.current >= targetNote.time) {
+              const isKeyHeld = curActiveNotes.has(targetNote.pitch);
+              if (!isKeyHeld) {
+                // Freeze right at hitline until user strikes key!
+                songBeatRef.current = targetNote.time;
+                canAdvance = false;
+                setWaitingState(true, targetNote.pitch);
+                setExpectedPitch(targetNote.pitch);
+              } else {
+                // Key is actively held: let timeline progress through its duration!
+                canAdvance = true;
+                setWaitingState(false, null);
+                setExpectedPitch(null);
+              }
+            } else {
+              setWaitingState(false, null);
+            }
+          } else {
+            setWaitingState(false, null);
+          }
+        }
+
+        if (canAdvance) {
+          songBeatRef.current += dt * (curSong.bpm / 60);
+        }
+
         const currentBeat = songBeatRef.current;
         const speed = 170 * curFlow.flowSpeed;
         const travelDistance = Math.max(100, ledBarTop - waterfallTop);
         const travelBeats = (travelDistance / speed) * (curSong.bpm / 60);
 
+        // Periodically sync playback position to store (for timeline scrubber)
+        playbackPublishTimerRef.current += dt;
+        if (playbackPublishTimerRef.current >= 0.04) {
+          playbackPublishTimerRef.current = 0;
+          const maxNoteEnd = Math.max(...curSong.notes.map(n => n.time + n.duration));
+          setPlaybackBeat(currentBeat, maxNoteEnd);
+        }
+
         curSong.notes.forEach((note, idx) => {
           if (spawnedSongNoteIdsRef.current.has(idx)) return;
+          if (note.time + note.duration < currentBeat) return; // Skip passed notes after seeking
 
           if (note.time <= currentBeat + travelBeats) {
             spawnedSongNoteIdsRef.current.add(idx);
 
-            const hFilter = handFilterRef.current;
             if (hFilter === 'right' && note.hand === 'left') return;
             if (hFilter === 'left' && note.hand === 'right') return;
 
@@ -1733,6 +1805,13 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
           {/* Subtle sleek hairline laser guide that only reveals upon hover/drag */}
           <div className="w-full h-[2px] opacity-0 group-hover:opacity-100 group-active:opacity-100 transition-opacity duration-150 bg-indigo-500/80 shadow-[0_0_8px_rgba(99,102,241,0.7)]" />
         </div>
+
+        {/* On-Stage Song Timeline Scrubber when Song is active on stage */}
+        {currentSong && (isSongPlaying || activeWorkspace === 'songs' || activeWorkspace === null) && activeWorkspace !== 'learn' && (
+          <div className="absolute top-3 left-1/2 -translate-x-1/2 z-30 max-w-lg w-[92%] pointer-events-auto animate-in fade-in slide-in-from-top-2 duration-200">
+            <SongTimelineScrubber />
+          </div>
+        )}
 
         <canvas
           ref={canvasRef}

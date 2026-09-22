@@ -32,6 +32,7 @@ import {
 import confetti from 'canvas-confetti';
 import { useLightSyncStore } from '../../store/useLightSyncStore';
 import { SongItem, SongNote, LearnSubView, SessionResult } from '../../types';
+import { SongTimelineScrubber } from '../layout/SongTimelineScrubber';
 
 export const LearnWorkspace: React.FC = () => {
   const { 
@@ -56,6 +57,9 @@ export const LearnWorkspace: React.FC = () => {
     isSongPlaying,
     startSongPlayback,
     stopSongPlayback,
+    isWaitingAtHitline,
+    waitingPitch,
+    setLearnMode,
     isRecording,
     startRecording,
     stopRecording,
@@ -281,6 +285,7 @@ export const LearnWorkspace: React.FC = () => {
             <button
               onClick={() => {
                 setMode('watch_listen');
+                setLearnMode('watch_listen');
                 if (isPlaying && song) startSongPlayback(song);
               }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
@@ -296,14 +301,15 @@ export const LearnWorkspace: React.FC = () => {
             <button
               onClick={() => {
                 setMode('wait_for_key');
-                stopSongPlayback();
+                setLearnMode('wait_for_key');
+                if (song) startSongPlayback(song);
               }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
                 mode === 'wait_for_key'
                   ? 'bg-emerald-600 text-white shadow-md shadow-emerald-500/20'
                   : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white'
               }`}
-              title="Pauses at each note until you strike the correct key"
+              title="Pauses at each note until you strike and hold the correct key"
             >
               <Hand className="w-3.5 h-3.5" />
               <span>Wait For Key</span>
@@ -311,6 +317,7 @@ export const LearnWorkspace: React.FC = () => {
             <button
               onClick={() => {
                 setMode('flow');
+                setLearnMode('flow');
                 stopSongPlayback();
               }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
@@ -524,10 +531,16 @@ export const LearnWorkspace: React.FC = () => {
             </div>
             <div>
               <span className="text-[10px] uppercase tracking-wider font-bold text-slate-400 font-mono block">
-                Target Piano Key
+                {isWaitingAtHitline ? 'WAITING AT HITLINE' : 'TARGET PIANO KEY'}
               </span>
-              <span className="text-sm font-bold text-slate-900 dark:text-white">
-                Strike {currentNote.name}
+              <span className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                {isWaitingAtHitline ? (
+                  <span className="text-amber-500 dark:text-amber-400 font-extrabold animate-pulse">
+                    Strike & Hold {currentNote.name}
+                  </span>
+                ) : (
+                  <span>Strike {currentNote.name}</span>
+                )}
               </span>
               {lastFeedback && (
                 <span className="text-xs font-bold text-emerald-500 font-mono block animate-bounce mt-0.5">
@@ -571,24 +584,10 @@ export const LearnWorkspace: React.FC = () => {
       </div>
 
       {/* ============================================================ */}
-      {/* 3. BOTTOM PROGRESS TRACKER */}
+      {/* 3. INTERACTIVE SONG TIMELINE SCRUBBER (SCROLLABLE & SEEKABLE) */}
       {/* ============================================================ */}
       <div className="w-full max-w-4xl mx-auto pointer-events-auto z-30 mb-1">
-        <div className="w-full p-2.5 rounded-2xl bg-white/90 dark:bg-[#0c0c0e]/90 backdrop-blur-md border border-slate-200/80 dark:border-zinc-800/80 shadow-lg flex flex-col gap-1.5">
-          <div className="flex justify-between items-center text-[11px] font-mono text-slate-500 dark:text-zinc-400 px-1">
-            <span className="font-semibold flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              {song ? song.title : 'Ready'}
-            </span>
-            <span>Note {Math.min(currentNoteIndex + 1, totalNotes)} of {totalNotes} ({progressPct}%)</span>
-          </div>
-          <div className="w-full h-2 rounded-full bg-slate-200 dark:bg-zinc-800 overflow-hidden">
-            <div 
-              className="h-full bg-gradient-to-r from-indigo-500 via-teal-500 to-emerald-500 transition-all duration-200"
-              style={{ width: `${progressPct}%` }}
-            />
-          </div>
-        </div>
+        <SongTimelineScrubber showPieceTitle={true} className="w-full shadow-2xl" />
       </div>
 
       {/* ============================================================ */}
