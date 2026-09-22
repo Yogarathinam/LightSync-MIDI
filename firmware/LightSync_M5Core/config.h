@@ -8,9 +8,19 @@
 // Hardware: M5Stack Core / Core2 / Fire / CoreS3 (ESP32) + WS2812B LED Strip
 // =========================================================================
 
-// WS2812B Data Output Pin (Pin 21 on M5Stack Core bottom header / Grove port)
+// =========================================================================
+// WS2812B Data Output Pin:
+// CRITICAL: DO NOT use Pin 21 or 22! On M5Stack Core, GPIO 21 & 22 are the
+// internal I2C bus (SDA/SCL) with hardware 4.7k pull-up resistors used by PMIC & IMU.
+// Connecting LEDs to Pin 21 causes I2C clock/data pulses to be read as 0xFFFFFF (WHITE),
+// permanently latching the first few LEDs into solid white!
+//
+// Recommended Pins for M5Stack Core:
+// - Pin 26: Port B (Grove Black Pin 1 / Yellow wire) or bottom M-BUS header Pin 26 (Default)
+// - Pin 2:  Bottom M-BUS header Pin G2
+// =========================================================================
 #ifndef LED_DATA_PIN
-#define LED_DATA_PIN 21
+#define LED_DATA_PIN 26
 #endif
 
 // Default LED strip configuration

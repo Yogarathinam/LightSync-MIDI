@@ -269,7 +269,9 @@ public:
         M5.Display.drawRoundRect(8, 34, 304, 28, 6, 0x2124);
         M5.Display.setTextSize(1);
         M5.Display.setTextColor(0x6CDF, 0x10A2);
-        M5.Display.drawString("LIVE OPTICAL STRIP SIMULATION (Pin 21)", 16, 37);
+        char stripTitle[48];
+        snprintf(stripTitle, sizeof(stripTitle), "LIVE OPTICAL STRIP SIMULATION (Pin %d)", LED_DATA_PIN);
+        M5.Display.drawString(stripTitle, 16, 37);
 
         // Center Deck: Left Card (Effect & Preset)
         M5.Display.fillRoundRect(8, 66, 148, 118, 6, 0x10A2);

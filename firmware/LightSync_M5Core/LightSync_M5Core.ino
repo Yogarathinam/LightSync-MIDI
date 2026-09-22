@@ -5,7 +5,7 @@
   
   Target Hardware: M5Stack Core / Core2 / CoreS3 / Fire (ESP32)
   Display & Input: M5Unified Library
-  LED Controller:  FastLED (WS2812B on Pin 21)
+  LED Controller:  FastLED (WS2812B on Pin 26 / Port B)
   Host Protocol:   High-speed USB Serial (115200 Baud)
   =============================================================================
 */
