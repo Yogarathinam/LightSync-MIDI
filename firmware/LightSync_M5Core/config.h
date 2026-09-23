@@ -38,7 +38,7 @@
 #define DEFAULT_BRIGHTNESS 15
 #define DEFAULT_SPEED 1.2f
 #define DEFAULT_DECAY 0.85f
-#define DEFAULT_SPREAD 3.0f
+#define DEFAULT_SPREAD 0.75f
 
 // Color Defaults (Electric Cyan & Hot Magenta - Cyberpunk Neon)
 #define DEFAULT_COLOR_R 0

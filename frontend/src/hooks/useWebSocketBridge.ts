@@ -36,6 +36,11 @@ export const useWebSocketBridge = () => {
             ws.send(JSON.stringify(msg));
           }
         });
+
+        // Send initial octave shift & transpose settings to backend
+        const state = useLightSyncStore.getState();
+        ws.send(JSON.stringify({ type: 'OCTAVE_SHIFT_CHANGED', octave_shift: state.octaveShift }));
+        ws.send(JSON.stringify({ type: 'TRANSPOSE_CHANGED', transpose: state.transpose }));
       };
 
       ws.onmessage = (event) => {

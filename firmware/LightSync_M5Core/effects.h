@@ -71,8 +71,16 @@ public:
         if (keyIndex < 0) keyIndex = 0;
         if (keyIndex >= config.keyCount) keyIndex = config.keyCount - 1;
 
-        float norm = (float)keyIndex / (float)(config.keyCount - 1);
-        int16_t led = (int16_t)(norm * (config.ledCount - 1));
+        // 1 LED space between adjacent keys (Key 0 = 11, Key 1 = 13, Key 2 = 15...)
+        int leftMargin = 11;
+        if (config.keyCount == 61 && config.ledCount == 144) {
+            leftMargin = 11;
+        } else {
+            leftMargin = (config.ledCount - (config.keyCount * 2)) / 2;
+            if (leftMargin < 0) leftMargin = 0;
+        }
+
+        int16_t led = leftMargin + keyIndex * 2;
         return constrain(led, 0, config.ledCount - 1);
     }
 

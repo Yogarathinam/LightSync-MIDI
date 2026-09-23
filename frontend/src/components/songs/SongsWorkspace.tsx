@@ -1,9 +1,10 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { 
   Music, 
   GraduationCap, 
   Activity, 
   Play, 
+  Square,
   Upload, 
   Search, 
   Filter, 
@@ -19,11 +20,16 @@ import {
   Trash2,
   Eye,
   CircleDot,
-  Trophy
+  Trophy,
+  LayoutList,
+  LayoutGrid,
+  ArrowUpDown,
+  ListFilter
 } from 'lucide-react';
 import { useLightSyncStore } from '../../store/useLightSyncStore';
 import { SongItem, SongNote } from '../../types';
 import { SongPracticeHubModal } from './SongPracticeHubModal';
+import { SaveRecordingModal } from './SaveRecordingModal';
 
 export const SongsWorkspace: React.FC = () => {
   const { 
@@ -38,10 +44,13 @@ export const SongsWorkspace: React.FC = () => {
     stopSongPlayback,
     isRecording,
     startRecording,
-    stopRecording,
+    stopRecordingAndPrompt,
+    showSaveRecordingModal,
+    closeSaveRecordingModal,
     triggerNoteOn, 
     triggerNoteOff,
     closeWorkspace,
+    setLearnMode,
     midiFolderPath,
     isScanningMidi,
     fetchSongs,
@@ -52,13 +61,17 @@ export const SongsWorkspace: React.FC = () => {
   } = useLightSyncStore();
 
   const handleWatchAndListen = (song: SongItem) => {
-    startSongPlayback(song);
+    setLearnMode('watch_listen');
+    startSongPlayback(song, true);
     closeWorkspace();
   };
 
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
   const [searchQuery, setSearchQuery] = useState('');
   const [difficultyFilter, setDifficultyFilter] = useState<'All' | 'Beginner' | 'Intermediate' | 'Advanced'>('All');
   const [sourceFilter, setSourceFilter] = useState<'All' | 'curated' | 'local_midi'>('All');
+  const [sortBy, setSortBy] = useState<'title' | 'notes' | 'bpm' | 'difficulty'>('title');
+  
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [copiedPath, setCopiedPath] = useState(false);
   const [playingDemoId, setPlayingDemoId] = useState<string | null>(null);
@@ -71,24 +84,43 @@ export const SongsWorkspace: React.FC = () => {
     fetchSongs();
   }, [fetchSongs]);
 
-  // Filter songs based on search, difficulty, and source
-  const filteredSongs = songsList.filter(song => {
-    const matchesSearch = 
-      song.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      song.composer.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      song.key.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (song.filename && song.filename.toLowerCase().includes(searchQuery.toLowerCase()));
-    
-    const matchesDifficulty = 
-      difficultyFilter === 'All' || song.difficulty === difficultyFilter;
+  // Filter & sort songs
+  const filteredSongs = useMemo(() => {
+    const list = songsList.filter(song => {
+      const query = searchQuery.toLowerCase().trim();
+      const matchesSearch = 
+        !query ||
+        song.title.toLowerCase().includes(query) ||
+        song.composer.toLowerCase().includes(query) ||
+        song.key.toLowerCase().includes(query) ||
+        (song.filename && song.filename.toLowerCase().includes(query));
+      
+      const matchesDifficulty = 
+        difficultyFilter === 'All' || song.difficulty === difficultyFilter;
 
-    const matchesSource = 
-      sourceFilter === 'All' || 
-      (sourceFilter === 'curated' && (song.source === 'curated' || !song.source)) ||
-      (sourceFilter === 'local_midi' && (song.source === 'local_midi' || song.source === 'imported'));
+      const matchesSource = 
+        sourceFilter === 'All' || 
+        (sourceFilter === 'curated' && (song.source === 'curated' || !song.source)) ||
+        (sourceFilter === 'local_midi' && (song.source === 'local_midi' || song.source === 'imported'));
 
-    return matchesSearch && matchesDifficulty && matchesSource;
-  });
+      return matchesSearch && matchesDifficulty && matchesSource;
+    });
+
+    // Sorting
+    return list.sort((a, b) => {
+      if (sortBy === 'title') {
+        return a.title.localeCompare(b.title);
+      } else if (sortBy === 'notes') {
+        return (b.notes?.length || 0) - (a.notes?.length || 0);
+      } else if (sortBy === 'bpm') {
+        return b.bpm - a.bpm;
+      } else if (sortBy === 'difficulty') {
+        const order: Record<string, number> = { 'Beginner': 1, 'Intermediate': 2, 'Advanced': 3 };
+        return (order[a.difficulty] || 0) - (order[b.difficulty] || 0);
+      }
+      return 0;
+    });
+  }, [songsList, searchQuery, difficultyFilter, sourceFilter, sortBy]);
 
   // Copy MIDI folder path
   const handleCopyPath = () => {
@@ -101,7 +133,6 @@ export const SongsWorkspace: React.FC = () => {
 
   // Play short song demo in visualizer + synth
   const handlePlayDemo = (song: SongItem) => {
-    // Clear any running demo
     demoTimersRef.current.forEach(t => clearTimeout(t));
     demoTimersRef.current = [];
 
@@ -131,7 +162,6 @@ export const SongsWorkspace: React.FC = () => {
       demoTimersRef.current.push(onTimer, offTimer);
     }
 
-    // Stop demo indicator after piece completes
     const totalDurationMs = (song.notes[maxNotesToPlay - 1]?.time || 10) * beatDurationMs + 1000;
     const endTimer = window.setTimeout(() => {
       setPlayingDemoId(null);
@@ -139,21 +169,19 @@ export const SongsWorkspace: React.FC = () => {
     demoTimersRef.current.push(endTimer);
   };
 
-  // Process MIDI file (upload to backend or fallback client-side)
+  // Process MIDI file upload
   const handleImportFile = async (file: File) => {
     if (!file.name.match(/\.(mid|midi)$/i)) {
       alert('Please select a valid .mid or .midi file.');
       return;
     }
 
-    // Try backend upload first
     const uploadedSong = await uploadMidiFile(file);
     if (uploadedSong) {
       selectSongAndLearn(uploadedSong, 'follow');
       return;
     }
 
-    // Client-side fallback if backend is unreachable
     processMidiFileClient(file);
   };
 
@@ -188,7 +216,7 @@ export const SongsWorkspace: React.FC = () => {
     }
   };
 
-  // Client-side MIDI parser fallback
+  // Client-side parser fallback
   const processMidiFileClient = (file: File) => {
     const reader = new FileReader();
     reader.onload = (event) => {
@@ -264,12 +292,12 @@ export const SongsWorkspace: React.FC = () => {
       onDrop={handleDrop}
     >
       
-      {/* Drag & Drop Visual Overlay */}
+      {/* Drag & Drop Overlay */}
       {isDraggingOver && (
         <div className="absolute inset-0 z-50 rounded-3xl border-2 border-dashed border-indigo-500 bg-slate-900/90 flex flex-col items-center justify-center text-white pointer-events-none gap-2">
           <Upload className="w-10 h-10 text-indigo-400 animate-bounce" />
           <p className="text-base font-bold">Drop MIDI (.mid / .midi) file to import</p>
-          <p className="text-xs text-slate-300">File will be saved to your backend MIDI library</p>
+          <p className="text-xs text-slate-300">File will be added to your backend MIDI library</p>
         </div>
       )}
 
@@ -283,7 +311,7 @@ export const SongsWorkspace: React.FC = () => {
             <div className="flex items-center gap-2 font-bold text-slate-800 dark:text-zinc-200">
               <span>Backend MIDI Folder</span>
               <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 font-mono font-semibold">
-                Auto-detected
+                Auto-scanned ({songsList.length} total)
               </span>
             </div>
             <p className="text-[11px] text-slate-500 dark:text-zinc-400 truncate font-mono mt-0.5" title={midiFolderPath || 'backend/data/midi'}>
@@ -296,7 +324,7 @@ export const SongsWorkspace: React.FC = () => {
           <button
             onClick={handleCopyPath}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white dark:bg-zinc-800 hover:bg-slate-50 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-300 border border-slate-200 dark:border-zinc-700 text-xs font-semibold shadow-xs transition-all cursor-pointer"
-            title="Copy MIDI folder path to paste in File Explorer"
+            title="Copy MIDI folder path"
           >
             {copiedPath ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
             <span>{copiedPath ? 'Copied!' : 'Copy Path'}</span>
@@ -314,76 +342,43 @@ export const SongsWorkspace: React.FC = () => {
         </div>
       </div>
 
-      {/* Top Search & Filter Toolbar */}
-      <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 pb-3 border-b border-slate-200 dark:border-zinc-800">
+      {/* Top Search, Filter & View Controls */}
+      <div className="flex flex-col gap-3 pb-2 border-b border-slate-200 dark:border-zinc-800">
         
-        {/* Search Bar */}
-        <div className="relative flex-1 max-w-md">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            placeholder="Search piece, composer, key, or filename..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9.5 pr-4 py-2 rounded-xl bg-slate-100 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-xs font-medium placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 transition-all"
-          />
-        </div>
-
-        {/* Source & Difficulty Filters */}
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Source Filter */}
-          <div className="flex items-center bg-slate-100 dark:bg-zinc-900 p-1 rounded-xl border border-slate-200/80 dark:border-zinc-800 text-xs">
-            {(['All', 'curated', 'local_midi'] as const).map((src) => (
-              <button
-                key={src}
-                onClick={() => setSourceFilter(src)}
-                className={`px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer ${
-                  sourceFilter === src
-                    ? 'bg-white dark:bg-zinc-800 text-indigo-600 dark:text-indigo-400 shadow-xs'
-                    : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white'
-                }`}
-              >
-                {src === 'All' ? 'All Sources' : src === 'curated' ? 'Curated' : 'Local MIDI'}
-              </button>
-            ))}
+        {/* Row 1: Search Bar & Primary Actions */}
+        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+          
+          {/* Search Input */}
+          <div className="relative flex-1">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Search by piece title, composer, key, or filename..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9.5 pr-4 py-2 rounded-xl bg-slate-100 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-xs font-medium text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 transition-all"
+            />
           </div>
 
-          {/* Difficulty Filter */}
-          <div className="flex items-center gap-1 overflow-x-auto py-0.5">
-            {(['All', 'Beginner', 'Intermediate', 'Advanced'] as const).map((level) => (
-              <button
-                key={level}
-                onClick={() => setDifficultyFilter(level)}
-                className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                  difficultyFilter === level
-                    ? 'bg-indigo-600 text-white shadow-xs'
-                    : 'bg-slate-100 dark:bg-zinc-900 text-slate-600 dark:text-zinc-400 hover:bg-slate-200 dark:hover:bg-zinc-800'
-                }`}
-              >
-                {level}
-              </button>
-            ))}
-          </div>
-
-          {/* MIDI Import & Record Buttons */}
-          <div className="flex items-center gap-2">
+          {/* Buttons: Record & Import */}
+          <div className="flex items-center gap-2 shrink-0">
             {!isRecording ? (
               <button
                 onClick={startRecording}
-                className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-zinc-900 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-slate-700 dark:text-zinc-300 hover:text-rose-600 border border-slate-200 dark:border-zinc-800 text-xs font-semibold shadow-xs transition-all cursor-pointer"
-                title="Record live session to .mid"
+                className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 dark:bg-zinc-900 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-slate-700 dark:text-zinc-300 hover:text-rose-600 border border-slate-200 dark:border-zinc-800 text-xs font-semibold shadow-xs transition-all cursor-pointer"
+                title="Record live MIDI session into .mid"
               >
                 <CircleDot className="w-3.5 h-3.5 text-rose-500" />
                 <span>Record .mid</span>
               </button>
             ) : (
               <button
-                onClick={() => stopRecording()}
-                className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-xs transition-all cursor-pointer animate-pulse"
-                title="Stop live recording"
+                onClick={() => stopRecordingAndPrompt()}
+                className="flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-xs transition-all cursor-pointer animate-pulse"
+                title="Stop live recording and prompt save"
               >
-                <CircleDot className="w-3.5 h-3.5 fill-current" />
-                <span>Recording...</span>
+                <Square className="w-3.5 h-3.5 fill-current" />
+                <span>Finish Recording</span>
               </button>
             )}
 
@@ -396,168 +391,414 @@ export const SongsWorkspace: React.FC = () => {
             />
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-xs transition-all cursor-pointer"
+              className="flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-xs transition-all cursor-pointer"
             >
               <Upload className="w-3.5 h-3.5" />
               <span>Import MIDI</span>
             </button>
           </div>
+
+        </div>
+
+        {/* Row 2: Filter Tabs, Sort, & View Switcher */}
+        <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
+          
+          {/* Left: Source & Difficulty Filter Pills */}
+          <div className="flex flex-wrap items-center gap-2">
+            
+            {/* Source Filter */}
+            <div className="flex items-center bg-slate-100 dark:bg-zinc-900 p-1 rounded-xl border border-slate-200/80 dark:border-zinc-800">
+              {(['All', 'local_midi', 'curated'] as const).map((src) => (
+                <button
+                  key={src}
+                  onClick={() => setSourceFilter(src)}
+                  className={`px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer ${
+                    sourceFilter === src
+                      ? 'bg-white dark:bg-zinc-800 text-indigo-600 dark:text-indigo-400 shadow-xs'
+                      : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  {src === 'All' ? 'All Songs' : src === 'local_midi' ? 'Local MIDI' : 'Curated'}
+                </button>
+              ))}
+            </div>
+
+            {/* Difficulty Filter */}
+            <div className="flex items-center gap-1">
+              {(['All', 'Beginner', 'Intermediate', 'Advanced'] as const).map((level) => (
+                <button
+                  key={level}
+                  onClick={() => setDifficultyFilter(level)}
+                  className={`px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer ${
+                    difficultyFilter === level
+                      ? 'bg-indigo-600 text-white shadow-xs'
+                      : 'bg-slate-100 dark:bg-zinc-900 text-slate-600 dark:text-zinc-400 hover:bg-slate-200 dark:hover:bg-zinc-800'
+                  }`}
+                >
+                  {level}
+                </button>
+              ))}
+            </div>
+
+          </div>
+
+          {/* Right: Sort By & View Mode Switcher */}
+          <div className="flex items-center gap-3">
+            
+            {/* Sort Dropdown */}
+            <div className="flex items-center gap-1.5 text-slate-500 dark:text-zinc-400">
+              <ArrowUpDown className="w-3.5 h-3.5" />
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as any)}
+                className="px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-xs font-semibold text-slate-700 dark:text-zinc-300 focus:outline-none"
+              >
+                <option value="title">Sort: Title (A-Z)</option>
+                <option value="notes">Sort: Note Count</option>
+                <option value="bpm">Sort: Tempo (BPM)</option>
+                <option value="difficulty">Sort: Difficulty</option>
+              </select>
+            </div>
+
+            {/* View Mode Toggle: List (Default) vs Grid */}
+            <div className="flex items-center bg-slate-100 dark:bg-zinc-900 p-1 rounded-xl border border-slate-200/80 dark:border-zinc-800">
+              <button
+                onClick={() => setViewMode('list')}
+                className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                  viewMode === 'list'
+                    ? 'bg-white dark:bg-zinc-800 text-indigo-600 dark:text-indigo-400 shadow-xs'
+                    : 'text-slate-400 hover:text-slate-700 dark:hover:text-zinc-200'
+                }`}
+                title="Table List View"
+              >
+                <LayoutList className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setViewMode('grid')}
+                className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                  viewMode === 'grid'
+                    ? 'bg-white dark:bg-zinc-800 text-indigo-600 dark:text-indigo-400 shadow-xs'
+                    : 'text-slate-400 hover:text-slate-700 dark:hover:text-zinc-200'
+                }`}
+                title="Cards Grid View"
+              >
+                <LayoutGrid className="w-4 h-4" />
+              </button>
+            </div>
+
+          </div>
+
         </div>
 
       </div>
 
-      {/* Song Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredSongs.map((song) => {
-          const isCurrent = currentSong?.id === song.id;
-          const isLocalOrImported = song.source === 'local_midi' || song.source === 'imported';
-
-          const songAttempts = sessionHistory.filter(s => s.song_id === song.id);
-          const bestAttempt = songAttempts.length > 0 
-            ? [...songAttempts].sort((a, b) => b.accuracy_pct - a.accuracy_pct)[0] 
-            : null;
-
-          const difficultyBadgeColor = 
-            song.difficulty === 'Beginner' ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800' :
-            song.difficulty === 'Intermediate' ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800' :
-            'bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 border-purple-200 dark:border-purple-800';
-
-          return (
-            <div
-              key={song.id}
-              className={`p-4 rounded-2xl border transition-colors duration-150 flex flex-col justify-between gap-4 relative group ${
-                isCurrent
-                  ? 'bg-indigo-50/40 dark:bg-indigo-950/20 border-indigo-500/60 shadow-md ring-1 ring-indigo-500/30'
-                  : 'bg-white dark:bg-black/60 border-slate-200/90 dark:border-zinc-800/90 hover:border-slate-300 dark:hover:border-zinc-700 shadow-xs'
-              }`}
-            >
-              {/* Header Info */}
-              <div>
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <h3 className="text-sm font-bold text-slate-900 dark:text-white tracking-tight truncate" title={song.title}>
-                      {song.title}
-                    </h3>
-                    <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5 truncate">
-                      {song.composer}
-                    </p>
-                  </div>
-                  
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    {/* Best Attempt Badge */}
-                    {bestAttempt && (
-                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-md border font-semibold bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800 flex items-center gap-1" title={`Best score: ${bestAttempt.accuracy_pct}% accuracy`}>
-                        <Trophy className="w-2.5 h-2.5 text-amber-500" />
-                        <span>{bestAttempt.accuracy_pct}% Best</span>
-                      </span>
-                    )}
-                    {/* Source Badge */}
-                    {song.source === 'local_midi' && (
-                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-md border font-semibold bg-cyan-50 dark:bg-cyan-950/40 text-cyan-600 dark:text-cyan-400 border-cyan-200 dark:border-cyan-800 flex items-center gap-1">
-                        <Folder className="w-2.5 h-2.5" />
-                        <span>Local MIDI</span>
-                      </span>
-                    )}
-                    {song.source === 'imported' && (
-                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-md border font-semibold bg-violet-50 dark:bg-violet-950/40 text-violet-600 dark:text-violet-400 border-violet-200 dark:border-violet-800 flex items-center gap-1">
-                        <Upload className="w-2.5 h-2.5" />
-                        <span>Imported</span>
-                      </span>
-                    )}
-                    <span className={`text-[10px] font-mono px-2 py-0.5 rounded-md border font-semibold shrink-0 ${difficultyBadgeColor}`}>
-                      {song.difficulty}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Filename subline if available */}
-                {song.filename && (
-                  <p className="text-[10px] font-mono text-slate-400 dark:text-zinc-500 truncate mt-1">
-                    📁 {song.filename}
-                  </p>
-                )}
-
-                {/* Meta details */}
-                <div className="flex flex-wrap items-center gap-3 mt-3 text-[11px] font-mono text-slate-500 dark:text-zinc-400">
-                  <span className="flex items-center gap-1">
-                    <span className="font-semibold text-slate-700 dark:text-zinc-300">{song.key}</span>
-                  </span>
-                  <span>•</span>
-                  <span>{song.bpm} BPM</span>
-                  <span>•</span>
-                  <span>{song.time_signature}</span>
-                  <span>•</span>
-                  <span>{song.notes.length} notes</span>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex flex-col gap-2 pt-2 border-t border-slate-100 dark:border-zinc-850">
-                {/* Practice with MIRA Primary Hub Button */}
-                <button
-                  onClick={() => setSelectedPracticeSong(song)}
-                  className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-sky-600 hover:from-purple-500 hover:to-sky-500 text-white text-xs font-bold shadow-md shadow-indigo-500/20 transition-all cursor-pointer group"
-                  title="Open MIRA AI Practice Hub with mode selection, coaching tips, analysis, and asking MIRA"
-                >
-                  <Sparkles className="w-3.5 h-3.5 text-amber-300 group-hover:rotate-12 transition-transform" />
-                  <span>Practice with MIRA</span>
-                </button>
-
-                {/* Secondary Quick Actions */}
-                <div className="flex items-center gap-1.5">
-                  {/* Watch & Listen (Stage Preview) */}
-                  <button
-                    onClick={() => handleWatchAndListen(song)}
-                    className="flex-1 flex items-center justify-center gap-1 py-1.5 px-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-white text-xs font-bold shadow-xs transition-all cursor-pointer"
-                    title="Watch falling notes and listen on the visualizer stage"
-                  >
-                    <Eye className="w-3.5 h-3.5" />
-                    <span>Watch</span>
-                  </button>
-
-                  {/* Learn / Follow Button */}
-                  <button
-                    onClick={() => selectSongAndLearn(song, 'follow')}
-                    className="flex-1 flex items-center justify-center gap-1 py-1.5 px-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-xs transition-all cursor-pointer"
-                    title="Open in interactive Learn & Follow mode"
-                  >
-                    <GraduationCap className="w-3.5 h-3.5" />
-                    <span>Learn</span>
-                  </button>
-
-                  {/* Practice Button */}
-                  <button
-                    onClick={() => selectSongAndLearn(song, 'practice')}
-                    className="flex items-center justify-center gap-1 py-1.5 px-2.5 rounded-xl bg-slate-100 dark:bg-zinc-900 hover:bg-slate-200 dark:hover:bg-zinc-800 text-slate-700 dark:text-zinc-300 text-xs font-semibold border border-slate-200/80 dark:border-zinc-800 transition-all cursor-pointer"
-                    title="Open targeted drills & sub-tempo practice"
-                  >
-                    <Activity className="w-3.5 h-3.5 text-sky-500" />
-                    <span>Drills</span>
-                  </button>
-
-                  {/* Delete button for local/imported songs */}
-                  {isLocalOrImported && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (confirm(`Remove "${song.title}" from library?`)) {
-                          deleteMidiSong(song.id);
-                        }
-                      }}
-                      className="p-1.5 rounded-xl border border-rose-200/60 dark:border-rose-900/60 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-all cursor-pointer"
-                      title="Remove from Library"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                </div>
-              </div>
-
-            </div>
-          );
-        })}
+      {/* Showing counter */}
+      <div className="flex items-center justify-between text-[11px] font-mono text-slate-500 dark:text-zinc-400 px-1">
+        <span>Showing {filteredSongs.length} of {songsList.length} songs</span>
+        {searchQuery && <span>Filter active: &quot;{searchQuery}&quot;</span>}
       </div>
 
+      {/* LIST VIEW (Table Layout) */}
+      {viewMode === 'list' && (
+        <div className="w-full overflow-x-auto rounded-2xl border border-slate-200/90 dark:border-zinc-800/90 bg-white dark:bg-zinc-900/60 shadow-xs">
+          <table className="w-full text-left border-collapse text-xs">
+            
+            {/* Table Header */}
+            <thead className="sticky top-0 z-10 shadow-xs">
+              <tr className="border-b border-slate-200 dark:border-zinc-800 bg-slate-100 dark:bg-zinc-900 text-slate-500 dark:text-zinc-400 font-bold uppercase tracking-wider text-[10px]">
+                <th className="py-3 px-3 w-12 text-center">#</th>
+                <th className="py-3 px-4">Song Title & Composer</th>
+                <th className="py-3 px-3">Key & BPM</th>
+                <th className="py-3 px-3">Difficulty</th>
+                <th className="py-3 px-3">Notes</th>
+                <th className="py-3 px-3">Source</th>
+                <th className="py-3 px-4 text-right">Quick Actions</th>
+              </tr>
+            </thead>
+
+            {/* Table Body */}
+            <tbody className="divide-y divide-slate-100 dark:divide-zinc-800/60 font-medium">
+              {filteredSongs.map((song, index) => {
+                const isCurrent = currentSong?.id === song.id;
+                const isLocalOrImported = song.source === 'local_midi' || song.source === 'imported';
+                const isPlayingDemo = playingDemoId === song.id;
+
+                const songAttempts = sessionHistory.filter(s => s.song_id === song.id);
+                const bestAttempt = songAttempts.length > 0 
+                  ? [...songAttempts].sort((a, b) => b.accuracy_pct - a.accuracy_pct)[0] 
+                  : null;
+
+                const difficultyBadgeColor = 
+                  song.difficulty === 'Beginner' ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800' :
+                  song.difficulty === 'Intermediate' ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800' :
+                  'bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 border-purple-200 dark:border-purple-800';
+
+                return (
+                  <tr 
+                    key={song.id}
+                    className={`transition-colors duration-150 hover:bg-slate-50/80 dark:hover:bg-zinc-800/40 ${
+                      isCurrent ? 'bg-indigo-50/50 dark:bg-indigo-950/20' : ''
+                    }`}
+                  >
+                    
+                    {/* Index & Demo Play */}
+                    <td className="py-3 px-3 text-center">
+                      <button
+                        onClick={() => handlePlayDemo(song)}
+                        className={`w-7 h-7 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
+                          isPlayingDemo 
+                            ? 'bg-amber-500 text-white animate-pulse' 
+                            : 'bg-slate-100 dark:bg-zinc-800 text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400'
+                        }`}
+                        title="Play 10-second stage preview demo"
+                      >
+                        {isPlayingDemo ? <Square className="w-3 h-3 fill-current" /> : <Play className="w-3 h-3 fill-current ml-0.5" />}
+                      </button>
+                    </td>
+
+                    {/* Title & Composer */}
+                    <td className="py-3 px-4 min-w-[220px]">
+                      <div className="flex flex-col">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-slate-900 dark:text-white tracking-tight" title={song.title}>
+                            {song.title}
+                          </span>
+                          {bestAttempt && (
+                            <span className="text-[10px] font-mono px-1.5 py-0.2 rounded border bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800 flex items-center gap-0.5">
+                              <Trophy className="w-2.5 h-2.5" />
+                              <span>{bestAttempt.accuracy_pct}%</span>
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 text-slate-500 dark:text-zinc-400 text-[11px] mt-0.5">
+                          <span>{song.composer}</span>
+                          {song.filename && (
+                            <span className="font-mono text-[10px] text-slate-400 dark:text-zinc-500 truncate max-w-[160px]" title={song.filename}>
+                              • {song.filename}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+
+                    {/* Key & BPM */}
+                    <td className="py-3 px-3 font-mono text-[11px] text-slate-600 dark:text-zinc-300">
+                      <div>{song.key}</div>
+                      <div className="text-[10px] text-slate-400">{song.bpm} BPM • {song.time_signature}</div>
+                    </td>
+
+                    {/* Difficulty */}
+                    <td className="py-3 px-3">
+                      <span className={`text-[10px] font-mono px-2 py-0.5 rounded-md border font-semibold ${difficultyBadgeColor}`}>
+                        {song.difficulty}
+                      </span>
+                    </td>
+
+                    {/* Notes count */}
+                    <td className="py-3 px-3 font-mono text-slate-600 dark:text-zinc-300">
+                      {song.notes?.length || 0} notes
+                    </td>
+
+                    {/* Source Badge */}
+                    <td className="py-3 px-3">
+                      {song.source === 'local_midi' && (
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded-md border font-semibold bg-cyan-50 dark:bg-cyan-950/40 text-cyan-600 dark:text-cyan-400 border-cyan-200 dark:border-cyan-800">
+                          Local MIDI
+                        </span>
+                      )}
+                      {song.source === 'imported' && (
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded-md border font-semibold bg-violet-50 dark:bg-violet-950/40 text-violet-600 dark:text-violet-400 border-violet-200 dark:border-violet-800">
+                          Imported
+                        </span>
+                      )}
+                      {(song.source === 'curated' || !song.source) && (
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded-md border font-semibold bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 border-slate-200 dark:border-zinc-700">
+                          Curated
+                        </span>
+                      )}
+                    </td>
+
+                    {/* Action Buttons */}
+                    <td className="py-3 px-4 text-right">
+                      <div className="flex items-center justify-end gap-1.5">
+                        
+                        {/* Practice with MIRA Primary */}
+                        <button
+                          onClick={() => setSelectedPracticeSong(song)}
+                          className="flex items-center gap-1.5 py-1.5 px-3 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-sky-600 hover:from-purple-500 hover:to-sky-500 text-white font-bold text-xs shadow-xs transition-all cursor-pointer"
+                          title="Open MIRA Practice Hub"
+                        >
+                          <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                          <span>Practice</span>
+                        </button>
+
+                        {/* Watch */}
+                        <button
+                          onClick={() => handleWatchAndListen(song)}
+                          className="flex items-center gap-1 py-1.5 px-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-white font-bold text-xs shadow-xs transition-all cursor-pointer"
+                          title="Watch falling note visualization"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          <span>Watch</span>
+                        </button>
+
+                        {/* Learn */}
+                        <button
+                          onClick={() => selectSongAndLearn(song, 'follow')}
+                          className="flex items-center gap-1 py-1.5 px-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-xs transition-all cursor-pointer"
+                          title="Open Interactive Follow Mode"
+                        >
+                          <GraduationCap className="w-3.5 h-3.5" />
+                          <span>Learn</span>
+                        </button>
+
+                        {/* Delete for local/imported */}
+                        {isLocalOrImported && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (confirm(`Remove "${song.title}" from library?`)) {
+                                deleteMidiSong(song.id);
+                              }
+                            }}
+                            className="p-1.5 rounded-xl border border-rose-200 dark:border-rose-900/60 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-all cursor-pointer"
+                            title="Delete file"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+
+                      </div>
+                    </td>
+
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* GRID VIEW (Cards Layout) */}
+      {viewMode === 'grid' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredSongs.map((song) => {
+            const isCurrent = currentSong?.id === song.id;
+            const isLocalOrImported = song.source === 'local_midi' || song.source === 'imported';
+
+            const songAttempts = sessionHistory.filter(s => s.song_id === song.id);
+            const bestAttempt = songAttempts.length > 0 
+              ? [...songAttempts].sort((a, b) => b.accuracy_pct - a.accuracy_pct)[0] 
+              : null;
+
+            const difficultyBadgeColor = 
+              song.difficulty === 'Beginner' ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800' :
+              song.difficulty === 'Intermediate' ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800' :
+              'bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 border-purple-200 dark:border-purple-800';
+
+            return (
+              <div
+                key={song.id}
+                className={`p-4 rounded-2xl border transition-colors duration-150 flex flex-col justify-between gap-4 relative group ${
+                  isCurrent
+                    ? 'bg-indigo-50/40 dark:bg-indigo-950/20 border-indigo-500/60 shadow-md ring-1 ring-indigo-500/30'
+                    : 'bg-white dark:bg-black/60 border-slate-200/90 dark:border-zinc-800/90 hover:border-slate-300 dark:hover:border-zinc-700 shadow-xs'
+                }`}
+              >
+                <div>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <h3 className="text-sm font-bold text-slate-900 dark:text-white tracking-tight truncate" title={song.title}>
+                        {song.title}
+                      </h3>
+                      <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5 truncate">
+                        {song.composer}
+                      </p>
+                    </div>
+                    
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {bestAttempt && (
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded-md border font-semibold bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800 flex items-center gap-1">
+                          <Trophy className="w-2.5 h-2.5 text-amber-500" />
+                          <span>{bestAttempt.accuracy_pct}%</span>
+                        </span>
+                      )}
+                      {song.source === 'local_midi' && (
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded-md border font-semibold bg-cyan-50 dark:bg-cyan-950/40 text-cyan-600 dark:text-cyan-400 border-cyan-200 dark:border-cyan-800 flex items-center gap-1">
+                          <Folder className="w-2.5 h-2.5" />
+                          <span>Local MIDI</span>
+                        </span>
+                      )}
+                      <span className={`text-[10px] font-mono px-2 py-0.5 rounded-md border font-semibold shrink-0 ${difficultyBadgeColor}`}>
+                        {song.difficulty}
+                      </span>
+                    </div>
+                  </div>
+
+                  {song.filename && (
+                    <p className="text-[10px] font-mono text-slate-400 dark:text-zinc-500 truncate mt-1">
+                      📁 {song.filename}
+                    </p>
+                  )}
+
+                  <div className="flex flex-wrap items-center gap-3 mt-3 text-[11px] font-mono text-slate-500 dark:text-zinc-400">
+                    <span className="font-semibold text-slate-700 dark:text-zinc-300">{song.key}</span>
+                    <span>•</span>
+                    <span>{song.bpm} BPM</span>
+                    <span>•</span>
+                    <span>{song.notes?.length || 0} notes</span>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-2 pt-2 border-t border-slate-100 dark:border-zinc-850">
+                  <button
+                    onClick={() => setSelectedPracticeSong(song)}
+                    className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-sky-600 hover:from-purple-500 hover:to-sky-500 text-white text-xs font-bold shadow-md shadow-indigo-500/20 transition-all cursor-pointer group"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                    <span>Practice with MIRA</span>
+                  </button>
+
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => handleWatchAndListen(song)}
+                      className="flex-1 flex items-center justify-center gap-1 py-1.5 px-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-white text-xs font-bold shadow-xs transition-all cursor-pointer"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      <span>Watch</span>
+                    </button>
+
+                    <button
+                      onClick={() => selectSongAndLearn(song, 'follow')}
+                      className="flex-1 flex items-center justify-center gap-1 py-1.5 px-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-xs transition-all cursor-pointer"
+                    >
+                      <GraduationCap className="w-3.5 h-3.5" />
+                      <span>Learn</span>
+                    </button>
+
+                    {isLocalOrImported && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (confirm(`Remove "${song.title}" from library?`)) {
+                            deleteMidiSong(song.id);
+                          }
+                        }}
+                        className="p-1.5 rounded-xl border border-rose-200/60 dark:border-rose-900/60 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-all cursor-pointer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Empty State */}
       {filteredSongs.length === 0 && (
         <div className="py-12 flex flex-col items-center justify-center text-center text-slate-400 dark:text-zinc-600">
           <FileMusic className="w-10 h-10 mb-2 opacity-40" />
@@ -570,6 +811,12 @@ export const SongsWorkspace: React.FC = () => {
       <SongPracticeHubModal 
         song={selectedPracticeSong} 
         onClose={() => setSelectedPracticeSong(null)} 
+      />
+
+      {/* Save Recording Confirmation Modal */}
+      <SaveRecordingModal
+        isOpen={showSaveRecordingModal}
+        onClose={closeSaveRecordingModal}
       />
 
     </div>

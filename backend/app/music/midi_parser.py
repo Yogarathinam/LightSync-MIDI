@@ -1,5 +1,6 @@
 import os
 import re
+import hashlib
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 import logging
@@ -34,14 +35,19 @@ def parse_midi_file(filepath: Path | str) -> Optional[Dict[str, Any]]:
         return None
 
     try:
-        mid = mido.MidiFile(str(path))
+        mid = mido.MidiFile(str(path), clip=True)
     except Exception as e:
         logger.error(f"Failed to open MIDI file {path.name}: {e}")
         return None
 
     ticks_per_beat = mid.ticks_per_beat or 480
-    song_id = f"midi_{re.sub(r'[^a-zA-Z0-9_]', '_', path.stem.lower())}"
-    default_title = path.stem.replace("_", " ").replace("-", " ").title()
+    # Include hash of file path to ensure absolute uniqueness across folders
+    path_hash = hashlib.md5(str(path.resolve()).lower().encode()).hexdigest()[:6]
+    song_id = f"midi_{re.sub(r'[^a-zA-Z0-9_]', '_', path.stem.lower())}_{path_hash}"
+    
+    clean_stem = path.stem.replace("_", " ").replace("-", " ")
+    clean_stem = re.sub(r"\s*\(\d+\)$", "", clean_stem)
+    default_title = clean_stem.strip().title()
 
     title: Optional[str] = None
     composer: Optional[str] = None
@@ -55,8 +61,8 @@ def parse_midi_file(filepath: Path | str) -> Optional[Dict[str, Any]]:
             if msg.is_meta:
                 if msg.type == "track_name" and not title and msg.name.strip():
                     cleaned = msg.name.strip()
-                    # Filter out generic track names like 'Track 1', 'Piano'
-                    if not re.match(r"^(track\s*\d+|piano|midi|channel\s*\d+)$", cleaned, re.IGNORECASE):
+                    # Filter out generic track names
+                    if not re.match(r"^(track\s*\d+|piano|midi|channel\s*\d+|melody|bass|drums|synth|chords|lead|chorus|verse)$", cleaned, re.IGNORECASE):
                         title = cleaned
                 elif msg.type == "set_tempo" and bpm == 120:
                     try:
@@ -78,7 +84,7 @@ def parse_midi_file(filepath: Path | str) -> Optional[Dict[str, Any]]:
                     if any(w in text.lower() for w in ["by ", "composer", "arranger", "copyright"]):
                         composer = text
 
-    if not title:
+    if not title or len(title) < 2:
         title = default_title
     if not composer:
         composer = "Local MIDI File"

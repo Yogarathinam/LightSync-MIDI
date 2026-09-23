@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useCallback, useMemo } from 'react';
-import { useLightSyncStore } from '../../store/useLightSyncStore';
+import { useLightSyncStore, getLedPosition } from '../../store/useLightSyncStore';
 import { useTheme } from '../../context/ThemeContext';
+import { synthEngine } from '../../audio/synthEngine';
 import { EffectType, EffectConfig, FlowKeyConfig } from '../../types';
 import { SongTimelineScrubber } from '../layout/SongTimelineScrubber';
 
@@ -528,6 +529,7 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
   const hasCompletedPieceRef = useRef<boolean>(false);
   const wrongNotesStruckRef = useRef<Set<number>>(new Set());
   const playbackPublishTimerRef = useRef<number>(0);
+  const activeGuideLedsRef = useRef<Set<number>>(new Set());
 
   // Cleanly synchronize song playback: whenever songPlaybackId or currentSong changes, reset notes
   useEffect(() => {
@@ -536,6 +538,8 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
     songBeatRef.current = 0;
     soundingSongNotesRef.current.forEach((pitch) => triggerNoteOff(pitch));
     soundingSongNotesRef.current.clear();
+    activeGuideLedsRef.current.forEach((pitch) => triggerNoteOff(pitch, true, 'Guide LED'));
+    activeGuideLedsRef.current.clear();
     fallingBarsRef.current = [];
     struckNotesRef.current.clear();
   }, [songPlaybackId, currentSong?.id, triggerNoteOff]);
@@ -610,7 +614,7 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
       if (!currentPitches.has(pitch)) {
         if (effectConfig.effect === 'static' || effectConfig.effect === 'blink') {
           const keyIdx = Math.max(0, Math.min(keyboardSize - 1, pitch - startMidi));
-          const centerLed = Math.floor((keyIdx / (keyboardSize - 1)) * 143);
+          const centerLed = getLedPosition(keyIdx, keyboardSize).centerLed;
           const cols = getNoteColors(pitch, effectConfig, flowKeyConfig);
           spawnParticle('static', centerLed, cols.primary);
         }
@@ -1071,12 +1075,79 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
                 }
               }
             }
+
+            // Synchronize target expected LEDs to M5Stack physical LED strip in wait_for_key mode
+            const targetGuidePitches = new Set<number>();
+            if (pendingAtHitline.length > 0) {
+              const remainingPending = pendingAtHitline.filter(
+                n => !struckNotesRef.current.has(`${n.pitch}_${n.time.toFixed(2)}`)
+              );
+              remainingPending.forEach(n => targetGuidePitches.add(n.pitch));
+            } else {
+              const activeDurationNotes = matchingNotes.filter(
+                n => struckNotesRef.current.has(`${n.pitch}_${n.time.toFixed(2)}`) &&
+                     currentBeat >= n.time &&
+                     currentBeat < (n.time + n.duration)
+              );
+              if (activeDurationNotes.length > 0) {
+                activeDurationNotes.forEach(n => targetGuidePitches.add(n.pitch));
+              } else {
+                const nextUpcoming = matchingNotes.find(
+                  n => !struckNotesRef.current.has(`${n.pitch}_${n.time.toFixed(2)}`)
+                );
+                if (nextUpcoming && (currentBeat + dt * (curSong.bpm / 60) >= nextUpcoming.time)) {
+                  targetGuidePitches.add(nextUpcoming.pitch);
+                }
+              }
+            }
+
+            const sendHardwareNoteOn = (p: number, v: number = 100) => {
+              const ws = useLightSyncStore.getState().wsSender;
+              if (ws) ws({ type: 'NOTE_ON', pitch: p, velocity: v });
+            };
+            const sendHardwareNoteOff = (p: number) => {
+              const ws = useLightSyncStore.getState().wsSender;
+              if (ws) ws({ type: 'NOTE_OFF', pitch: p });
+            };
+
+            // Turn off LEDs that are no longer target
+            activeGuideLedsRef.current.forEach((pitch) => {
+              if (!targetGuidePitches.has(pitch)) {
+                sendHardwareNoteOff(pitch);
+                activeGuideLedsRef.current.delete(pitch);
+              }
+            });
+
+            // Turn on target LEDs on M5Stack physical strip
+            targetGuidePitches.forEach((pitch) => {
+              if (!activeGuideLedsRef.current.has(pitch)) {
+                sendHardwareNoteOn(pitch, 100);
+                activeGuideLedsRef.current.add(pitch);
+              }
+            });
+          } else if (activeGuideLedsRef.current.size > 0) {
+            const sendHardwareNoteOff = (p: number) => {
+              const ws = useLightSyncStore.getState().wsSender;
+              if (ws) ws({ type: 'NOTE_OFF', pitch: p });
+            };
+            activeGuideLedsRef.current.forEach((pitch) => {
+              sendHardwareNoteOff(pitch);
+            });
           }
 
           if (canAdvance) {
             const prevBeat = songBeatRef.current;
             songBeatRef.current += dt * (curSong.bpm / 60);
             const currentBeat = songBeatRef.current;
+
+            const sendHardwareNoteOn = (p: number, v: number = 100) => {
+              const ws = useLightSyncStore.getState().wsSender;
+              if (ws) ws({ type: 'NOTE_ON', pitch: p, velocity: v });
+            };
+            const sendHardwareNoteOff = (p: number) => {
+              const ws = useLightSyncStore.getState().wsSender;
+              if (ws) ws({ type: 'NOTE_OFF', pitch: p });
+            };
 
             // In Watch & Listen: trigger notes and explosive impact visuals
             if (curLearnMode !== 'wait_for_key') {
@@ -1085,7 +1156,8 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
 
                 // Note On
                 if (prevBeat < note.time && currentBeat >= note.time) {
-                  triggerNoteOn(note.pitch, 100);
+                  sendHardwareNoteOn(note.pitch, 100);
+                  try { synthEngine.noteOn(note.pitch, 100); } catch (_) {}
                   soundingSongNotesRef.current.set(idx, note.pitch);
 
                   const geom = getKeyGeometry(note.pitch, width, keyAreaTop, keyAreaHeight);
@@ -1095,7 +1167,7 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
                       : (rightHandColorRef.current || '#10b981');
                     const col = hexToRgb(noteColorHex);
                     const keyIdx = Math.max(0, Math.min(keyboardSize - 1, note.pitch - startMidi));
-                    const centerLed = Math.floor((keyIdx / (keyboardSize - 1)) * 143);
+                    const centerLed = getLedPosition(keyIdx, keyboardSize).centerLed;
 
                     if (curEff.effect !== 'static' && curEff.effect !== 'blink') {
                       for (let s = 0; s < 4; s++) spawnParticle('spark', centerLed, col);
@@ -1113,7 +1185,8 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
                 const noteEnd = note.time + note.duration;
                 if (prevBeat < noteEnd && currentBeat >= noteEnd) {
                   if (soundingSongNotesRef.current.has(idx)) {
-                    triggerNoteOff(note.pitch);
+                    sendHardwareNoteOff(note.pitch);
+                    try { synthEngine.noteOff(note.pitch); } catch (_) {}
                     soundingSongNotesRef.current.delete(idx);
                   }
                 }
@@ -1173,14 +1246,20 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
           barGrad.addColorStop(0.85, `rgba(${col.r}, ${col.g}, ${col.b}, 0.95)`);
           barGrad.addColorStop(1, '#ffffff');
 
-          ctx.fillStyle = barGrad;
-          ctx.beginPath();
-          ctx.roundRect(barX, noteY, barW, barH, [6, 6, 4, 4]);
-          ctx.fill();
+          if (!isNaN(barX) && !isNaN(noteY) && !isNaN(barW) && !isNaN(barH) && barW > 0 && barH > 0) {
+            ctx.fillStyle = barGrad;
+            ctx.beginPath();
+            if (typeof (ctx as any).roundRect === 'function') {
+              (ctx as any).roundRect(barX, noteY, barW, barH, [6, 6, 4, 4]);
+            } else {
+              ctx.rect(barX, noteY, barW, barH);
+            }
+            ctx.fill();
 
-          ctx.strokeStyle = `rgba(${col.r}, ${col.g}, ${col.b}, 0.9)`;
-          ctx.lineWidth = 1.2;
-          ctx.stroke();
+            ctx.strokeStyle = `rgba(${col.r}, ${col.g}, ${col.b}, 0.9)`;
+            ctx.lineWidth = 1.2;
+            ctx.stroke();
+          }
 
           // Impact / Active Glow at LED strip line
           const noteBottom = noteY + barH;
@@ -1234,7 +1313,7 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
               triggerNoteOn(bar.pitch, 100);
 
               const keyIdx = Math.max(0, Math.min(keyboardSize - 1, bar.pitch - startMidi));
-              const centerLed = Math.floor((keyIdx / (keyboardSize - 1)) * 143);
+              const centerLed = getLedPosition(keyIdx, keyboardSize).centerLed;
               if (curEff.effect !== 'static' && curEff.effect !== 'blink') {
                 for (let s = 0; s < 4; s++) spawnParticle('spark', centerLed, bar.color);
                 const keyCenterX = bar.x + bar.width / 2;
@@ -1348,7 +1427,7 @@ export const StudioCanvas: React.FC<{ onFpsUpdate?: (fps: number) => void }> = (
           // Continuous contact sparks
           if (curFlow.showParticles && Math.random() < 0.25) {
             const keyIdx = Math.max(0, Math.min(keyboardSize - 1, t.pitch - startMidi));
-            const centerLed = Math.floor((keyIdx / (keyboardSize - 1)) * 143);
+            const centerLed = getLedPosition(keyIdx, keyboardSize).centerLed;
             spawnParticle('spark', centerLed, t.color);
             const geom = getKeyGeometry(t.pitch, width, keyAreaTop, keyAreaHeight);
             if (geom) {

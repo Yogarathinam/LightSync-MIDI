@@ -183,11 +183,14 @@ class MidiEngine:
                 num = winmm.midiInGetNumDevs()
                 dev_idx = -1
                 for i in range(num):
-                    caps = MIDIINCAPSW()
-                    if winmm.midiInGetDevCapsW(i, ctypes.byref(caps), ctypes.sizeof(caps)) == 0:
-                        if target_port == caps.szPname or target_port in caps.szPname or caps.szPname in target_port:
-                            dev_idx = i
-                            break
+                    try:
+                        caps = MIDIINCAPSW()
+                        if winmm.midiInGetDevCapsW(i, ctypes.byref(caps), ctypes.sizeof(caps)) == 0:
+                            if target_port == caps.szPname or target_port in caps.szPname or caps.szPname in target_port:
+                                dev_idx = i
+                                break
+                    except Exception:
+                        pass
                 if dev_idx == -1 and num > 0:
                     dev_idx = 0
 
@@ -210,13 +213,17 @@ class MidiEngine:
                                 self.handle_note_off(pitch, source="physical_midi")
 
                     self._winmm_cb = MIDIINPROC(_winmm_proc)
-                    res = winmm.midiInOpen(
-                        ctypes.byref(h_midi),
-                        dev_idx,
-                        self._winmm_cb,
-                        0,
-                        CALLBACK_FUNCTION
-                    )
+                    res = -1
+                    try:
+                        res = winmm.midiInOpen(
+                            ctypes.byref(h_midi),
+                            dev_idx,
+                            self._winmm_cb,
+                            0,
+                            CALLBACK_FUNCTION
+                        )
+                    except Exception as err:
+                        logger.warning(f"WinMM midiInOpen exception: {err}")
                     if res == 0:
                         winmm.midiInStart(h_midi)
                         self._winmm_handle = h_midi

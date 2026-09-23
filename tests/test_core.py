@@ -34,6 +34,22 @@ class TestLightSyncCore(unittest.TestCase):
         self.assertIsNotNone(g7)
         self.assertEqual(g7["chord"], "G 7")
 
+    def test_serial_manager_octave_and_transpose_shift(self):
+        from app.device.serial_manager import SerialDeviceManager
+        sm = SerialDeviceManager()
+        sm.connect("SIMULATED")
+        
+        event_bus.publish_sync("OCTAVE_SHIFT_CHANGED", {"octave_shift": 1})
+        event_bus.publish_sync("TRANSPOSE_CHANGED", {"transpose": 2})
+        self.assertEqual(sm.octave_shift, 1)
+        self.assertEqual(sm.transpose, 2)
+        
+        event_bus.publish_sync("NOTE_ON", {"pitch": 60, "velocity": 100})
+        self.assertEqual(sm.active_note_shifts[60], 74)
+        
+        event_bus.publish_sync("NOTE_OFF", {"pitch": 60})
+        self.assertNotIn(60, sm.active_note_shifts)
+
     def test_protocol_builder(self):
         note_on = ProtocolBuilder.note_on(60, 110)
         self.assertEqual(note_on, "NOTE_ON 60 110\n")

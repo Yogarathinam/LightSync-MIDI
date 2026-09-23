@@ -24,6 +24,9 @@ class SerialDeviceManager:
         self.simulated = True
         self.last_ping_ms = 0
         self.last_latency_ms = 0
+        self.octave_shift: int = 0
+        self.transpose: int = 0
+        self.active_note_shifts: Dict[int, int] = {}
         self.device_info: Dict[str, Any] = {
             "name": "LightSync M5 Core",
             "firmware": "v2.0-PRO",
@@ -39,6 +42,8 @@ class SerialDeviceManager:
         event_bus.subscribe("COLOR_PRESET_CHANGED", self._on_preset_changed)
         event_bus.subscribe("KEY_COUNT_CHANGED", self._on_key_count_changed)
         event_bus.subscribe("MIDI_STATUS", self._on_midi_status)
+        event_bus.subscribe("OCTAVE_SHIFT_CHANGED", self._on_octave_shift_changed)
+        event_bus.subscribe("TRANSPOSE_CHANGED", self._on_transpose_changed)
 
     def list_ports(self) -> List[Dict[str, str]]:
         if not serial:
@@ -46,7 +51,21 @@ class SerialDeviceManager:
 
         try:
             ports = serial.tools.list_ports.comports()
-            res = [{"port": p.device, "desc": p.description} for p in ports]
+            cp210x_ports = []
+            other_ports = []
+            for p in ports:
+                item = {"port": p.device, "desc": p.description or ""}
+                desc_lower = (p.description or "").lower()
+                mfg_lower = getattr(p, "manufacturer", "") or ""
+                if isinstance(mfg_lower, str):
+                    mfg_lower = mfg_lower.lower()
+                
+                if any(k in desc_lower or k in mfg_lower for k in ["silicon", "cp210", "m5stack", "ch340"]):
+                    cp210x_ports.append(item)
+                else:
+                    other_ports.append(item)
+
+            res = cp210x_ports + other_ports
             res.append({"port": "STANDALONE", "desc": "LightSync Optical Engine (Virtual)"})
             return res
         except Exception as e:
@@ -128,19 +147,30 @@ class SerialDeviceManager:
     def _on_note_on(self, data: Dict[str, Any]):
         pitch = data.get("pitch", 60)
         vel = data.get("velocity", 100)
-        self.send_raw(ProtocolBuilder.note_on(pitch, vel))
+        shifted_pitch = max(0, min(127, pitch + (self.octave_shift * 12) + self.transpose))
+        self.active_note_shifts[pitch] = shifted_pitch
+        self.send_raw(ProtocolBuilder.note_on(shifted_pitch, vel))
         chord = data.get("chord")
         if chord and isinstance(chord, dict) and "chord" in chord:
             self.send_raw(ProtocolBuilder.chord(chord["chord"]))
 
     def _on_note_off(self, data: Dict[str, Any]):
         pitch = data.get("pitch", 60)
-        self.send_raw(ProtocolBuilder.note_off(pitch))
+        shifted_pitch = self.active_note_shifts.pop(pitch, max(0, min(127, pitch + (self.octave_shift * 12) + self.transpose)))
+        self.send_raw(ProtocolBuilder.note_off(shifted_pitch))
         chord = data.get("chord")
         if chord and isinstance(chord, dict) and "chord" in chord:
             self.send_raw(ProtocolBuilder.chord(chord["chord"]))
         elif data.get("active_count", 0) == 0:
             self.send_raw(ProtocolBuilder.chord("Ready"))
+
+    def _on_octave_shift_changed(self, data: Dict[str, Any]):
+        self.octave_shift = int(data.get("octave_shift", 0))
+        logger.info(f"SerialManager octave_shift updated to {self.octave_shift}")
+
+    def _on_transpose_changed(self, data: Dict[str, Any]):
+        self.transpose = int(data.get("transpose", 0))
+        logger.info(f"SerialManager transpose updated to {self.transpose}")
 
     def _on_effect_changed(self, data: Dict[str, Any]):
         eff = data.get("effect", "bounce")

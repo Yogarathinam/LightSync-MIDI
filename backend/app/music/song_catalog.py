@@ -119,49 +119,73 @@ SONG_CATALOG: List[Dict[str, Any]] = [
     }
 ]
 
-# Cached local MIDI songs
+# Cached local MIDI songs & mtime parse cache
 _cached_local_songs: List[Dict[str, Any]] = []
+_file_parse_cache: Dict[str, tuple[float, Dict[str, Any]]] = {}  # filepath -> (mtime, song_dict)
 _has_scanned: bool = False
 
 def scan_midi_folders() -> List[Dict[str, Any]]:
     """
-    Scans the primary backend/data/midi directory and optional backend/midi directory
-    for .mid and .midi files, parses them, and updates cache.
+    Scans primary backend/data/midi directory and related midi folders
+    recursively for .mid and .midi files (case-insensitive), parses them with mtime caching, and updates library.
     """
-    global _cached_local_songs, _has_scanned
+    global _cached_local_songs, _has_scanned, _file_parse_cache
     folder = get_midi_folder_path()
     generate_sample_midi_files(folder)
 
-    # Directories to scan
-    scan_dirs = [folder]
-    alt_folder = Path(__file__).resolve().parent.parent.parent / "midi"
-    if alt_folder.exists() and alt_folder.is_dir() and alt_folder != folder:
-        scan_dirs.append(alt_folder)
+    # Candidate directories to scan recursively
+    root_backend = Path(__file__).resolve().parent.parent.parent
+    scan_dirs = [
+        folder,
+        root_backend / "data" / "midi",
+        root_backend / "midi",
+        root_backend.parent / "data" / "midi",
+        root_backend.parent / "midi"
+    ]
 
     discovered_songs: List[Dict[str, Any]] = []
     seen_ids = set()
 
     for d in scan_dirs:
-        midi_files = sorted(list(d.glob("*.mid")) + list(d.glob("*.midi")))
-        for mf in midi_files:
-            try:
-                song = parse_midi_file(mf)
-                if song and song["id"] not in seen_ids:
-                    seen_ids.add(song["id"])
-                    discovered_songs.append(song)
-            except Exception as e:
-                logger.error(f"Error parsing MIDI file {mf.name}: {e}")
+        if not d.exists() or not d.is_dir():
+            continue
+        try:
+            # Recursive scan for all case variations (.mid, .midi, .MID, .MIDI)
+            candidate_files = [
+                p for p in d.rglob("*")
+                if p.is_file() and p.suffix.lower() in (".mid", ".midi")
+            ]
+            candidate_files.sort(key=lambda p: p.name.lower())
+
+            for mf in candidate_files:
+                try:
+                    str_path = str(mf.resolve())
+                    mtime = mf.stat().st_mtime
+                    
+                    # Check mtime cache to speed up rescan
+                    if str_path in _file_parse_cache and _file_parse_cache[str_path][0] == mtime:
+                        song = _file_parse_cache[str_path][1]
+                    else:
+                        song = parse_midi_file(mf)
+                        if song:
+                            _file_parse_cache[str_path] = (mtime, song)
+
+                    if song and song["id"] not in seen_ids:
+                        seen_ids.add(song["id"])
+                        discovered_songs.append(song)
+                except Exception as e:
+                    logger.error(f"Error parsing MIDI file {mf.name}: {e}")
+        except Exception as err:
+            logger.error(f"Error scanning directory {d}: {err}")
 
     _cached_local_songs = discovered_songs
     _has_scanned = True
-    logger.info(f"Scanned MIDI folder. Found {len(_cached_local_songs)} local MIDI songs.")
+    logger.info(f"Scanned MIDI folders. Found {len(_cached_local_songs)} local MIDI songs.")
     return _cached_local_songs
 
 def get_all_songs() -> List[Dict[str, Any]]:
     """Returns combined list of curated songs and scanned local MIDI songs."""
-    global _has_scanned
-    if not _has_scanned:
-        scan_midi_folders()
+    scan_midi_folders()
     return SONG_CATALOG + _cached_local_songs
 
 def rescan_midi_folder() -> List[Dict[str, Any]]:

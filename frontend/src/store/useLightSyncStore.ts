@@ -29,11 +29,36 @@ import {
 import { synthEngine } from '../audio/synthEngine';
 import { createMidiFile, downloadMidiFile } from '../utils/midi_recorder';
 
+export const getApiUrl = (path: string): string => {
+  const cleanPath = path.startsWith('/') ? path : `/${path}`;
+  if (typeof window !== 'undefined' && window.location) {
+    if (window.location.port === '5173' || window.location.port === '3000') {
+      return `http://127.0.0.1:8765${cleanPath}`;
+    }
+    if (window.location.origin && window.location.origin !== 'null' && !window.location.origin.startsWith('file://')) {
+      return `${window.location.origin}${cleanPath}`;
+    }
+  }
+  return `http://127.0.0.1:8765${cleanPath}`;
+};
+
 const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 export const getMidiNoteName = (pitch: number) => {
   const octave = Math.floor(pitch / 12) - 1;
   const name = NOTE_NAMES[pitch % 12];
   return `${name}${octave}`;
+};
+
+export const getLedPosition = (keyIdx: number, keyboardSize: number = 61) => {
+  const ledsPerKey = 2; // Step of 2 LEDs (Key 0 = LED 11, Key 1 = LED 13, Key 2 = LED 15 -> 1 LED spacer gap!)
+  let leftMargin = 11;
+  if (keyboardSize === 61) leftMargin = 11;
+  else if (keyboardSize === 88) leftMargin = 0;
+  else if (keyboardSize === 49) leftMargin = 23;
+  else if (keyboardSize === 25) leftMargin = 47;
+
+  const ledStart = leftMargin + keyIdx * ledsPerKey;
+  return { ledStart, ledEnd: ledStart, centerLed: ledStart };
 };
 
 function hexToRgb(hex: string): { r: number; g: number; b: number } {
@@ -353,9 +378,13 @@ interface LightSyncState {
   recordingStartTime: number | null;
   recordedEvents: RecordedMidiEvent[];
   isPlayingRecording: boolean;
+  showSaveRecordingModal: boolean;
   startRecording: () => void;
   recordEvent: (event: RecordedMidiEvent) => void;
   stopRecording: () => RecordedMidiEvent[];
+  stopRecordingAndPrompt: () => void;
+  openSaveRecordingModal: () => void;
+  closeSaveRecordingModal: () => void;
   playRecording: () => void;
   stopPlayback: () => void;
   downloadRecording: (filename?: string) => void;
@@ -581,11 +610,10 @@ export const useLightSyncStore = create<LightSyncState>((set, get) => ({
     const { activeNotes, keyboardSize, octaveShift, transpose, wsSender, currentChord } = get();
     if (activeNotes.has(pitch)) return;
 
-    // Calculate normalized LED center
+    // Calculate normalized LED center (2 LEDs per note for 61 keys on 144-LED strip with 22 margin LEDs)
     const baseStartMidi = keyboardSize === 25 ? 48 : keyboardSize === 49 ? 36 : keyboardSize === 61 ? 36 : 21;
-    const startMidi = baseStartMidi + (octaveShift * 12) + transpose;
-    const keyIdx = Math.max(0, Math.min(keyboardSize - 1, pitch - startMidi));
-    const centerLed = Math.floor((keyIdx / (keyboardSize - 1)) * 143);
+    const keyIdx = Math.max(0, Math.min(keyboardSize - 1, pitch - baseStartMidi));
+    const centerLed = getLedPosition(keyIdx, keyboardSize).centerLed;
 
     // Audio synth
     synthEngine.noteOn(pitch, velocity);
@@ -706,28 +734,46 @@ export const useLightSyncStore = create<LightSyncState>((set, get) => ({
   },
   setKeyboardHeight: (height) => set({ keyboardHeight: Math.max(100, Math.min(420, height)) }),
   setOctaveShift: (shift) => {
-    set({ octaveShift: Math.max(-4, Math.min(4, shift)) });
+    const val = Math.max(-4, Math.min(4, shift));
+    set({ octaveShift: val });
     triggerPersist(get());
+    const { wsSender } = get();
+    if (wsSender) wsSender({ type: 'OCTAVE_SHIFT_CHANGED', octave_shift: val });
   },
   incrementOctave: () => {
-    set((state) => ({ octaveShift: Math.max(-4, Math.min(4, state.octaveShift + 1)) }));
+    const val = Math.max(-4, Math.min(4, get().octaveShift + 1));
+    set({ octaveShift: val });
     triggerPersist(get());
+    const { wsSender } = get();
+    if (wsSender) wsSender({ type: 'OCTAVE_SHIFT_CHANGED', octave_shift: val });
   },
   decrementOctave: () => {
-    set((state) => ({ octaveShift: Math.max(-4, Math.min(4, state.octaveShift - 1)) }));
+    const val = Math.max(-4, Math.min(4, get().octaveShift - 1));
+    set({ octaveShift: val });
     triggerPersist(get());
+    const { wsSender } = get();
+    if (wsSender) wsSender({ type: 'OCTAVE_SHIFT_CHANGED', octave_shift: val });
   },
   setTranspose: (semitones) => {
-    set({ transpose: Math.max(-12, Math.min(12, semitones)) });
+    const val = Math.max(-12, Math.min(12, semitones));
+    set({ transpose: val });
     triggerPersist(get());
+    const { wsSender } = get();
+    if (wsSender) wsSender({ type: 'TRANSPOSE_CHANGED', transpose: val });
   },
   incrementTranspose: () => {
-    set((state) => ({ transpose: Math.max(-12, Math.min(12, state.transpose + 1)) }));
+    const val = Math.max(-12, Math.min(12, get().transpose + 1));
+    set({ transpose: val });
     triggerPersist(get());
+    const { wsSender } = get();
+    if (wsSender) wsSender({ type: 'TRANSPOSE_CHANGED', transpose: val });
   },
   decrementTranspose: () => {
-    set((state) => ({ transpose: Math.max(-12, Math.min(12, state.transpose - 1)) }));
+    const val = Math.max(-12, Math.min(12, get().transpose - 1));
+    set({ transpose: val });
     triggerPersist(get());
+    const { wsSender } = get();
+    if (wsSender) wsSender({ type: 'TRANSPOSE_CHANGED', transpose: val });
   },
   setKeyLabels: (labels) => set({ keyLabels: labels }),
   setDiffuseBlur: (enabled) => set({ diffuseBlur: enabled }),
@@ -1061,6 +1107,7 @@ export const useLightSyncStore = create<LightSyncState>((set, get) => ({
   recordingStartTime: null,
   recordedEvents: [],
   isPlayingRecording: false,
+  showSaveRecordingModal: false,
 
   startRecording: () => {
     recordingPlaybackTimers.forEach(t => clearTimeout(t));
@@ -1069,7 +1116,8 @@ export const useLightSyncStore = create<LightSyncState>((set, get) => ({
       isRecording: true,
       recordingStartTime: performance.now(),
       recordedEvents: [],
-      isPlayingRecording: false
+      isPlayingRecording: false,
+      showSaveRecordingModal: false
     });
     get().addConsoleLog('Started Live MIDI Recording (.mid)...');
   },
@@ -1086,6 +1134,14 @@ export const useLightSyncStore = create<LightSyncState>((set, get) => ({
     get().addConsoleLog(`Stopped MIDI Recording. Captured ${events.length} events.`);
     return events;
   },
+
+  stopRecordingAndPrompt: () => {
+    get().stopRecording();
+    set({ showSaveRecordingModal: true });
+  },
+
+  openSaveRecordingModal: () => set({ showSaveRecordingModal: true }),
+  closeSaveRecordingModal: () => set({ showSaveRecordingModal: false }),
 
   playRecording: () => {
     const { recordedEvents, triggerNoteOn, triggerNoteOff } = get();
@@ -1187,7 +1243,7 @@ export const useLightSyncStore = create<LightSyncState>((set, get) => ({
     get().addConsoleLog(`Saved recorded session as song: "${newSong.title}" with ${songNotes.length} notes.`);
 
     try {
-      await fetch('http://localhost:8000/api/midi/record/save', {
+      await fetch(getApiUrl('/api/midi/record/save'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1257,7 +1313,7 @@ export const useLightSyncStore = create<LightSyncState>((set, get) => ({
   isScanningMidi: false,
   fetchSongs: async () => {
     try {
-      const res = await fetch('http://localhost:8000/api/songs');
+      const res = await fetch(getApiUrl('/api/songs'));
       if (!res.ok) return;
       const data = await res.json();
       if (data.songs && Array.isArray(data.songs)) {
@@ -1273,7 +1329,7 @@ export const useLightSyncStore = create<LightSyncState>((set, get) => ({
   rescanMidiFolder: async () => {
     set({ isScanningMidi: true });
     try {
-      const res = await fetch('http://localhost:8000/api/songs/rescan', { method: 'POST' });
+      const res = await fetch(getApiUrl('/api/songs/rescan'), { method: 'POST' });
       if (res.ok) {
         const data = await res.json();
         if (data.songs) {
@@ -1295,7 +1351,7 @@ export const useLightSyncStore = create<LightSyncState>((set, get) => ({
     try {
       const formData = new FormData();
       formData.append('file', file);
-      const res = await fetch('http://localhost:8000/api/songs/upload', {
+      const res = await fetch(getApiUrl('/api/songs/upload'), {
         method: 'POST',
         body: formData
       });
@@ -1315,7 +1371,7 @@ export const useLightSyncStore = create<LightSyncState>((set, get) => ({
   },
   deleteMidiSong: async (songId: string) => {
     try {
-      await fetch(`http://localhost:8000/api/songs/${encodeURIComponent(songId)}`, {
+      await fetch(getApiUrl(`/api/songs/${encodeURIComponent(songId)}`), {
         method: 'DELETE'
       });
     } catch (e) {
@@ -1387,7 +1443,22 @@ export const useLightSyncStore = create<LightSyncState>((set, get) => ({
       const res = await fetch('/api/device/ports');
       if (res.ok) {
         const data = await res.json();
-        set({ devicePorts: data.ports || [] });
+        const ports: Array<{ port: string; desc: string }> = data.ports || [];
+        set({ devicePorts: ports });
+
+        const cp210xPort = ports.find((p) => {
+          const d = (p.desc || '').toLowerCase();
+          return p.port !== 'STANDALONE' && (d.includes('silicon') || d.includes('cp210') || d.includes('m5stack') || d.includes('ch340'));
+        });
+        const bestPort = cp210xPort ? cp210xPort.port : (ports.find((p) => p.port !== 'STANDALONE')?.port || 'STANDALONE');
+        if (bestPort && bestPort !== 'STANDALONE') {
+          set((state) => ({
+            deviceStatus: {
+              ...state.deviceStatus,
+              port: state.deviceStatus.port && state.deviceStatus.port !== 'STANDALONE' ? state.deviceStatus.port : bestPort
+            }
+          }));
+        }
       }
     } catch (e) {
       console.warn('Could not fetch device COM ports:', e);

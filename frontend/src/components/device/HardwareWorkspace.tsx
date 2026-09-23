@@ -55,8 +55,23 @@ export const HardwareWorkspace: React.FC = () => {
   }, [fetchDevicePorts, fetchMidiPorts]);
 
   useEffect(() => {
-    if (deviceStatus.port) setSelectedModulePort(deviceStatus.port);
-  }, [deviceStatus.port]);
+    if (devicePorts.length > 0) {
+      const cp210x = devicePorts.find((p) => {
+        const d = (p.desc || '').toLowerCase();
+        return p.port !== 'STANDALONE' && (d.includes('silicon') || d.includes('cp210') || d.includes('m5stack') || d.includes('ch340'));
+      });
+      if (cp210x) {
+        setSelectedModulePort(cp210x.port);
+      } else if (deviceStatus.port) {
+        setSelectedModulePort(deviceStatus.port);
+      } else {
+        const firstReal = devicePorts.find((p) => p.port !== 'STANDALONE');
+        if (firstReal) setSelectedModulePort(firstReal.port);
+      }
+    } else if (deviceStatus.port) {
+      setSelectedModulePort(deviceStatus.port);
+    }
+  }, [devicePorts, deviceStatus.port]);
 
   useEffect(() => {
     if (activeMidiPort) setSelectedMidiPort(activeMidiPort);

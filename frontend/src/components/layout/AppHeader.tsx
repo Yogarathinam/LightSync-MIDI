@@ -67,7 +67,8 @@ export const AppHeader: React.FC<{
     decrementOctave,
     isRecording,
     startRecording,
-    stopRecording
+    stopRecording,
+    stopRecordingAndPrompt
   } = useLightSyncStore();
 
 
@@ -333,7 +334,7 @@ export const AppHeader: React.FC<{
               </button>
             ) : (
               <button
-                onClick={() => stopRecording()}
+                onClick={() => stopRecordingAndPrompt()}
                 title="Stop Recording Live Session"
                 className="w-7 h-7 rounded-lg flex items-center justify-center bg-rose-600 text-white animate-pulse transition-all cursor-pointer"
               >

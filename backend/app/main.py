@@ -43,6 +43,18 @@ async def lifespan(app: FastAPI):
     midi_engine.start()
     serial_manager.connect("SIMULATED")
 
+    # Load initial persisted user settings into serial_manager
+    if SETTINGS_FILE.exists():
+        try:
+            with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
+                s_data = json.load(f)
+                if "octaveShift" in s_data:
+                    serial_manager.octave_shift = int(s_data["octaveShift"])
+                if "transpose" in s_data:
+                    serial_manager.transpose = int(s_data["transpose"])
+        except Exception as e:
+            logger.error(f"Error loading user settings on startup: {e}")
+
     # Hook event bus to forward events to all active WebSocket clients thread-safely
     def forward_to_ws(event: Dict[str, Any]):
         if not active_websockets:
@@ -182,9 +194,25 @@ def save_user_settings(payload: Dict[str, Any]):
         SETTINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
         with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
             json.dump(payload, f, indent=2)
+        if "octaveShift" in payload:
+            event_bus.publish_sync("OCTAVE_SHIFT_CHANGED", {"octave_shift": payload["octaveShift"]})
+        if "transpose" in payload:
+            event_bus.publish_sync("TRANSPOSE_CHANGED", {"transpose": payload["transpose"]})
         return {"status": "ok", "saved": True}
     except Exception as e:
         logger.error(f"Error saving user settings: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/settings/clear")
+def clear_user_settings():
+    try:
+        if SETTINGS_FILE.exists():
+            SETTINGS_FILE.unlink()
+        event_bus.publish_sync("OCTAVE_SHIFT_CHANGED", {"octave_shift": 0})
+        event_bus.publish_sync("TRANSPOSE_CHANGED", {"transpose": 0})
+        return {"status": "ok", "cleared": True}
+    except Exception as e:
+        logger.error(f"Error clearing user settings: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -414,6 +442,14 @@ async def websocket_endpoint(websocket: WebSocket):
                 elif msg_type == "KEY_COUNT_CHANGED":
                     key_count = msg.get("key_count", 61)
                     event_bus.publish_sync("KEY_COUNT_CHANGED", {"key_count": key_count})
+
+                elif msg_type == "OCTAVE_SHIFT_CHANGED":
+                    shift = int(msg.get("octave_shift", 0))
+                    event_bus.publish_sync("OCTAVE_SHIFT_CHANGED", {"octave_shift": shift})
+
+                elif msg_type == "TRANSPOSE_CHANGED":
+                    trans = int(msg.get("transpose", 0))
+                    event_bus.publish_sync("TRANSPOSE_CHANGED", {"transpose": trans})
 
                 elif msg_type == "START_SESSION":
                     song_id = msg.get("song_id", "freestyle")

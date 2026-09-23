@@ -25,10 +25,12 @@ const MainApp: React.FC = () => {
   const activeWorkspace = useLightSyncStore((s) => s.activeWorkspace);
   const closeWorkspace = useLightSyncStore((s) => s.closeWorkspace);
   const loadSettingsFromFile = useLightSyncStore((s) => s.loadSettingsFromFile);
+  const fetchSongs = useLightSyncStore((s) => s.fetchSongs);
 
   useEffect(() => {
     loadSettingsFromFile();
-  }, [loadSettingsFromFile]);
+    fetchSongs();
+  }, [loadSettingsFromFile, fetchSongs]);
 
   const handleFpsUpdate = React.useCallback((val: number) => {
     setFps(val);
