@@ -18,7 +18,8 @@
     "showParticles": true,
     "bloomGlow": true,
     "customColor": "#00f0ff",
-    "customSecondaryColor": "#ec4899"
+    "customSecondaryColor": "#ec4899",
+    "flowDirection": "down"
   },
   "bgConfig": {
     "showVerticalPitchLanes": true,
@@ -34,5 +35,7 @@
   "volume": 0.7,
   "keyboardSize": 61,
   "octaveShift": 0,
-  "transpose": 0
+  "transpose": 2,
+  "leftHandColor": "#38bdf8",
+  "rightHandColor": "#10b981"
 }

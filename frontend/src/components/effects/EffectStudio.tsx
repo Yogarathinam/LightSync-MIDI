@@ -14,7 +14,10 @@ import {
   Grid,
   Clock,
   Zap,
-  CheckCircle2
+  CheckCircle2,
+  Minus,
+  Plus,
+  Music
 } from 'lucide-react';
 import { useLightSyncStore, COLOR_SYNC_PRESETS } from '../../store/useLightSyncStore';
 import { EffectType, ColorSyncPresetId, FlowKeyTrailStyle } from '../../types';
@@ -49,8 +52,15 @@ export const EffectStudio: React.FC = () => {
     setBgConfigParam,
     applyColorPreset,
     addConsoleLog,
-    wsSender 
+    wsSender,
+    octaveShift,
+    incrementOctave,
+    decrementOctave,
+    transpose,
+    incrementTranspose,
+    decrementTranspose
   } = useLightSyncStore();
+
 
   // Natural structured order: 1. LED Effects -> 2. FlowKey -> 3. Grid & Background
   const [activeSection, setActiveSection] = useState<'led' | 'flow' | 'background'>('led');
@@ -336,8 +346,89 @@ export const EffectStudio: React.FC = () => {
                 </div>
               </div>
             </div>
+
+            {/* LED Position Octave Shift & Pitch Transpose Control Pod */}
+            <div className="bg-white dark:bg-black rounded-2xl border border-slate-200 dark:border-zinc-800 p-5 shadow-sm transition-colors flex flex-col gap-4">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-zinc-800">
+                <div>
+                  <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    <Music className="w-4 h-4 text-indigo-500" />
+                    LED Position Octave Shift & Pitch Transpose
+                  </h2>
+                  <p className="text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5">
+                    Adjust key-to-LED spatial alignment across the WS2812B LED strip using step buttons
+                  </p>
+                </div>
+                <span className="text-[11px] font-mono text-indigo-500 font-bold bg-indigo-50 dark:bg-zinc-900 px-2 py-0.5 rounded border border-indigo-200 dark:border-zinc-800">
+                  STEPPER BUTTONS
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* 1. LED Octave Shift Stepper */}
+                <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 flex items-center justify-between">
+                  <div>
+                    <div className="text-xs font-bold text-slate-800 dark:text-zinc-200">LED Octave Shift</div>
+                    <div className="text-[10px] text-slate-500 dark:text-zinc-400 mt-0.5">Shift LED strip alignment by octaves</div>
+                  </div>
+
+                  <div className="flex items-center bg-slate-200/80 dark:bg-zinc-900 p-1 rounded-xl border border-slate-300/80 dark:border-zinc-700">
+                    <button
+                      onClick={decrementOctave}
+                      className="w-8 h-8 rounded-lg bg-white dark:bg-zinc-800 flex items-center justify-center text-slate-700 dark:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-700 active:scale-95 transition-all shadow-xs cursor-pointer"
+                      title="Shift LED Octave Down (-12 st)"
+                    >
+                      <Minus className="w-4 h-4" />
+                    </button>
+
+                    <span className="px-3 font-mono font-bold text-xs text-slate-900 dark:text-white min-w-[60px] text-center select-none">
+                      {octaveShift === 0 ? 'Oct 0' : `Oct ${octaveShift > 0 ? `+${octaveShift}` : octaveShift}`}
+                    </span>
+
+                    <button
+                      onClick={incrementOctave}
+                      className="w-8 h-8 rounded-lg bg-white dark:bg-zinc-800 flex items-center justify-center text-slate-700 dark:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-700 active:scale-95 transition-all shadow-xs cursor-pointer"
+                      title="Shift LED Octave Up (+12 st)"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* 2. LED Pitch Transpose Stepper */}
+                <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 flex items-center justify-between">
+                  <div>
+                    <div className="text-xs font-bold text-slate-800 dark:text-zinc-200">LED Pitch Transpose</div>
+                    <div className="text-[10px] text-slate-500 dark:text-zinc-400 mt-0.5">Shift LED position by semitones</div>
+                  </div>
+
+                  <div className="flex items-center bg-slate-200/80 dark:bg-zinc-900 p-1 rounded-xl border border-slate-300/80 dark:border-zinc-700">
+                    <button
+                      onClick={decrementTranspose}
+                      className="w-8 h-8 rounded-lg bg-white dark:bg-zinc-800 flex items-center justify-center text-slate-700 dark:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-700 active:scale-95 transition-all shadow-xs cursor-pointer"
+                      title="Transpose -1 Semitone"
+                    >
+                      <Minus className="w-4 h-4" />
+                    </button>
+
+                    <span className="px-3 font-mono font-bold text-xs text-slate-900 dark:text-white min-w-[60px] text-center select-none">
+                      {transpose === 0 ? '0 st' : `${transpose > 0 ? `+${transpose}` : transpose} st`}
+                    </span>
+
+                    <button
+                      onClick={incrementTranspose}
+                      className="w-8 h-8 rounded-lg bg-white dark:bg-zinc-800 flex items-center justify-center text-slate-700 dark:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-700 active:scale-95 transition-all shadow-xs cursor-pointer"
+                      title="Transpose +1 Semitone"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         )}
+
 
         {/* SECTION 2: Flow Key Visualizer & Trails (Displayed Second) */}
         {activeSection === 'flow' && (
